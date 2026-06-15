@@ -1,7 +1,10 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -36,6 +39,10 @@ android {
     }
 }
 
+kotlin {
+    jvmToolchain(11)
+}
+
 dependencies {
     implementation(project(":core:camera:impl"))
     implementation(project(":core:datastore:impl"))
@@ -49,6 +56,7 @@ dependencies {
     implementation(project(":domain:expense:impl"))
     implementation(project(":domain:participant:impl"))
     implementation(project(":domain:receipt:impl"))
+    implementation(project(":domain:sharing:api"))
     implementation(project(":domain:sharing:impl"))
     implementation(project(":feature:expense-flow:impl"))
 
@@ -64,6 +72,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

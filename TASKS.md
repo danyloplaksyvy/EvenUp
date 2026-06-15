@@ -161,7 +161,7 @@ Done when:
 
 ## T004 - Add Hilt composition pattern
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
