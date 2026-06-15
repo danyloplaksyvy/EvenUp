@@ -347,7 +347,7 @@ Done when:
 
 ## T013 - Implement deterministic split rounding utility
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -374,7 +374,7 @@ Validation:
 
 ## T014 - Implement receipt and participant validation
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -396,7 +396,7 @@ Done when:
 
 ## T015 - Implement item assignment validation
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -423,7 +423,7 @@ Done when:
 
 ## T016 - Implement fee allocation use cases
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -443,7 +443,7 @@ Done when:
 
 ## T017 - Implement settlement calculation use case
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -470,7 +470,7 @@ Done when:
 
 ## T018 - Implement final expense validation and save orchestration contracts
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 

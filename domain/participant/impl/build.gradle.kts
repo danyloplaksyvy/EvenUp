@@ -4,4 +4,6 @@ plugins {
 
 dependencies {
     implementation(project(":domain:participant:api"))
+
+    testImplementation(libs.junit)
 }

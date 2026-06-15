@@ -4,4 +4,6 @@ plugins {
 
 dependencies {
     implementation(project(":domain:receipt:api"))
+
+    testImplementation(libs.junit)
 }
