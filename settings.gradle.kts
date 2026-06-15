@@ -14,6 +14,9 @@ pluginManagement {
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
+
+includeBuild("build-logic")
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -24,3 +27,33 @@ dependencyResolutionManagement {
 
 rootProject.name = "EvenUp"
 include(":app")
+include(":core:common")
+include(":core:model")
+include(":core:designsystem:api")
+include(":core:designsystem:impl")
+include(":core:navigation:api")
+include(":core:navigation:impl")
+include(":core:network:api")
+include(":core:network:impl")
+include(":core:datastore:api")
+include(":core:datastore:impl")
+include(":core:camera:api")
+include(":core:camera:impl")
+include(":domain:receipt:api")
+include(":domain:receipt:impl")
+include(":domain:expense:api")
+include(":domain:expense:impl")
+include(":domain:participant:api")
+include(":domain:participant:impl")
+include(":domain:sharing:api")
+include(":domain:sharing:impl")
+include(":data:receipt:api")
+include(":data:receipt:impl")
+include(":data:expense:api")
+include(":data:expense:impl")
+include(":data:participant:api")
+include(":data:participant:impl")
+include(":data:sharing:api")
+include(":data:sharing:impl")
+include(":feature:expense-flow:api")
+include(":feature:expense-flow:impl")

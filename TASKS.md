@@ -52,7 +52,7 @@ Manual full flow should work before receipt scan integration.
 
 ## T000 - Add Codex project files
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -89,7 +89,7 @@ Validation:
 
 ## T001 - Create or verify Android project baseline
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -122,7 +122,7 @@ Done when:
 
 ## T002 - Create Gradle module skeleton
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -131,6 +131,7 @@ Create modules listed in `ARCHITECTURE.md`.
 Goal:
 
 Set up real multi-module Clean Architecture with API/implementation separation.
+To exclude boilerplate repeatable code for gradle files, use convention plugin approach.
 
 Do not implement product logic yet.
 
@@ -1162,7 +1163,7 @@ Manual fallback demo works without receipt scan.
 
 Done when:
 
-- New Expense -> Manual Entry -> People -> Assignment -> Fees -> Review -> Save -> Share link works.
+- New Expense → Manual Entry → People → Assignment → Fees → Review → Save → Share link works.
 
 ## T123 - End-to-end receipt scan smoke test
 
