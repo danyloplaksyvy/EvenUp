@@ -3,5 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":core:datastore:api"))
+
     implementation(libs.androidx.datastore.preferences)
 }

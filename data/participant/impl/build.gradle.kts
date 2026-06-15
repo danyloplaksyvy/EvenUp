@@ -4,6 +4,10 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":core:datastore:api"))
+    implementation(project(":data:participant:api"))
+    implementation(project(":domain:participant:api"))
+
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)

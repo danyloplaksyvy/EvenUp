@@ -37,6 +37,21 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:camera:impl"))
+    implementation(project(":core:datastore:impl"))
+    implementation(project(":core:designsystem:impl"))
+    implementation(project(":core:navigation:impl"))
+    implementation(project(":core:network:impl"))
+    implementation(project(":data:expense:impl"))
+    implementation(project(":data:participant:impl"))
+    implementation(project(":data:receipt:impl"))
+    implementation(project(":data:sharing:impl"))
+    implementation(project(":domain:expense:impl"))
+    implementation(project(":domain:participant:impl"))
+    implementation(project(":domain:receipt:impl"))
+    implementation(project(":domain:sharing:impl"))
+    implementation(project(":feature:expense-flow:impl"))
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

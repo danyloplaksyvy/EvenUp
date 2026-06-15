@@ -143,7 +143,7 @@ Done when:
 
 ## T003 - Wire baseline dependency graph
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 

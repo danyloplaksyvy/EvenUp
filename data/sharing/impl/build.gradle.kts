@@ -4,6 +4,10 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":core:network:api"))
+    implementation(project(":data:sharing:api"))
+    implementation(project(":domain:sharing:api"))
+
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
 }
