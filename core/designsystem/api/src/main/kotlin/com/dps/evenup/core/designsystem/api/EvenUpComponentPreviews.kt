@@ -43,3 +43,78 @@ private fun EvenUpInputsAndStatesPreview() {
         }
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+private fun EvenUpReceiptAndSettlementPreview() {
+    EvenUpTheme {
+        Column(
+            modifier = Modifier.padding(EvenUpTheme.spacing.space16),
+            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+        ) {
+            EvenUpReceiptItemsCard(
+                title = "Bella Roma",
+                subtitle = "Tue, May 14",
+                items = listOf(
+                    {
+                        EvenUpReceiptItemRow(
+                            itemName = "Margherita Pizza",
+                            quantityLabel = "1x",
+                            unitPriceLabel = "EUR 14.00 each",
+                            totalLabel = "EUR 14.00",
+                            state = EvenUpReceiptItemState.Assigned,
+                            assignees = listOf(EvenUpReceiptAssignee(name = "You")),
+                        )
+                    },
+                    {
+                        EvenUpReceiptItemRow(
+                            itemName = "Truffle Pasta",
+                            quantityLabel = "2x",
+                            unitPriceLabel = "EUR 22.00 each",
+                            totalLabel = "EUR 44.00",
+                            state = EvenUpReceiptItemState.Shared,
+                            assignees = listOf(
+                                EvenUpReceiptAssignee(name = "Anna", colorIndex = 1, detail = "Anna"),
+                                EvenUpReceiptAssignee(name = "Ben", colorIndex = 2, detail = "Ben"),
+                            ),
+                        )
+                    },
+                    {
+                        EvenUpReceiptItemRow(
+                            itemName = "Tiramisu",
+                            totalLabel = "EUR 9.50",
+                            state = EvenUpReceiptItemState.Unassigned,
+                        )
+                    },
+                ),
+            )
+            EvenUpSummaryCard(
+                title = "Bella Roma",
+                subtitle = "Total",
+                totalLabel = "EUR 112.50",
+                payerLabel = "Paid by",
+                payerName = "You",
+            ) {
+                EvenUpSettlementRow(
+                    participantName = "Anna",
+                    relationLabel = "owes you",
+                    amountLabel = "EUR 31.90",
+                    colorIndex = 1,
+                )
+            }
+            EvenUpExpandableDetailsCard(
+                title = "Calculation details",
+                leadingLabel = "Tax + tip",
+                expanded = true,
+                onExpandedChange = {},
+            ) {
+                EvenUpSettlementRow(
+                    participantName = "Anna",
+                    relationLabel = "total share",
+                    amountLabel = "EUR 31.90",
+                    colorIndex = 1,
+                )
+            }
+        }
+    }
+}

@@ -248,7 +248,7 @@ Done when:
 
 ## T007 - Implement receipt and settlement UI components
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
