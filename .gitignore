@@ -1,15 +1,49 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+# macOS
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+
+# Gradle / Android build output
+.gradle/
+build/
+**/build/
+.externalNativeBuild/
+.cxx/
+captures/
+
+# Local Android configuration
 local.properties
+*.iml
+
+# Signing and other local secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# Android Studio / IntelliJ local state
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/deploymentTargetSelector.xml
+
+# Kotlin / Java tooling
+.kotlin/
+out/
+
+# Cloudflare Worker / Node backend local state
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
