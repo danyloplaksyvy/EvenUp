@@ -23,6 +23,24 @@ Primary demo flow:
 9. Save expense.
 10. Open/share public guest link.
 
+## Read these project references before implementation
+
+Before making implementation decisions, read:
+
+- `MVP_SCOPE.md`
+- `ARCHITECTURE.md`
+- `CALCULATIONS.md`
+- `API_CONTRACT.md`
+- `DESIGN_SYSTEM.md`
+- `TASKS.md`
+- `docs/design/STITCH_REFERENCE.md`
+
+For UI work, also inspect the relevant folder under:
+
+- `docs/design/stitch/`
+
+The Stitch HTML and PNG files are design references only. Do not copy the HTML directly into production Android code. Implement native Jetpack Compose screens using project design system components.
+
 ## Architecture rules
 
 Use multi-module Clean Architecture with API/implementation separation.
@@ -49,6 +67,7 @@ Allowed dependency direction:
 ```text
 :app -> feature impl, domain impl, data impl, core impl
 feature:*:impl -> feature:*:api, domain:*:api, core:*:api
+feature:*:impl -> core:designsystem:api, core:navigation:api
 domain:*:impl -> domain:*:api and data:*:api only when use cases need repository contracts
 data:*:impl -> data:*:api, domain:*:api, core:*:api
 core:*:impl -> core:*:api
@@ -127,12 +146,15 @@ Saved participants are local reusable names only.
 
 ## UI rules
 
+Use `DESIGN_SYSTEM.md` and `docs/design/STITCH_REFERENCE.md` as the design source of truth.
 Use the project design system components.
 Do not hardcode colors inside feature screens.
 Use a white/black premium fintech visual direction.
 Use subtle green only for success states.
 Use bottom sheets for complex item split configuration.
 Keep screens focused on one task.
+
+The generated Stitch export is a reference, not production source. Use it to match layout, hierarchy, spacing, tone, and screen states. Implement the UI in native Compose.
 
 ## Domain rules
 
@@ -170,3 +192,4 @@ Do not collapse modules to speed up implementation.
 Do not add production dependencies without explicit approval.
 Do not replace the architecture with a single-module or package-only structure.
 When a task is complex, create a plan first and wait for approval.
+Do not proceed to the next task unless explicitly asked.

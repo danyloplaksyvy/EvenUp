@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Review Expense</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#160066",
+                        "on-primary-container": "#848484",
+                        "primary": "#000000",
+                        "surface-variant": "#e2e2e2",
+                        "outline-variant": "#cfc4c5",
+                        "on-secondary-fixed-variant": "#474646",
+                        "secondary-fixed": "#e5e2e1",
+                        "secondary": "#5f5e5e",
+                        "surface": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#160066",
+                        "outline": "#7e7576",
+                        "on-secondary-container": "#656464",
+                        "tertiary-fixed": "#e4dfff",
+                        "on-primary-fixed-variant": "#474747",
+                        "surface-bright": "#f9f9f9",
+                        "tertiary": "#000000",
+                        "secondary-container": "#e5e2e1",
+                        "on-primary-fixed": "#1b1b1b",
+                        "primary-fixed-dim": "#c6c6c6",
+                        "on-tertiary-container": "#7f70fb",
+                        "primary-container": "#1b1b1b",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "surface-container-highest": "#e2e2e2",
+                        "background": "#f9f9f9",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e2e2e2",
+                        "on-surface-variant": "#4c4546",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#1a1c1c",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#4029ba",
+                        "surface-container-low": "#f3f3f3",
+                        "surface-tint": "#5e5e5e",
+                        "surface-dim": "#dadada",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "surface-container-high": "#e8e8e8",
+                        "inverse-primary": "#c6c6c6",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eeeeee",
+                        "tertiary-fixed-dim": "#c6bfff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "margin-desktop": "40px",
+                        "gutter": "16px",
+                        "margin-mobile": "20px",
+                        "stack-md": "16px",
+                        "unit": "4px",
+                        "stack-lg": "24px",
+                        "safe-bottom": "env(safe-area-inset-bottom, 20px)"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter", "sans-serif"],
+                        "body-lg": ["Inter", "sans-serif"],
+                        "display-lg": ["Inter", "sans-serif"],
+                        "headline-lg-mobile": ["Inter", "sans-serif"],
+                        "label-sm": ["Inter", "sans-serif"],
+                        "headline-md": ["Inter", "sans-serif"],
+                        "label-lg": ["Inter", "sans-serif"],
+                        "body-md": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "500"}],
+                        "display-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md antialiased min-h-screen flex flex-col relative pb-[100px]">
+<!-- TopAppBar (From JSON logic, suppressing BottomNavBar for transactional view) -->
+<header class="bg-surface dark:bg-surface flex justify-between items-center w-full px-4 h-16 sticky top-0 z-50">
+<button aria-label="Go back" class="w-10 h-10 flex items-center justify-center hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-primary dark:text-on-surface">arrow_back</span>
+</button>
+<h1 class="text-headline-md font-headline-md font-black text-primary dark:text-on-surface tracking-tight">EvenUp</h1>
+<button aria-label="Close" class="w-10 h-10 flex items-center justify-center hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-primary dark:text-on-surface">close</span>
+</button>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 px-margin-mobile flex flex-col gap-stack-lg max-w-2xl mx-auto w-full">
+<!-- Header / Total Area -->
+<section class="flex flex-col items-center justify-center text-center mt-stack-md">
+<span class="text-body-md font-body-md text-secondary">Bella Roma</span>
+<div class="text-display-lg font-display-lg text-primary mt-unit tracking-tighter">€112.50</div>
+<!-- Metadata Chip -->
+<div class="mt-stack-md flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full border border-surface-variant">
+<span class="text-label-sm font-label-sm text-secondary">Paid by</span>
+<div class="w-5 h-5 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center text-[10px] font-bold">Y</div>
+<span class="text-label-sm font-label-sm font-semibold text-primary">You</span>
+</div>
+</section>
+<!-- Settlement Summary -->
+<section class="bg-surface-container-lowest rounded-xl border border-surface-variant shadow-sm overflow-hidden mt-stack-sm">
+<div class="px-4 py-3 border-b border-surface-variant bg-surface-container-low/50">
+<h2 class="text-label-sm font-label-sm text-secondary uppercase tracking-wider">Settlement Summary</h2>
+</div>
+<div class="flex flex-col divide-y divide-surface-variant">
+<!-- Anna -->
+<div class="flex items-center justify-between p-4 bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center text-label-lg font-label-lg font-bold">A</div>
+<span class="text-body-md font-body-md font-semibold text-primary">Anna</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-label-sm font-label-sm text-secondary">owes you</span>
+<span class="text-body-md font-body-md font-bold text-primary">€31.90</span>
+</div>
+</div>
+<!-- Ben -->
+<div class="flex items-center justify-between p-4 bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center text-label-lg font-label-lg font-bold">B</div>
+<span class="text-body-md font-body-md font-semibold text-primary">Ben</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-label-sm font-label-sm text-secondary">owes you</span>
+<span class="text-body-md font-body-md font-bold text-primary">€27.20</span>
+</div>
+</div>
+<!-- Chris -->
+<div class="flex items-center justify-between p-4 bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-fixed-dim text-on-primary-fixed flex items-center justify-center text-label-lg font-label-lg font-bold">C</div>
+<span class="text-body-md font-body-md font-semibold text-primary">Chris</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-label-sm font-label-sm text-secondary">owes you</span>
+<span class="text-body-md font-body-md font-bold text-primary">€24.40</span>
+</div>
+</div>
+<!-- Your Share -->
+<div class="flex items-center justify-between p-4 bg-surface-container-low">
+<span class="text-body-md font-body-md font-semibold text-secondary">Your share</span>
+<span class="text-body-md font-body-md font-bold text-secondary">€29.00</span>
+</div>
+</div>
+</section>
+<!-- Expandable Calculation Details -->
+<section class="border border-surface-variant rounded-xl overflow-hidden bg-surface-container-lowest shadow-sm mb-stack-lg">
+<button class="w-full px-4 py-4 flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset hover:bg-surface-container-low transition-colors" id="calc-toggle">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">calculate</span>
+<span class="text-label-lg font-label-lg font-semibold text-primary">Calculation details</span>
+</div>
+<span class="material-symbols-outlined text-secondary transition-transform duration-300" id="calc-icon">expand_more</span>
+</button>
+<div class="px-4 pb-4 hidden flex-col gap-stack-sm border-t border-surface-variant pt-4 bg-surface-container-lowest" id="calc-content">
+<div class="text-label-sm font-label-sm font-bold text-tertiary-fixed-dim bg-tertiary-fixed text-on-tertiary-fixed inline-block px-2 py-1 rounded w-max mb-2">
+                    Anna's Breakdown
+                </div>
+<div class="flex justify-between items-center text-body-md font-body-md">
+<span class="text-secondary">Items</span>
+<span class="text-primary font-medium">€24.00</span>
+</div>
+<div class="flex justify-between items-center text-body-md font-body-md">
+<span class="text-secondary">Tax</span>
+<span class="text-primary font-medium">€1.73</span>
+</div>
+<div class="flex justify-between items-center text-body-md font-body-md">
+<span class="text-secondary">Tip</span>
+<span class="text-primary font-medium">€6.17</span>
+</div>
+<div class="mt-2 pt-3 border-t border-surface-variant flex justify-between items-center">
+<span class="text-label-lg font-label-lg font-bold text-primary">Total share</span>
+<span class="text-headline-md font-headline-md font-bold text-primary">€31.90</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Action Bar (Contextual FAB replacement for transactional screen) -->
+<div class="fixed bottom-0 left-0 w-full px-margin-mobile py-4 bg-surface/95 backdrop-blur-sm border-t border-surface-variant z-40 pb-[var(--safe-bottom,20px)] flex justify-center">
+<button class="w-full max-w-2xl bg-primary text-on-primary py-4 rounded-xl text-label-lg font-label-lg font-bold hover:bg-inverse-surface transition-colors shadow-sm flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+            Save expense
+        </button>
+</div>
+<script>
+        // Simple accordion logic for calculation details
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleBtn = document.getElementById('calc-toggle');
+            const content = document.getElementById('calc-content');
+            const icon = document.getElementById('calc-icon');
+
+            toggleBtn.addEventListener('click', () => {
+                const isHidden = content.classList.contains('hidden');
+                
+                if (isHidden) {
+                    content.classList.remove('hidden');
+                    content.classList.add('flex');
+                    icon.style.transform = 'rotate(180deg)';
+                } else {
+                    content.classList.add('hidden');
+                    content.classList.remove('flex');
+                    icon.style.transform = 'rotate(0deg)';
+                }
+            });
+        });
+    </script>
+</body></html>

@@ -105,3 +105,17 @@ New Expense
 ### P2
 
 Everything listed as out of scope.
+
+---
+
+## Design reference package
+
+The generated Stitch design is included under:
+
+```text
+docs/design/stitch/
+```
+
+Use `docs/design/STITCH_REFERENCE.md` to map screens to implementation tasks.
+
+The Stitch design is the visual reference for the MVP screens, while this file remains the product scope source of truth. If any generated design includes out-of-scope UI, do not implement that out-of-scope UI.

@@ -1,18 +1,27 @@
 # EvenUp MVP Codex Task Board
 
-## Working rules
+## How to use this file
 
-- Complete tasks in order unless explicitly instructed otherwise.
-- Work on exactly one task at a time.
-- Do not proceed to the next task automatically.
+Codex should execute one task at a time.
+
+Before every task, read:
+
+- `AGENTS.md`
+- this file
+- any task-specific referenced files
+
+Rules:
+
+- Do not start the next task unless explicitly asked.
 - Keep changes small and reviewable.
-- End every task with validation commands and results.
+- Run the validation command listed in the task when possible.
+- If the repository does not yet contain the required command, explain what is missing and add the minimal command only if appropriate.
 - Do not implement out-of-scope features.
-- Do not collapse the architecture.
-- Do not put business logic in ViewModels.
-- Do not use Float or Double for money.
+- Do not collapse the architecture to speed up implementation.
 
-## Status legend
+## Task statuses
+
+Use these statuses manually:
 
 ```text
 TODO
@@ -21,48 +30,72 @@ BLOCKED
 DONE
 ```
 
+## Current implementation strategy
+
+Build the MVP in this order:
+
+1. Persistent Codex/project docs.
+2. Android module skeleton.
+3. Domain and calculation engine.
+4. Backend save/fetch/share.
+5. Android data layer.
+6. Manual full flow.
+7. Scanner integration.
+8. UI polish using Stitch references.
+9. Demo hardening.
+
+Manual full flow should work before receipt scan integration.
+
 ---
 
-# Milestone 0 - Repository instruction setup
+# Milestone 0 - Project instructions and design references
 
-## T000 - Add Codex instruction files
+## T000 - Add Codex project files
 
 Status: TODO
 Priority: P0
 Scope:
 
-- AGENTS.md
-- TASKS.md
-- ARCHITECTURE.md
-- MVP_SCOPE.md
-- CALCULATIONS.md
-- API_CONTRACT.md
-- DESIGN_SYSTEM.md
-- android/AGENTS.md
-- backend/AGENTS.md
+- `AGENTS.md`
+- `TASKS.md`
+- `ARCHITECTURE.md`
+- `MVP_SCOPE.md`
+- `CALCULATIONS.md`
+- `API_CONTRACT.md`
+- `DESIGN_SYSTEM.md`
+- `android/AGENTS.md`
+- `backend/AGENTS.md`
+- `prompts/CODEX_PROMPTS.md`
+- `docs/design/STITCH_REFERENCE.md`
+- `docs/design/stitch/`
+- `docs/design/original_refs/`
 
 Goal:
 
-Add the instruction files and confirm Codex has read them.
+Add all instructions and design references into the repo.
 
 Done when:
 
 - Files exist in the repository.
-- Codex confirms the architecture and task execution rules.
+- Codex confirms the architecture rules, MVP scope, design references, and task execution rules.
+
+Validation:
+
+- No build command required.
 
 ---
 
 # Milestone 1 - Android foundation
 
-## T001 - Create Android project baseline
+## T001 - Create or verify Android project baseline
 
 Status: TODO
 Priority: P0
 Scope:
 
-- settings.gradle.kts
+- `settings.gradle.kts`
 - root build files
-- app module
+- `app` module
 - version catalog if used
 
 Goal:
@@ -93,7 +126,7 @@ Status: TODO
 Priority: P0
 Scope:
 
-Create modules listed in ARCHITECTURE.md.
+Create modules listed in `ARCHITECTURE.md`.
 
 Goal:
 
@@ -113,11 +146,11 @@ Status: TODO
 Priority: P0
 Scope:
 
-- module build.gradle.kts files
+- module `build.gradle.kts` files
 
 Goal:
 
-Apply dependency rules from ARCHITECTURE.md.
+Apply dependency rules from `ARCHITECTURE.md`.
 
 Done when:
 
@@ -131,7 +164,7 @@ Status: TODO
 Priority: P0
 Scope:
 
-- app module
+- `app` module
 - implementation modules that need DI
 
 Goal:
@@ -145,7 +178,104 @@ Done when:
 
 ---
 
-# Milestone 2 - Domain and calculation engine
+# Milestone 2 - Design system foundation
+
+## T005 - Implement design tokens and app theme
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:core:designsystem:api`
+- `:core:designsystem:impl`
+- `DESIGN_SYSTEM.md`
+- `docs/design/STITCH_REFERENCE.md`
+
+Goal:
+
+Implement EvenUp theme tokens for the white/black premium fintech UI.
+
+Requirements:
+
+- Colors exposed through semantic tokens.
+- Typography roles.
+- Shapes and spacing.
+- Compose theme wrapper.
+- No product screens yet.
+
+Done when:
+
+- App can use `EvenUpTheme`.
+- No feature screen hardcodes design tokens.
+- `./gradlew :core:designsystem:impl:compileDebugKotlin` or `./gradlew assembleDebug` passes.
+
+## T006 - Implement base design system components
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:core:designsystem:api`
+- `:core:designsystem:impl`
+
+Goal:
+
+Implement reusable components required by feature screens.
+
+Required components:
+
+- `EvenUpPrimaryButton`
+- `EvenUpSecondaryButton`
+- `EvenUpTextButton`
+- `EvenUpTextField`
+- `EvenUpMoneyField`
+- `EvenUpCard`
+- `EvenUpBottomActionBar`
+- `EvenUpBottomSheet`
+- `EvenUpParticipantAvatar`
+- `EvenUpParticipantChip`
+- `EvenUpValidationMessage`
+- `EvenUpLoadingState`
+- `EvenUpErrorState`
+- `EvenUpSuccessState`
+
+Done when:
+
+- Components compile.
+- Basic previews exist if the project supports previews.
+- `./gradlew :core:designsystem:impl:compileDebugKotlin` or `./gradlew assembleDebug` passes.
+
+## T007 - Implement receipt and settlement UI components
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:core:designsystem:api`
+- `:core:designsystem:impl`
+- `docs/design/stitch/assign_items/`
+- `docs/design/stitch/review_expense/`
+
+Goal:
+
+Add reusable components for receipt rows, assignment states, and settlement summaries.
+
+Required components:
+
+- `EvenUpReceiptItemRow`
+- `EvenUpSettlementRow`
+- `EvenUpSummaryCard`
+- `EvenUpExpandableDetailsCard`
+
+Done when:
+
+- Components compile.
+- Components support the states required by the Stitch references.
+- `./gradlew :core:designsystem:impl:compileDebugKotlin` or `./gradlew assembleDebug` passes.
+
+---
+
+# Milestone 3 - Domain and calculation engine
 
 ## T010 - Define domain value objects
 
@@ -153,9 +283,9 @@ Status: TODO
 Priority: P0
 Scope:
 
-- :domain:expense:api
-- :domain:receipt:api
-- :domain:participant:api
+- `:domain:expense:api`
+- `:domain:receipt:api`
+- `:domain:participant:api`
 
 Goal:
 
@@ -163,10 +293,10 @@ Define common domain value objects.
 
 Required:
 
-- MoneyMinor
-- CurrencyCode
-- Quantity
-- PercentageBasisPoints
+- `MoneyMinor`
+- `CurrencyCode`
+- `Quantity`
+- `PercentageBasisPoints`
 - strongly typed IDs for expense, draft, receipt item, fee, participant
 
 Done when:
@@ -175,18 +305,22 @@ Done when:
 - No Android dependencies.
 - Unit tests cover basic value validation if implemented.
 
+Validation:
+
+- `./gradlew :domain:expense:api:test` if tests exist, otherwise relevant compile command.
+
 ## T011 - Define receipt and participant models
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :domain:receipt:api
-- :domain:participant:api
+- `:domain:receipt:api`
+- `:domain:participant:api`
 
 Goal:
 
-Define Receipt, ReceiptItem, ReceiptFee, FeeType, Participant.
+Define `Receipt`, `ReceiptItem`, `ReceiptFee`, `FeeType`, `Participant`.
 
 Done when:
 
@@ -199,11 +333,11 @@ Status: TODO
 Priority: P0
 Scope:
 
-- :domain:expense:api
+- `:domain:expense:api`
 
 Goal:
 
-Define ItemAssignment, ItemParticipantShare, FeeAllocation, FeeParticipantShare, assignment modes, and allocation modes.
+Define `ItemAssignment`, `ItemParticipantShare`, `FeeAllocation`, `FeeParticipantShare`, assignment modes, and allocation modes.
 
 Done when:
 
@@ -216,91 +350,84 @@ Status: TODO
 Priority: P0
 Scope:
 
-- :domain:expense:impl
+- `:domain:expense:impl`
 
 Goal:
 
-Implement minor-unit splitting and remainder distribution.
+Implement deterministic splitting of integer minor units.
 
 Tests required:
 
-- 1000 / 3 -> 334, 333, 333
-- 1001 / 3 -> 334, 334, 333
-- 1002 / 3 -> 334, 334, 334
-- Stable ordering is respected.
+- `1000 / 3 -> 334, 333, 333`
+- `1001 / 3 -> 334, 334, 333`
+- stable participant order is respected
 
 Done when:
 
-- `./gradlew :domain:expense:impl:test` passes.
+- Unit tests pass.
+- No Float or Double is used.
 
-## T014 - Implement receipt validation
+Validation:
+
+- `./gradlew :domain:expense:impl:test`
+
+## T014 - Implement receipt and participant validation
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :domain:receipt:api
-- :domain:receipt:impl
+- `:domain:receipt:api`
+- `:domain:receipt:impl`
+- `:domain:participant:api`
+- `:domain:participant:impl`
 
 Goal:
 
-Validate receipt completeness and consistency.
+Add use cases and results for validating receipts and participant setup.
 
 Done when:
 
-- Invalid receipt produces specific validation errors.
-- Total mismatch can be represented as warning.
-- Tests pass.
-
-## T015 - Implement participant validation
-
-Status: TODO
-Priority: P0
-Scope:
-
-- :domain:participant:api
-- :domain:participant:impl
-
-Goal:
-
-Validate participant setup and payer selection.
-
-Done when:
-
+- Invalid receipt fields return specific errors.
 - At least two participants required.
-- Payer must exist in participant list.
-- Empty names fail validation.
+- Payer must exist in participants.
 - Tests pass.
 
-## T016 - Implement item assignment validation
+## T015 - Implement item assignment validation
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :domain:expense:api
-- :domain:expense:impl
+- `:domain:expense:api`
+- `:domain:expense:impl`
 
 Goal:
 
 Validate item assignments.
 
+Rules:
+
+- Every item assigned.
+- Amount shares sum to item total.
+- Unit shares sum to item quantity.
+- Percentage shares sum to 10000 basis points.
+- No negative values.
+- No unknown participants.
+
 Done when:
 
-- Unassigned item fails validation.
-- Custom amount split must equal item total.
-- Percentage split must equal 10000 basis points.
-- Quantity split must assign all units.
-- Tests pass.
+- Unit tests cover valid and invalid assignment cases.
+- `./gradlew :domain:expense:impl:test` passes.
 
-## T017 - Implement fee allocation logic
+## T016 - Implement fee allocation use cases
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :domain:expense:api
-- :domain:expense:impl
+- `:domain:expense:api`
+- `:domain:expense:impl`
 
 Goal:
 
@@ -308,23 +435,30 @@ Implement equal, proportional, and custom fee allocation.
 
 Done when:
 
-- Equal fee allocation works.
-- Proportional fee allocation works from item subtotals.
-- Custom fee allocation validates exact total.
+- Equal allocation distributes remainder cents deterministically.
+- Proportional allocation uses item subtotal by participant.
+- Custom allocation validates exact totals.
 - Tests pass.
 
-## T018 - Implement settlement calculation
+## T017 - Implement settlement calculation use case
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :domain:expense:api
-- :domain:expense:impl
+- `:domain:expense:api`
+- `:domain:expense:impl`
 
 Goal:
 
-Calculate participant summaries and settlement rows.
+Calculate participant summaries and one-payer settlement rows.
+
+Rules:
+
+```text
+person_share = assigned_item_total + allocated_tax + allocated_tip + other_allocated_fees
+net_balance = amount_paid_by_person - person_share
+```
 
 Done when:
 
@@ -333,51 +467,50 @@ Done when:
 - Settlement rows are correct for one-payer MVP.
 - Tests pass.
 
-## T019 - Implement final expense validation
+## T018 - Implement final expense validation and save orchestration contracts
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :domain:expense:api
-- :domain:expense:impl
+- `:domain:expense:api`
+- `:domain:expense:impl`
+- `:domain:sharing:api`
 
 Goal:
 
-Validate draft before save.
+Define and implement final validation before save.
 
 Done when:
 
-- Receipt valid.
-- Participants valid.
-- Payer valid.
-- All items assigned.
-- All fees allocated.
-- Summary can be calculated.
+- Invalid draft cannot become finalized expense.
+- Valid draft can produce finalized expense payload.
 - Tests pass.
 
 ---
 
-# Milestone 3 - Backend Worker and D1
+# Milestone 4 - Backend Worker and D1
 
-## T030 - Create Cloudflare Worker baseline
+## T050 - Create Cloudflare Worker baseline
 
 Status: TODO
 Priority: P0
 Scope:
 
-- backend project
+- `backend/`
+- `backend/AGENTS.md`
+- `API_CONTRACT.md`
 
 Goal:
 
-Create Worker project with health endpoint.
+Create or verify Worker project with health route and environment bindings.
 
 Done when:
 
 - `GET /health` returns `{ "ok": true }`.
 - Worker runs locally.
 
-## T031 - Add D1 migration
+## T051 - Add D1 migration
 
 Status: TODO
 Priority: P0
@@ -387,233 +520,259 @@ Scope:
 
 Goal:
 
-Create expenses table.
+Create MVP `expenses` table.
+
+Schema is defined in `API_CONTRACT.md` and `backend/AGENTS.md`.
 
 Done when:
 
 - Migration runs.
-- Worker can access D1 binding.
+- D1 binding is configured.
 
-## T032 - Implement POST /v1/expenses
-
-Status: TODO
-Priority: P0
-Scope:
-
-- backend routes
-
-Goal:
-
-Save finalized expense payload and generate share link.
-
-Done when:
-
-- Expense stored in D1.
-- Response returns expenseId, shareId, shareUrl.
-- Duplicate share ID generation retries.
-
-## T033 - Implement GET /v1/expenses/:shareId
+## T052 - Implement save finalized expense endpoint
 
 Status: TODO
 Priority: P0
 Scope:
 
-- backend routes
+- backend only
+- `API_CONTRACT.md`
 
-Goal:
+Endpoint:
 
-Fetch finalized expense by public share ID.
+```http
+POST /v1/expenses
+```
 
 Done when:
 
-- Existing expense returns payload.
-- Missing expense returns 404.
+- Valid payload is stored in D1.
+- Server generates expense ID and unique share ID.
+- Response includes `expenseId`, `shareId`, and `shareUrl`.
 
-## T034 - Implement GET /e/:shareId guest page
+## T053 - Implement fetch public expense endpoint
 
 Status: TODO
 Priority: P0
 Scope:
 
-- backend guest HTML rendering
+- backend only
 
-Goal:
+Endpoint:
 
-Render public read-only guest expense page.
+```http
+GET /v1/expenses/:shareId
+```
 
 Done when:
 
-- Mobile-friendly HTML page renders.
-- Shows total, payer, settlement, participants, item breakdown, fee breakdown.
-- No login required.
+- Existing share ID returns saved payload.
+- Missing share ID returns safe 404.
+- No auth required.
 
-## T035 - Implement POST /v1/receipts/parse
+## T054 - Implement receipt parse endpoint
 
 Status: TODO
 Priority: P0
 Scope:
 
-- backend parse route
-- OpenAI integration
+- backend only
 
-Goal:
+Endpoint:
 
-Parse receipt image through OpenAI and return structured receipt JSON.
+```http
+POST /v1/receipts/parse
+```
+
+Requirements:
+
+- Accept base64 image payload.
+- Call OpenAI from Worker only.
+- Return strict receipt JSON matching `API_CONTRACT.md`.
+- Return safe errors.
+- Do not log image payloads.
 
 Done when:
 
-- OpenAI API key is read from Worker secret.
-- Android-compatible JSON response returned.
-- Invalid parse returns safe error.
-- Image payloads are not logged.
+- A real receipt image can be parsed.
+- Invalid parse returns retry/manual fallback-friendly error.
+
+## T061 - Implement guest web page
+
+Status: TODO
+Priority: P0
+Scope:
+
+- backend only
+- `docs/design/stitch/guest_view_web/`
+- `docs/design/STITCH_REFERENCE.md`
+
+Endpoint:
+
+```http
+GET /e/:shareId
+```
+
+Goal:
+
+Render public read-only expense page.
+
+Done when:
+
+- Mobile web page follows guest view reference.
+- Shows settlement summary and breakdown.
+- No login, editing, or payment UI.
+
+## T062 - Implement guest web error states
+
+Status: TODO
+Priority: P1
+Scope:
+
+- backend only
+- `docs/design/stitch/validation_states/`
+
+Goal:
+
+Render safe guest web error pages.
+
+Done when:
+
+- Invalid/missing link does not expose stack traces.
+- Page remains visually consistent.
 
 ---
 
-# Milestone 4 - Android data layer
+# Milestone 5 - Android data layer
 
-## T040 - Implement core network module
-
-Status: TODO
-Priority: P0
-Scope:
-
-- :core:network:api
-- :core:network:impl
-
-Goal:
-
-Create network client abstraction and implementation.
-
-Done when:
-
-- Base URL configurable.
-- JSON configured.
-- Errors mapped.
-- Compile passes.
-
-## T041 - Implement receipt repository and DTO mapper
+## T060 - Implement network core
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :data:receipt:api
-- :data:receipt:impl
+- `:core:network:api`
+- `:core:network:impl`
 
 Goal:
 
-Map `/v1/receipts/parse` response into domain Receipt.
+Provide Worker API client foundation.
 
 Done when:
 
-- ReceiptRepository.parseReceipt works through network client.
-- DTOs do not leak to domain.
+- Base URL is configurable.
+- JSON serialization works.
+- Network errors are mapped safely.
 
-## T042 - Implement expense save repository
+## T061A - Implement receipt repository and DTO mapper
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :data:expense:api
-- :data:expense:impl
+- `:data:receipt:api`
+- `:data:receipt:impl`
+- `:domain:receipt:api`
 
 Goal:
 
-Save FinalizedExpense to Worker and return ShareLink.
+Map `/v1/receipts/parse` response into domain `Receipt`.
 
 Done when:
 
-- POST /v1/expenses integration compiles.
-- Errors are mapped.
+- Backend JSON maps to domain.
+- Unknown fee type maps safely to `OTHER`.
+- Invalid values produce controlled errors.
 
-## T043 - Implement draft persistence
+## T062A - Implement expense save repository
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :data:expense:api
-- :data:expense:impl
-- :core:datastore:api
-- :core:datastore:impl
+- `:data:expense:api`
+- `:data:expense:impl`
+- `:data:sharing:api`
+- `:data:sharing:impl`
 
 Goal:
 
-Persist ExpenseDraft locally with DataStore JSON.
+Save finalized expenses through Worker.
 
 Done when:
 
-- observeDraft, saveDraft, clearDraft work.
-- Draft survives navigation and basic recreation.
+- App can call `POST /v1/expenses`.
+- Share link response maps to domain.
 
-## T044 - Implement saved participants persistence
+## T063 - Implement local draft persistence
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :data:participant:api
-- :data:participant:impl
+- `:core:datastore:*`
+- `:data:expense:*`
 
 Goal:
 
-Persist saved participant names locally.
+Persist expense draft as serialized JSON for MVP.
 
 Done when:
 
-- Save name.
-- Observe saved names.
-- Delete saved name.
-- Avoid duplicates.
+- Draft survives navigation and reasonable process recreation.
+- Draft clears only after successful save or explicit reset.
+
+## T064 - Implement saved participant persistence
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:data:participant:*`
+- `:domain:participant:*`
+
+Goal:
+
+Persist reusable participant names locally.
+
+Done when:
+
+- Added names appear in future expense.
+- Names can be deleted.
+- Duplicates are avoided.
 
 ---
 
-# Milestone 5 - Manual product flow first
+# Milestone 6 - Manual app flow first
 
-## T050 - Implement design system tokens and base components
+## T070 - Implement New Expense screen
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :core:designsystem:api
-- :core:designsystem:impl
+- `:feature:expense-flow:api`
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/new_expense/`
 
 Goal:
 
-Implement theme, tokens, buttons, fields, cards, bottom action bar, loading/error/success states.
+Implement app entry screen.
 
 Done when:
 
-- Feature screens can use design system components.
-- No hardcoded feature colors needed.
+- Screen matches Stitch reference.
+- `Scan receipt` and `Enter manually` actions route correctly.
+- No history/groups/AI text UI is added.
 
-## T051 - Implement New Expense screen
+## T072 - Implement Manual Receipt Entry screen
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:api
-- :feature:expense-flow:impl
-
-Goal:
-
-Show Scan receipt and Enter manually entry points.
-
-Done when:
-
-- Primary CTA goes to scan placeholder or screen.
-- Secondary CTA goes to manual entry.
-
-## T052 - Implement Manual Receipt Entry screen
-
-Status: TODO
-Priority: P0
-Scope:
-
-- :feature:expense-flow:impl
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/manual_entry/`
 
 Goal:
 
@@ -621,269 +780,454 @@ Allow complete manual receipt creation.
 
 Done when:
 
-- User can add/edit/delete items.
-- User can enter tax/tip/total/currency.
-- Valid receipt can continue.
+- User can enter merchant, date, currency, items, tax, tip, and total.
+- Valid receipt saves into draft.
+- Continue routes to Choose People.
 
-## T053 - Implement Receipt Review screen
-
-Status: TODO
-Priority: P0
-Scope:
-
-- :feature:expense-flow:impl
-
-Goal:
-
-Review and edit parsed or manually entered receipt.
-
-Done when:
-
-- Same model used for scanner and manual flow.
-- Invalid fields show errors.
-
-## T054 - Implement Choose People screen
+## T073 - Implement Receipt Review screen
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:impl
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/receipt_review/`
 
 Goal:
 
-Add participants, reuse saved names, delete saved names, choose payer.
+Allow parsed receipt correction and editing.
 
 Done when:
 
-- At least two participants required.
-- Payer required.
-- Saved names work.
+- User can edit receipt data.
+- User can add/delete/edit items and fees.
+- Validation errors are inline.
 
-## T055 - Implement Assign Receipt screen with simple full assignment
+## T080 - Implement Choose People screen
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:impl
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/choose_people/`
 
 Goal:
 
-Tap participant then tap item to assign full item.
+Add participants and choose payer.
 
 Done when:
 
-- Full item assignment works for quantity 1 items.
-- Continue blocked until all items assigned.
+- User can add participants by name.
+- Color avatars appear.
+- Payer can be selected from participants.
+- Continue blocked until valid.
 
-## T056 - Implement quantity assignment
+## T081 - Implement saved participant names UI
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:impl
+- `:feature:expense-flow:impl`
+- `:data:participant:*` only if needed
+- `docs/design/stitch/choose_people/`
 
 Goal:
 
-Support item quantity assignment by units.
+Show saved participant suggestions and deletion.
 
 Done when:
 
-- A quantity 3 item can be assigned as 2 units to one person and 1 to another.
-- Remaining quantity displayed.
+- Saved names appear as suggestions.
+- Tapping suggestion adds participant to current expense.
+- Delete removes saved name.
 
-## T057 - Implement Item Detail Bottom Sheet
+## T090 - Implement Assign Items screen skeleton
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:impl
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/assign_items/`
 
 Goal:
 
-Support by-units, shared equal, custom amount, and percentage modes.
+Implement participant selector, receipt item list, and assignment progress.
 
 Done when:
 
-- Valid split can be saved.
-- Invalid split shows error.
+- User can select participant.
+- Receipt items are visible with assignment states.
+- Continue is disabled until all assigned.
 
-## T058 - Implement Fees Allocation screen
+## T091 - Implement full item assignment UI
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:impl
+- `:feature:expense-flow:impl`
+- domain use cases only through existing contracts
 
 Goal:
 
-Allocate tax/tip/fees equally, proportionally, or custom.
+Support simple full item assignment by tapping selected person then item.
 
 Done when:
 
-- Equal default works.
-- Proportional preview works.
-- Custom exact-match validation works.
+- Quantity 1 item can be assigned fully to selected participant.
+- Assignment progress updates.
 
-## T059 - Implement Review Expense screen
+## T092 - Implement quantity assignment UI
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:impl
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/assign_items/`
 
 Goal:
 
-Show final settlement summary and expandable calculation details.
+Support unit-based assignment for quantity > 1 items.
 
 Done when:
 
-- Settlement rows display correctly.
-- Details explain item and fee totals.
-- Save disabled if invalid.
+- User can assign multiple units to one person.
+- User can assign units to multiple people.
+- Remaining quantity is visible.
 
-## T060 - Implement Save / Share screen
+## T093 - Implement Item Split bottom sheet
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:impl
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/item_split/`
 
 Goal:
 
-Save finalized expense and show share URL.
+Implement advanced item split editing bottom sheet.
 
 Done when:
 
-- Expense saved through use case.
-- Draft cleared only after successful save.
-- Share URL shown.
-- Native share sheet opens.
+- Units mode works.
+- Shared/custom/percentage modes have UI structure.
+- Invalid input shows validation.
+
+## T094 - Implement shared/custom/percentage split UI
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/item_split/`
+
+Goal:
+
+Complete advanced item split modes.
+
+Done when:
+
+- Shared equal split works.
+- Custom amount split validates exact amount.
+- Percentage split validates 10000 basis points.
+
+## T100 - Implement Fees Allocation screen
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/fees_allocation/`
+
+Goal:
+
+Allocate tax/tip/fees.
+
+Done when:
+
+- Equal allocation is default.
+- Proportional and custom modes work.
+- Continue blocked when fee allocation invalid.
+
+## T101 - Implement Review Expense screen
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/review_expense/`
+
+Goal:
+
+Show final settlement summary before saving.
+
+Done when:
+
+- User sees who owes whom.
+- Save is blocked if validation fails.
+- Screen matches Stitch reference.
+
+## T102 - Implement calculation details UI
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/review_expense/`
+
+Goal:
+
+Add expandable transparent calculation details.
+
+Done when:
+
+- Shows item subtotal, fees, total share, amount paid, net balance per participant.
+
+## T103 - Implement Saved and Share screen
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/expense_saved/`
+
+Goal:
+
+Confirm save and show share link.
+
+Done when:
+
+- Success state appears after save.
+- Share URL is shown.
+- Add another expense clears draft and restarts flow.
+
+## T104 - Implement Android share sheet
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:feature:expense-flow:impl`
+
+Goal:
+
+Share generated URL through native Android share sheet.
+
+Done when:
+
+- User can share generated link.
 
 ---
 
-# Milestone 6 - Scanner integration
+# Milestone 7 - Receipt scanner integration
 
-## T070 - Implement camera abstraction
-
-Status: TODO
-Priority: P0
-Scope:
-
-- :core:camera:api
-- :core:camera:impl
-
-Goal:
-
-Provide camera capture result to feature layer.
-
-Done when:
-
-- Camera capture returns image data/URI usable by parse flow.
-
-## T071 - Implement gallery import
+## T110 - Add CameraX capture
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :core:camera:api
-- :core:camera:impl
+- `:core:camera:api`
+- `:core:camera:impl`
 
 Goal:
 
-Import receipt image from gallery/photo picker.
+Provide camera capture abstraction.
 
 Done when:
 
-- Gallery selected image can be passed to parse flow.
+- Feature can request a receipt image through camera API.
 
-## T072 - Implement Receipt Scan screen
+## T111 - Add Android Photo Picker gallery import
 
 Status: TODO
 Priority: P0
 Scope:
 
-- :feature:expense-flow:impl
+- `:core:camera:api`
+- `:core:camera:impl`
 
 Goal:
 
-Scan/import receipt and parse through ParseReceiptUseCase.
+Provide gallery import abstraction.
 
 Done when:
 
-- Camera path works.
-- Gallery path works.
-- Loading shown.
-- Errors allow retry/manual fallback.
+- Feature can request a receipt image from gallery.
+
+## T071 - Implement Receipt Scan screen
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:feature:expense-flow:impl`
+- `docs/design/stitch/receipt_scan/`
+
+Goal:
+
+Connect scan/gallery image selection to receipt parsing.
+
+Done when:
+
+- User can capture or select image.
+- Loading state is shown.
+- Success routes to Receipt Review.
+- Error offers retry and manual fallback.
+
+## T112 - Integrate OpenAI receipt parsing through Worker
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:data:receipt:*`
+- `:domain:receipt:*`
+- `:feature:expense-flow:impl`
+- backend endpoint if needed
+
+Goal:
+
+Connect real parser to scan flow.
+
+Done when:
+
+- Prepared real receipt image parses successfully.
+- Parsed result is editable in Receipt Review.
+- API key is not in Android.
 
 ---
 
-# Milestone 7 - Demo hardening
+# Milestone 8 - Demo hardening
 
-## T080 - Domain regression test pass
-
-Status: TODO
-Priority: P0
-Goal:
-
-Run and fix domain tests.
-
-Done when:
-
-- All domain tests pass.
-
-## T081 - Manual full-flow smoke test
+## T120 - Implement validation and error states
 
 Status: TODO
 Priority: P0
+Scope:
+
+- UI screens
+- `docs/design/stitch/validation_states/`
+
 Goal:
 
-Complete full app flow without receipt scanning.
+Add polished validation/error/loading states across the MVP.
 
 Done when:
 
-- Manual entry to guest link works.
+- Receipt parse error works.
+- Save retry works.
+- Unassigned item warning works.
+- Invalid custom split warning works.
+- No internet error works where practical.
 
-## T082 - Real receipt scan smoke test
+## T121 - Domain regression test suite
 
 Status: TODO
 Priority: P0
+Scope:
+
+- `:domain:*:impl`
+
 Goal:
 
-Complete full flow with prepared real receipt image.
+Lock down calculation behavior before pitch.
 
 Done when:
 
-- Receipt parse succeeds or fallback path works.
+- All P0 calculation tests pass.
 
-## T083 - Guest link smoke test
+## T122 - End-to-end manual flow smoke test
 
 Status: TODO
 Priority: P0
+Scope:
+
+- Android app
+- backend save/fetch/share
+
 Goal:
 
-Open generated share link in browser.
+Manual fallback demo works without receipt scan.
 
 Done when:
 
-- Guest page renders and balances match Android.
+- New Expense -> Manual Entry -> People -> Assignment -> Fees -> Review -> Save -> Share link works.
 
-## T084 - UI polish pass
+## T123 - End-to-end receipt scan smoke test
 
 Status: TODO
-Priority: P1
+Priority: P0
+Scope:
+
+- Android app
+- backend parse/save/fetch/share
+
 Goal:
 
-Make the main pitch flow visually coherent and premium.
+Real receipt scan demo works.
 
 Done when:
 
-- Screens use design system components.
-- No obvious placeholder styling in main flow.
+- Prepared receipt image parses.
+- Full flow completes.
+- Guest link opens.
+
+## T124 - Final UI polish pass
+
+Status: TODO
+Priority: P0
+Scope:
+
+- `:feature:expense-flow:impl`
+- `:core:designsystem:*`
+- all Stitch folders
+
+Goal:
+
+Align implemented screens with Stitch references.
+
+Done when:
+
+- Screens are visually cohesive.
+- CTAs, cards, avatars, rows, and bottom sheets match the intended premium style.
+- No out-of-scope UI appears.
+
+---
+
+# Review task
+
+## T900 - Architecture and scope review
+
+Status: TODO
+Priority: P0
+Scope:
+
+- whole diff
+
+Goal:
+
+Review compliance before merging or moving to the next milestone.
+
+Checklist:
+
+- No feature impl depends on data impl.
+- No domain module imports Android, Compose, DTOs, or database entities.
+- No money logic uses Float or Double.
+- No out-of-scope features were added.
+- UI follows design system and Stitch references.
+- Relevant tests/compile commands were run.
+
+Done when:
+
+- Review findings are resolved or explicitly accepted.

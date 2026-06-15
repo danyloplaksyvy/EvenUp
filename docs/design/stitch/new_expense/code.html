@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvenUp - New Expense</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-container": "#160066",
+                    "on-primary-container": "#848484",
+                    "primary": "#000000",
+                    "surface-variant": "#e2e2e2",
+                    "outline-variant": "#cfc4c5",
+                    "on-secondary-fixed-variant": "#474646",
+                    "secondary-fixed": "#e5e2e1",
+                    "secondary": "#5f5e5e",
+                    "surface": "#f9f9f9",
+                    "inverse-on-surface": "#f1f1f1",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed": "#160066",
+                    "outline": "#7e7576",
+                    "on-secondary-container": "#656464",
+                    "tertiary-fixed": "#e4dfff",
+                    "on-primary-fixed-variant": "#474747",
+                    "surface-bright": "#f9f9f9",
+                    "tertiary": "#000000",
+                    "secondary-container": "#e5e2e1",
+                    "on-primary-fixed": "#1b1b1b",
+                    "primary-fixed-dim": "#c6c6c6",
+                    "on-tertiary-container": "#7f70fb",
+                    "primary-container": "#1b1b1b",
+                    "on-primary": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "inverse-surface": "#2f3131",
+                    "surface-container-highest": "#e2e2e2",
+                    "background": "#ffffff",
+                    "on-error": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "primary-fixed": "#e2e2e2",
+                    "on-surface-variant": "#4c4546",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#1a1c1c",
+                    "on-secondary": "#ffffff",
+                    "on-background": "#1a1c1c",
+                    "on-tertiary-fixed-variant": "#4029ba",
+                    "surface-container-low": "#f3f3f3",
+                    "surface-tint": "#5e5e5e",
+                    "surface-dim": "#dadada",
+                    "secondary-fixed-dim": "#c8c6c5",
+                    "on-secondary-fixed": "#1c1b1b",
+                    "surface-container-high": "#e8e8e8",
+                    "inverse-primary": "#c6c6c6",
+                    "error": "#ba1a1a",
+                    "surface-container": "#eeeeee",
+                    "tertiary-fixed-dim": "#c6bfff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px",
+                    "2xl": "1rem",
+                    "3xl": "1.5rem"
+            },
+            "spacing": {
+                    "stack-sm": "8px",
+                    "margin-desktop": "40px",
+                    "gutter": "16px",
+                    "margin-mobile": "20px",
+                    "stack-md": "16px",
+                    "unit": "4px",
+                    "stack-lg": "24px",
+                    "safe": "env(safe-area-inset-bottom)"
+            },
+            "fontFamily": {
+                    "headline-lg": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "display-lg": [
+                            "Inter"
+                    ],
+                    "headline-lg-mobile": [
+                            "Inter"
+                    ],
+                    "label-sm": [
+                            "Inter"
+                    ],
+                    "headline-md": [
+                            "Inter"
+                    ],
+                    "label-lg": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "display-lg": [
+                            "40px",
+                            {
+                                    "lineHeight": "48px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "36px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-lg": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Subtle pulse for AI input */
+        @keyframes subtle-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.05); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+        }
+        .ai-pulse:focus-within {
+            animation: subtle-pulse 2s infinite;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container-lowest text-on-surface font-body-md antialiased min-h-screen flex flex-col items-center justify-center">
+<!-- Mobile Device Container for Preview -->
+<div class="relative w-full max-w-[400px] h-[884px] md:h-[850px] md:max-h-[795px] bg-background md:rounded-[40px] md:shadow-2xl overflow-hidden flex flex-col md:border-[8px] border-surface-container-high">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-4 h-16 bg-surface-container-lowest flat no shadows relative z-10 shrink-0">
+<button aria-label="Close" class="w-10 h-10 flex items-center justify-center rounded-full text-primary hover:opacity-80 transition-transform active:scale-95">
+<span class="material-symbols-outlined text-[24px]">close</span>
+</button>
+<div class="absolute left-1/2 -translate-x-1/2">
+<h1 class="text-headline-md font-headline-md font-black text-primary">EvenUp</h1>
+</div>
+<div class="w-10"></div> <!-- Placeholder for balance -->
+</header>
+<!-- Main Scrollable Content -->
+<main class="flex-1 overflow-y-auto px-margin-mobile pb-24 pt-4 flex flex-col gap-stack-lg">
+<!-- Hero Section -->
+<div class="flex flex-col gap-stack-sm mb-4">
+<h2 class="text-headline-lg-mobile font-headline-lg-mobile text-primary tracking-tight">Add expense</h2>
+<p class="text-body-md font-body-md text-secondary">Split shared expenses without the awkward math.</p>
+</div>
+<!-- AI Fast Input -->
+<div class="ai-pulse bg-surface-container-lowest border border-outline-variant rounded-2xl p-4 flex flex-col gap-3 transition-shadow duration-300">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-1" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<div class="flex-1">
+<textarea class="w-full bg-transparent border-none p-0 text-body-lg font-body-lg text-primary placeholder-on-surface-variant focus:ring-0 resize-none h-14" placeholder="Dinner $120 with Alex and Maya, I paid"></textarea>
+</div>
+<button aria-label="Voice Input" class="text-secondary hover:text-primary transition-colors h-10 w-10 flex items-center justify-center rounded-full bg-surface-container-low shrink-0">
+<span class="material-symbols-outlined">mic</span>
+</button>
+</div>
+</div>
+<!-- Suggestions -->
+<div class="flex flex-col gap-stack-sm">
+<span class="text-label-sm font-label-sm text-secondary px-1">Try saying something like...</span>
+<div class="flex flex-wrap gap-2">
+<button class="px-4 py-2 bg-surface-container-low hover:bg-surface-container-high text-on-surface text-label-lg font-label-lg rounded-full transition-colors border border-transparent">Dinner</button>
+<button class="px-4 py-2 bg-surface-container-low hover:bg-surface-container-high text-on-surface text-label-lg font-label-lg rounded-full transition-colors border border-transparent">Trip</button>
+<button class="px-4 py-2 bg-surface-container-low hover:bg-surface-container-high text-on-surface text-label-lg font-label-lg rounded-full transition-colors border border-transparent">Rent</button>
+<button class="px-4 py-2 bg-surface-container-low hover:bg-surface-container-high text-on-surface text-label-lg font-label-lg rounded-full transition-colors border border-transparent">Taxi</button>
+</div>
+</div>
+<div class="h-px w-full bg-surface-container-high my-2"></div>
+<!-- Alternative Input Methods -->
+<div class="flex flex-col gap-stack-md">
+<button class="group w-full bg-surface-container-lowest border border-outline-variant hover:border-primary rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98] text-left">
+<div class="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">receipt_long</span>
+</div>
+<div class="flex-1">
+<h3 class="text-label-lg font-label-lg text-primary">Scan receipt</h3>
+<p class="text-label-sm font-label-sm text-secondary mt-1">Snap a photo to auto-fill details</p>
+</div>
+<span class="material-symbols-outlined text-secondary group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<button class="group w-full bg-surface-container-lowest border border-outline-variant hover:border-primary rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98] text-left">
+<div class="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">edit</span>
+</div>
+<div class="flex-1">
+<h3 class="text-label-lg font-label-lg text-primary">Enter manually</h3>
+<p class="text-label-sm font-label-sm text-secondary mt-1">Fill in the details yourself</p>
+</div>
+<span class="material-symbols-outlined text-secondary group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+</div>
+<!-- Trust / Footer Area -->
+<div class="mt-auto pt-8 pb-4 flex items-center justify-center gap-2 text-secondary opacity-80">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+<p class="text-label-sm font-label-sm">Transparent item-level splitting.</p>
+</div>
+</main>
+<!-- No Bottom Nav - Transactional Screen -->
+</div>
+</body></html>

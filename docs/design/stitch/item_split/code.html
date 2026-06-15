@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvenUp - Item Split</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .no-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+            .no-scrollbar {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-container": "#160066",
+                      "on-primary-container": "#848484",
+                      "primary": "#000000",
+                      "surface-variant": "#e2e2e2",
+                      "outline-variant": "#cfc4c5",
+                      "on-secondary-fixed-variant": "#474646",
+                      "secondary-fixed": "#e5e2e1",
+                      "secondary": "#5f5e5e",
+                      "surface": "#f9f9f9",
+                      "inverse-on-surface": "#f1f1f1",
+                      "error-container": "#ffdad6",
+                      "on-tertiary-fixed": "#160066",
+                      "outline": "#7e7576",
+                      "on-secondary-container": "#656464",
+                      "tertiary-fixed": "#e4dfff",
+                      "on-primary-fixed-variant": "#474747",
+                      "surface-bright": "#f9f9f9",
+                      "tertiary": "#000000",
+                      "secondary-container": "#e5e2e1",
+                      "on-primary-fixed": "#1b1b1b",
+                      "primary-fixed-dim": "#c6c6c6",
+                      "on-tertiary-container": "#7f70fb",
+                      "primary-container": "#1b1b1b",
+                      "on-primary": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "inverse-surface": "#2f3131",
+                      "surface-container-highest": "#e2e2e2",
+                      "background": "#f9f9f9",
+                      "on-error": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "primary-fixed": "#e2e2e2",
+                      "on-surface-variant": "#4c4546",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface": "#1a1c1c",
+                      "on-secondary": "#ffffff",
+                      "on-background": "#1a1c1c",
+                      "on-tertiary-fixed-variant": "#4029ba",
+                      "surface-container-low": "#f3f3f3",
+                      "surface-tint": "#5e5e5e",
+                      "surface-dim": "#dadada",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "on-secondary-fixed": "#1c1b1b",
+                      "surface-container-high": "#e8e8e8",
+                      "inverse-primary": "#c6c6c6",
+                      "error": "#ba1a1a",
+                      "surface-container": "#eeeeee",
+                      "tertiary-fixed-dim": "#c6bfff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-sm": "8px",
+                      "margin-desktop": "40px",
+                      "gutter": "16px",
+                      "margin-mobile": "20px",
+                      "stack-md": "16px",
+                      "unit": "4px",
+                      "stack-lg": "24px"
+              },
+              "fontFamily": {
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "label-sm": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "label-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "40px",
+                              {
+                                      "lineHeight": "48px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-lg": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased font-body-md h-screen overflow-hidden flex flex-col items-center justify-center relative">
+<!-- Background Context (Blurred out Screen 6) -->
+<div class="absolute inset-0 w-full h-full bg-surface-container-lowest opacity-40 blur-md pointer-events-none flex flex-col max-w-md mx-auto shadow-2xl">
+<div class="flex justify-between items-center w-full px-4 h-16 bg-surface">
+<div class="flex items-center">
+<span class="material-symbols-outlined text-primary mr-2" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+<span class="text-headline-md font-headline-md font-bold text-primary">Assign receipt</span>
+</div>
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 0;">info</span>
+</div>
+<!-- Mock Content for Background -->
+<div class="px-margin-mobile flex-1 pt-4">
+<div class="w-full h-32 bg-surface-container-high rounded-xl mb-4"></div>
+<div class="w-full h-16 bg-surface-container rounded-xl mb-4"></div>
+<div class="w-full h-16 bg-surface-container rounded-xl mb-4"></div>
+<div class="w-full h-16 bg-surface-container rounded-xl mb-4"></div>
+</div>
+</div>
+<!-- Scrim Overlay -->
+<div class="absolute inset-0 bg-primary/40 z-40 transition-opacity"></div>
+<!-- Bottom Sheet -->
+<div class="absolute bottom-0 w-full max-w-md bg-surface-container-lowest rounded-t-[32px] shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out translate-y-0 h-[751px]">
+<!-- Drag Handle -->
+<div class="w-full flex justify-center pt-4 pb-2">
+<div class="w-12 h-1.5 bg-surface-dim rounded-full"></div>
+</div>
+<!-- Sheet Header -->
+<div class="flex justify-between items-start px-margin-mobile pb-4 pt-2">
+<div class="flex items-start gap-stack-md">
+<div class="w-12 h-12 bg-surface-container flex items-center justify-center rounded-xl text-2xl shrink-0">
+                    🍝
+                </div>
+<div>
+<h2 class="text-headline-md font-headline-md text-primary mb-1">2x Truffle Pasta</h2>
+<p class="text-label-lg font-label-lg text-secondary">€18.00 each • €36.00 total</p>
+</div>
+</div>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container-high text-on-surface hover:bg-surface-variant transition-colors shrink-0">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 0;">close</span>
+</button>
+</div>
+<!-- Segmented Control -->
+<div class="px-margin-mobile mb-6">
+<div class="flex bg-surface-container p-1 rounded-[14px]">
+<button class="flex-1 py-2 text-label-lg font-label-lg bg-primary text-on-primary rounded-[10px] shadow-sm transition-all text-center">
+                    Units
+                </button>
+<button class="flex-1 py-2 text-label-lg font-label-lg text-secondary hover:text-primary transition-colors text-center">
+                    Shared
+                </button>
+<button class="flex-1 py-2 text-label-lg font-label-lg text-secondary hover:text-primary transition-colors text-center">
+                    Custom
+                </button>
+<button class="flex-1 py-2 text-label-lg font-label-lg text-secondary hover:text-primary transition-colors text-center">
+                    %
+                </button>
+</div>
+</div>
+<div class="px-margin-mobile mb-4">
+<h3 class="text-label-sm font-label-sm text-secondary uppercase tracking-wider mb-2">Assign units (2 total)</h3>
+</div>
+<!-- People List (Scrollable area) -->
+<div class="flex-1 overflow-y-auto px-margin-mobile no-scrollbar pb-32">
+<!-- Person 1: You -->
+<div class="flex items-center justify-between py-3 border-b border-surface-container-high last:border-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-[#E8F5E9] flex items-center justify-center text-label-lg font-label-lg font-bold text-[#2E7D32]">
+                        Y
+                    </div>
+<span class="text-body-lg font-body-lg text-primary">You</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-8 h-8 rounded-full border border-surface-variant flex items-center justify-center text-secondary disabled:opacity-30 disabled:bg-surface-container" disabled="">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<span class="text-body-lg font-body-lg font-bold w-4 text-center">0</span>
+<button class="w-8 h-8 rounded-full border border-surface-variant flex items-center justify-center text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+<!-- Person 2: Anna -->
+<div class="flex items-center justify-between py-3 border-b border-surface-container-high last:border-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-[#E3F2FD] flex items-center justify-center text-label-lg font-label-lg font-bold text-[#1565C0]">
+                        A
+                    </div>
+<span class="text-body-lg font-body-lg text-primary">Anna</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-8 h-8 rounded-full border border-surface-variant flex items-center justify-center text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<span class="text-body-lg font-body-lg font-bold w-4 text-center">1</span>
+<button class="w-8 h-8 rounded-full border border-surface-variant flex items-center justify-center text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+<!-- Person 3: Ben -->
+<div class="flex items-center justify-between py-3 border-b border-surface-container-high last:border-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-[#FFF3E0] flex items-center justify-center text-label-lg font-label-lg font-bold text-[#E65100]">
+                        B
+                    </div>
+<span class="text-body-lg font-body-lg text-primary">Ben</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-8 h-8 rounded-full border border-surface-variant flex items-center justify-center text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<span class="text-body-lg font-body-lg font-bold w-4 text-center">1</span>
+<button class="w-8 h-8 rounded-full border border-surface-variant flex items-center justify-center text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+<!-- Person 4: Chris -->
+<div class="flex items-center justify-between py-3 border-b border-surface-container-high last:border-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-[#F3E5F5] flex items-center justify-center text-label-lg font-label-lg font-bold text-[#6A1B9A]">
+                        C
+                    </div>
+<span class="text-body-lg font-body-lg text-primary">Chris</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-8 h-8 rounded-full border border-surface-variant flex items-center justify-center text-secondary disabled:opacity-30 disabled:bg-surface-container" disabled="">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<span class="text-body-lg font-body-lg font-bold w-4 text-center">0</span>
+<button class="w-8 h-8 rounded-full border border-surface-variant flex items-center justify-center text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Sticky Bottom Action Area -->
+<div class="absolute bottom-0 left-0 w-full bg-surface-container-lowest border-t border-surface-container-high p-margin-mobile pb-safe">
+<div class="flex justify-between items-center mb-4">
+<span class="text-label-lg font-label-lg text-secondary">Assigned: <span class="text-primary font-bold">2 of 2 units</span></span>
+<span class="material-symbols-outlined text-[#2E7D32]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<button class="w-full bg-primary text-on-primary py-4 rounded-xl text-label-lg font-label-lg font-bold hover:opacity-90 transition-opacity flex justify-center items-center gap-2">
+                Save
+            </button>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvenUp - Assign Items</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#160066",
+                        "on-primary-container": "#848484",
+                        "primary": "#000000",
+                        "surface-variant": "#e2e2e2",
+                        "outline-variant": "#cfc4c5",
+                        "on-secondary-fixed-variant": "#474646",
+                        "secondary-fixed": "#e5e2e1",
+                        "secondary": "#5f5e5e",
+                        "surface": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#160066",
+                        "outline": "#7e7576",
+                        "on-secondary-container": "#656464",
+                        "tertiary-fixed": "#e4dfff",
+                        "on-primary-fixed-variant": "#474747",
+                        "surface-bright": "#f9f9f9",
+                        "tertiary": "#000000",
+                        "secondary-container": "#e5e2e1",
+                        "on-primary-fixed": "#1b1b1b",
+                        "primary-fixed-dim": "#c6c6c6",
+                        "on-tertiary-container": "#7f70fb",
+                        "primary-container": "#1b1b1b",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "surface-container-highest": "#e2e2e2",
+                        "background": "#f9f9f9",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e2e2e2",
+                        "on-surface-variant": "#4c4546",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#1a1c1c",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#4029ba",
+                        "surface-container-low": "#f3f3f3",
+                        "surface-tint": "#5e5e5e",
+                        "surface-dim": "#dadada",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "surface-container-high": "#e8e8e8",
+                        "inverse-primary": "#c6c6c6",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eeeeee",
+                        "tertiary-fixed-dim": "#c6bfff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "margin-desktop": "40px",
+                        "gutter": "16px",
+                        "margin-mobile": "20px",
+                        "stack-md": "16px",
+                        "unit": "4px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9f9f9;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background antialiased flex justify-center min-h-screen">
+<div class="w-full max-w-md bg-surface min-h-screen relative shadow-sm border-x border-outline-variant/30 flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-4 h-16 bg-surface dark:bg-surface docked full-width top-0 z-10 sticky">
+<button class="text-primary dark:text-on-surface hover:opacity-80 active:scale-95 transition-transform p-2 -ml-2 rounded-full">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="text-headline-md font-headline-md font-black text-primary dark:text-on-surface text-center flex-1">Assign items</h1>
+<button class="text-primary dark:text-on-surface hover:opacity-80 active:scale-95 transition-transform p-2 -mr-2 rounded-full">
+<span class="material-symbols-outlined">close</span>
+</button>
+</header>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto pb-32">
+<div class="px-margin-mobile pt-stack-sm pb-stack-lg">
+<p class="text-body-md font-body-md text-secondary text-center">Pick a person, then tap what they had.</p>
+</div>
+<!-- Person Selector Horizontal Scroll -->
+<div class="px-margin-mobile mb-stack-lg">
+<div class="flex gap-stack-sm overflow-x-auto hide-scrollbar pb-2">
+<!-- You (Active) -->
+<button class="flex flex-col items-center gap-1 min-w-[64px] shrink-0 group">
+<div class="w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center text-label-lg font-label-lg shadow-sm transition-transform group-active:scale-95">
+                            You
+                        </div>
+<span class="text-label-sm font-label-sm text-primary font-bold">You</span>
+</button>
+<!-- Anna -->
+<button class="flex flex-col items-center gap-1 min-w-[64px] shrink-0 group">
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant text-on-surface flex items-center justify-center text-label-lg font-label-lg transition-transform group-active:scale-95 overflow-hidden">
+<img alt="Anna avatar" class="w-full h-full object-cover" data-alt="A clean, minimalist portrait photo of a young woman with dark hair, set against a neutral soft gray background. The lighting is bright and even, matching a modern fintech app aesthetic. The image is cropped in a tight circle." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFSZXEQLn4CUPCZjleBa6Hot4J0gQtCKhPOSfwD5ZLYD4ATQ6drIsGFTBaHtxWojUMf4x1a6fHLihobQhTwmbiTcSexw6BAyvO6xQ8e0ykGMPhnWLkIt5k-9M5QVS6bNRTBL6HC--Nayqn4GrLtOYDR-NFqSEpubi5uPw7DXpEJiXzmjW-2rc91EZPtkjfXHHQMw6ScDN4zMii7Gf3lEl3higbdi-BOt_s7FsM4KnOS9AbCjlkBPd-kQtUEpgHCw1u6egS31KhU7KL"/>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Anna</span>
+</button>
+<!-- Ben -->
+<button class="flex flex-col items-center gap-1 min-w-[64px] shrink-0 group">
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant text-on-surface flex items-center justify-center text-label-lg font-label-lg transition-transform group-active:scale-95 overflow-hidden">
+<img alt="Ben avatar" class="w-full h-full object-cover" data-alt="A clean, minimalist portrait photo of a young man with short hair, set against a neutral soft gray background. The lighting is bright and even, matching a modern fintech app aesthetic. The image is cropped in a tight circle." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBY-khqCL0l29ZrfzBe2nqd_4tndrvw2xhM6f2LplG4pwt6Ax5HglXdJPNVFdOegD9QWSR0on9hofUGGkV2uhsYzRGCEGjLVDWuxOSPJEyx7Xoq3M3vahayi_aP0Z8HFgaEjnLkTsP5ZFo4-CNPRyFPOBTWKoV1Itid0JgsGIgmn1ysVF21Rf7O7sjJ0Crl1qxNf7c5bH2G8Z_NOZ_jUmqoHiX9otE8rTCyKiFEXFwBmPpEr6mQxTIRSKnHghR71OmQOlOdz3taBOIN"/>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Ben</span>
+</button>
+<!-- Chris -->
+<button class="flex flex-col items-center gap-1 min-w-[64px] shrink-0 group">
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant text-on-surface flex items-center justify-center text-label-lg font-label-lg transition-transform group-active:scale-95 overflow-hidden">
+<img alt="Chris avatar" class="w-full h-full object-cover" data-alt="A clean, minimalist portrait photo of a man with glasses, set against a neutral soft gray background. The lighting is bright and even, matching a modern fintech app aesthetic. The image is cropped in a tight circle." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOxRK377DCWwxB6b0rDj039c1U3eRvO8wfFpb54wn7zArsgcJYden6_8Ps9Qgpr9kvBlG9tJtEHacSDgHXAhqOILfOb_Iz90JgHLvU1Q9pIer5oyVWBmgwSfHHllSsUAo_AOJWphQye5VXV32BRyDmdNmyIynYlHtsoo94OrrYfnYHvdLGspaonffk8YcsW_CdnDSWgWHHmnBln4KUBP_UP4qK2y3tzmpgiWmxM-ktlzzNsu092ngBTiT8nanSE0oQNRhftRZIzepF"/>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Chris</span>
+</button>
+</div>
+</div>
+<!-- Receipt Container -->
+<div class="px-margin-mobile">
+<div class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_16px_rgba(0,0,0,0.03)] border border-outline-variant/50 p-4 mb-8">
+<!-- Receipt Header -->
+<div class="text-center mb-6 border-b border-outline-variant/30 pb-4">
+<h2 class="text-label-lg font-label-lg text-secondary tracking-widest uppercase">Bella Roma</h2>
+<p class="text-label-sm font-label-sm text-outline mt-1">Tue, May 14, 2024 • #3487</p>
+</div>
+<!-- Items List -->
+<div class="flex flex-col gap-0">
+<!-- Margherita Pizza: Assigned to You -->
+<div class="py-3 border-b border-outline-variant/30 last:border-0 group cursor-pointer hover:bg-surface-container-low transition-colors rounded-lg px-2 -mx-2">
+<div class="flex justify-between items-start">
+<div class="flex gap-2">
+<span class="text-body-md font-body-md text-primary mt-0.5">1x</span>
+<div>
+<h3 class="text-body-md font-body-md text-primary font-medium">Margherita Pizza</h3>
+<p class="text-label-sm font-label-sm text-secondary mt-0.5">€14.00 each</p>
+</div>
+</div>
+<span class="text-body-md font-body-md text-primary font-semibold">€14.00</span>
+</div>
+<div class="mt-2 pl-6">
+<div class="inline-flex items-center gap-1.5 bg-surface-variant px-2 py-1 rounded-full border border-outline-variant/50">
+<div class="w-4 h-4 rounded-full bg-primary text-on-primary flex items-center justify-center text-[8px] font-bold">Y</div>
+<span class="text-[10px] font-label-sm text-primary font-medium">You</span>
+</div>
+</div>
+</div>
+<!-- Truffle Pasta (2): 1 Anna, 1 Ben -->
+<div class="py-3 border-b border-outline-variant/30 last:border-0 group cursor-pointer hover:bg-surface-container-low transition-colors rounded-lg px-2 -mx-2">
+<div class="flex justify-between items-start">
+<div class="flex gap-2">
+<span class="text-body-md font-body-md text-primary mt-0.5">2x</span>
+<div>
+<h3 class="text-body-md font-body-md text-primary font-medium">Truffle Pasta</h3>
+<p class="text-label-sm font-label-sm text-secondary mt-0.5">€22.00 each</p>
+</div>
+</div>
+<span class="text-body-md font-body-md text-primary font-semibold">€44.00</span>
+</div>
+<div class="mt-2 pl-6 flex flex-wrap gap-2">
+<div class="inline-flex items-center gap-1.5 bg-surface-variant px-2 py-1 rounded-full border border-outline-variant/50">
+<div class="w-4 h-4 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[8px] font-bold overflow-hidden">
+<img alt="Anna" class="w-full h-full object-cover" data-alt="Small avatar of a young woman. Clean minimal fintech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9MoTBuj3ul6CmW76B_dIilPARftoG9oqK6S7IEzuUmAfuSYINnxxBYjzf2KYo4U-IG_bO_UDOKdn7XegIJXbC89kedEdQfptS7Rj_MgIttYarl1npoG_hL8WjgWzYPmQvWDS-2dN-fCFKosy1gBeo0JZ35yvBDl9d2qiP3aoaZs7W2NgEwsaxd1TcBkhwKZQkaoWO_BwOGl9G3JP6msldGB2zfYhHCQnwDK_vLSV3fhHlmzIh8yk7E6z6mfSY9s-lBFhuMNz1isir"/>
+</div>
+<span class="text-[10px] font-label-sm text-secondary font-medium">Anna</span>
+</div>
+<div class="inline-flex items-center gap-1.5 bg-surface-variant px-2 py-1 rounded-full border border-outline-variant/50">
+<div class="w-4 h-4 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[8px] font-bold overflow-hidden">
+<img alt="Ben" class="w-full h-full object-cover" data-alt="Small avatar of a young man. Clean minimal fintech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkZI_QBawk7wdb24irHIPxUlUS-hyc9Xphn2SFBYzN968RpI1yG0GIDJKi1YJd1VpstlObUmmel7wIncqFitRuKq9Nk4c_kwE0IapOblQUhixPzag5e8blzfvtz2MULayG6ok08pA9HnH20NhBvZHn1SxwxHnL-oWs65Thn48_QD7lnUyRo5DmkcKFOEXVcJDIEqg8R0E2hluU3j2ZaqdsqEErL7lTNZGLyQpvLojYNbV5U32MgfFfDdlOx3WcOjVUsQ7XrxlELmB1"/>
+</div>
+<span class="text-[10px] font-label-sm text-secondary font-medium">Ben</span>
+</div>
+</div>
+</div>
+<!-- Caesar Salad: Shared by Anna + Chris -->
+<div class="py-3 border-b border-outline-variant/30 last:border-0 group cursor-pointer hover:bg-surface-container-low transition-colors rounded-lg px-2 -mx-2">
+<div class="flex justify-between items-start">
+<div class="flex gap-2">
+<span class="text-body-md font-body-md text-primary mt-0.5">1x</span>
+<div>
+<h3 class="text-body-md font-body-md text-primary font-medium">Caesar Salad</h3>
+<p class="text-label-sm font-label-sm text-secondary mt-0.5">€12.00 each</p>
+</div>
+</div>
+<span class="text-body-md font-body-md text-primary font-semibold">€12.00</span>
+</div>
+<div class="mt-2 pl-6">
+<div class="inline-flex items-center gap-1.5 bg-surface-variant px-2 py-1 rounded-full border border-outline-variant/50">
+<div class="flex -space-x-1">
+<div class="w-4 h-4 rounded-full bg-secondary-container border border-surface-variant flex items-center justify-center overflow-hidden z-10">
+<img alt="Anna" class="w-full h-full object-cover" data-alt="Small avatar of a young woman. Clean minimal fintech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuADgrokp6AErGAuj6L7P64-Fv9SUvjE-ytT2ttFmWuj1rA4BKD-ChYNL2UuZwKnWLmlUO4gfH8qsdObS_8EwBvU26CLfV2bKWjNbH5dr0ub8X2UTs8d8HRUNUF2fO54TFGIwlyWXOdfw8Ykoi9cAomYiKdihZjsWvhey4hjcNBgBIYMcv39nBwq2uq4zey2rjuypi7-cbMqBMCCCtIdWHrmxTQlQG2B2arRDSubjrmggDseDQP7JDg9ZNgU6q-Mipff8jg5mYVddTBK"/>
+</div>
+<div class="w-4 h-4 rounded-full bg-secondary-container border border-surface-variant flex items-center justify-center overflow-hidden z-0">
+<img alt="Chris" class="w-full h-full object-cover" data-alt="Small avatar of a man with glasses. Clean minimal fintech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoJUJbTvRsGmymKf887Cx2VX8yeD2kptWPxEZyhn4n-QkPqjVqv7RMxQ6cHfgW9JWpNF_MxNn4_n7ETPBXn9lT-208Vy-finS5_YGyp4kLZFwrQ10z86qzz74YUqhJibf47XVeXbq2lOsXj1lbjpAJ-ngcditTgs4DAnk_yT0DSrT4zOZCs0qR0RAIz1-J1vtBTe6ZNqH4bWAok--aZfGEFqkkfR9kxTbR3F-0rIVrID20byR30JaFUkNoNOF1xd1zD7AWNUi21Gas"/>
+</div>
+</div>
+<span class="text-[10px] font-label-sm text-secondary font-medium">Shared</span>
+</div>
+</div>
+</div>
+<!-- Sparkling Water (3): 1 You, 1 Anna, 1 Chris -->
+<div class="py-3 border-b border-outline-variant/30 last:border-0 group cursor-pointer hover:bg-surface-container-low transition-colors rounded-lg px-2 -mx-2">
+<div class="flex justify-between items-start">
+<div class="flex gap-2">
+<span class="text-body-md font-body-md text-primary mt-0.5">3x</span>
+<div>
+<h3 class="text-body-md font-body-md text-primary font-medium">Sparkling Water</h3>
+<p class="text-label-sm font-label-sm text-secondary mt-0.5">€4.00 each</p>
+</div>
+</div>
+<span class="text-body-md font-body-md text-primary font-semibold">€12.00</span>
+</div>
+<div class="mt-2 pl-6 flex flex-wrap gap-2">
+<div class="inline-flex items-center gap-1.5 bg-surface-variant px-2 py-1 rounded-full border border-outline-variant/50">
+<div class="w-4 h-4 rounded-full bg-primary text-on-primary flex items-center justify-center text-[8px] font-bold">Y</div>
+</div>
+<div class="inline-flex items-center gap-1.5 bg-surface-variant px-2 py-1 rounded-full border border-outline-variant/50">
+<div class="w-4 h-4 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[8px] font-bold overflow-hidden">
+<img alt="Anna" class="w-full h-full object-cover" data-alt="Small avatar of a young woman. Clean minimal fintech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD67MRhbMrIfnG3N3yFTuVVgSUz_h5ZcfL1rA62DJPRvREPp8oKeVAJc6Rbtjq5cn3d5PnitQPoD4ScI8xtkh4k0Yb07R3d55OVHfvWujFGNT4L6QTd3N2ldW4wzyN5xRCcNksJgMr5fWO128zGOcWFvVs4JRTwu1GlzWCXASWsByDuttxrk_wwF06fOvO3hG5zyDpkKuJ83JtKTQdSv6Ja4KDT2FfFBFS1QQBlwf6f36sL6Xs3u5nLRbCpyRNtL7XYqDVMerGGi26z"/>
+</div>
+</div>
+<div class="inline-flex items-center gap-1.5 bg-surface-variant px-2 py-1 rounded-full border border-outline-variant/50">
+<div class="w-4 h-4 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[8px] font-bold overflow-hidden">
+<img alt="Chris" class="w-full h-full object-cover" data-alt="Small avatar of a man with glasses. Clean minimal fintech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwT7LoAqPEGWc72UEnBQJZSVPM-MmRE2lsfSYYuvvVQtQRO7q5y3hjpxMOWt-OWTtFGb3knHCD0NTdaWbld_0jBEs2mSke7im8i0qbeucSTH_4jd0Dym1-qFPlLkl7hro8kOtnnfFNmoLtevkb5SZIKoO_2W111CJi0kmeoBQ-DqPWdksqZy0oBIOL95lkwr541A5NV9gNPSiaRdgb_pw6vjApE6zm7NzNZ_XRGVaxV47FqxOwm08NH5Di5tDEpjMaGRWMp17L41kb"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Tiramisu: Unassigned -->
+<div class="py-3 border-b border-outline-variant/30 last:border-0 group cursor-pointer hover:bg-surface-container-low transition-colors rounded-lg px-2 -mx-2 bg-error-container/20 border-l-2 border-l-error">
+<div class="flex justify-between items-start">
+<div class="flex gap-2">
+<span class="text-body-md font-body-md text-primary mt-0.5">1x</span>
+<div>
+<h3 class="text-body-md font-body-md text-primary font-medium">Tiramisu</h3>
+<p class="text-label-sm font-label-sm text-secondary mt-0.5">€9.00 each</p>
+</div>
+</div>
+<span class="text-body-md font-body-md text-primary font-semibold">€9.00</span>
+</div>
+<div class="mt-2 pl-6">
+<span class="text-[12px] font-label-sm text-error font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">error</span>
+                                    Unassigned
+                                </span>
+</div>
+</div>
+</div>
+<!-- Subtotal Info (Simplified for this view) -->
+<div class="mt-4 pt-4 border-t border-outline-variant/50 flex justify-between items-center text-label-sm font-label-sm text-secondary">
+<span>Subtotal (items only)</span>
+<span>€91.00</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Action Bar -->
+<div class="fixed bottom-0 w-full max-w-md bg-surface border-t border-outline-variant/30 p-4 pb-safe z-50 flex flex-col gap-3 shadow-[0px_-4px_16px_rgba(0,0,0,0.02)]">
+<div class="flex justify-center items-center gap-2">
+<span class="material-symbols-outlined text-error text-[18px]">info</span>
+<span class="text-label-sm font-label-sm text-secondary">4 of 5 items assigned</span>
+</div>
+<button class="w-full py-4 rounded-xl text-label-lg font-label-lg font-bold bg-surface-variant text-on-surface-variant opacity-50 cursor-not-allowed transition-all" disabled="">
+                Continue
+            </button>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvenUp - Receipt Review</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-container": "#160066",
+                    "on-primary-container": "#848484",
+                    "primary": "#000000",
+                    "surface-variant": "#e2e2e2",
+                    "outline-variant": "#cfc4c5",
+                    "on-secondary-fixed-variant": "#474646",
+                    "secondary-fixed": "#e5e2e1",
+                    "secondary": "#5f5e5e",
+                    "surface": "#f9f9f9",
+                    "inverse-on-surface": "#f1f1f1",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed": "#160066",
+                    "outline": "#7e7576",
+                    "on-secondary-container": "#656464",
+                    "tertiary-fixed": "#e4dfff",
+                    "on-primary-fixed-variant": "#474747",
+                    "surface-bright": "#f9f9f9",
+                    "tertiary": "#000000",
+                    "secondary-container": "#e5e2e1",
+                    "on-primary-fixed": "#1b1b1b",
+                    "primary-fixed-dim": "#c6c6c6",
+                    "on-tertiary-container": "#7f70fb",
+                    "primary-container": "#1b1b1b",
+                    "on-primary": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "inverse-surface": "#2f3131",
+                    "surface-container-highest": "#e2e2e2",
+                    "background": "#f9f9f9",
+                    "on-error": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "primary-fixed": "#e2e2e2",
+                    "on-surface-variant": "#4c4546",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#1a1c1c",
+                    "on-secondary": "#ffffff",
+                    "on-background": "#1a1c1c",
+                    "on-tertiary-fixed-variant": "#4029ba",
+                    "surface-container-low": "#f3f3f3",
+                    "surface-tint": "#5e5e5e",
+                    "surface-dim": "#dadada",
+                    "secondary-fixed-dim": "#c8c6c5",
+                    "on-secondary-fixed": "#1c1b1b",
+                    "surface-container-high": "#e8e8e8",
+                    "inverse-primary": "#c6c6c6",
+                    "error": "#ba1a1a",
+                    "surface-container": "#eeeeee",
+                    "tertiary-fixed-dim": "#c6bfff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-sm": "8px",
+                    "margin-desktop": "40px",
+                    "gutter": "16px",
+                    "margin-mobile": "20px",
+                    "stack-md": "16px",
+                    "unit": "4px",
+                    "stack-lg": "24px"
+            },
+            "fontFamily": {
+                    "headline-lg": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "display-lg": [
+                            "Inter"
+                    ],
+                    "headline-lg-mobile": [
+                            "Inter"
+                    ],
+                    "label-sm": [
+                            "Inter"
+                    ],
+                    "headline-md": [
+                            "Inter"
+                    ],
+                    "label-lg": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "display-lg": [
+                            "40px",
+                            {
+                                    "lineHeight": "48px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "36px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-lg": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+        },
+        },
+      }
+    </script>
+<style>
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .material-symbols-outlined {
+          font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24
+        }
+        
+        /* Receipt edge decoration */
+        .receipt-edge {
+            background-image: radial-gradient(circle at 10px 0, transparent 10px, #ffffff 11px);
+            background-size: 24px 10px;
+            background-repeat: repeat-x;
+            height: 10px;
+            width: 100%;
+        }
+        .receipt-edge-bottom {
+            background-image: radial-gradient(circle at 10px 10px, transparent 10px, #ffffff 11px);
+            background-size: 24px 10px;
+            background-repeat: repeat-x;
+            height: 10px;
+            width: 100%;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen flex flex-col md:items-center">
+<!-- Mobile Container (Max width constraint for desktop viewing) -->
+<main class="w-full max-w-md bg-surface min-h-screen flex flex-col relative shadow-2xl overflow-hidden">
+<!-- TopAppBar (Suppressed nav intent, but keeping header for back action) -->
+<header class="flex justify-between items-center w-full px-4 h-16 bg-surface z-10 sticky top-0">
+<button class="p-2 -ml-2 text-primary hover:opacity-80 transition-opacity rounded-full focus:outline-none focus:ring-2 focus:ring-primary">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="text-label-lg font-label-lg text-primary absolute left-1/2 -translate-x-1/2">Receipt review</h1>
+<button class="p-2 -mr-2 text-primary hover:opacity-80 transition-opacity rounded-full focus:outline-none focus:ring-2 focus:ring-primary">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</header>
+<!-- Canvas Content -->
+<div class="flex-1 px-4 pb-32 overflow-y-auto">
+<!-- Summary Card -->
+<div class="mt-4 mb-6">
+<p class="text-label-sm font-label-sm text-secondary mb-1 uppercase tracking-wider">Receipt summary</p>
+<div class="flex items-end justify-between">
+<h2 class="text-display-lg font-display-lg text-primary tracking-tight">€112.50</h2>
+<span class="inline-flex items-center gap-1 bg-[#E8F5E9] text-[#2E7D32] px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2">
+                        Looks good
+                    </span>
+</div>
+<p class="text-body-md font-body-md text-secondary mt-1">Bella Roma</p>
+</div>
+<!-- Receipt Container -->
+<div class="relative bg-white rounded-t-xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-surface-variant/50">
+<!-- Items Section -->
+<div class="p-4 space-y-4">
+<div class="flex justify-between items-center pb-2 border-b border-surface-variant border-dashed">
+<span class="text-label-sm font-label-sm text-secondary uppercase tracking-widest">Item</span>
+<span class="text-label-sm font-label-sm text-secondary uppercase tracking-widest">Amount</span>
+</div>
+<!-- Item Row -->
+<div class="group flex justify-between items-start py-1">
+<div class="flex-1 pr-4">
+<p class="text-body-md font-body-md text-primary">Margherita Pizza</p>
+</div>
+<div class="flex items-center gap-3">
+<p class="text-body-md font-body-md text-primary font-medium">€14.50</p>
+</div>
+</div>
+<!-- Item Row -->
+<div class="group flex justify-between items-start py-1">
+<div class="flex-1 pr-4">
+<p class="text-body-md font-body-md text-primary">Truffle Pasta</p>
+<p class="text-label-sm font-label-sm text-secondary">Qty 2</p>
+</div>
+<div class="flex items-center gap-3">
+<p class="text-body-md font-body-md text-primary font-medium">€36.00</p>
+</div>
+</div>
+<!-- Item Row -->
+<div class="group flex justify-between items-start py-1">
+<div class="flex-1 pr-4">
+<p class="text-body-md font-body-md text-primary">Caesar Salad</p>
+</div>
+<div class="flex items-center gap-3">
+<p class="text-body-md font-body-md text-primary font-medium">€12.00</p>
+</div>
+</div>
+<!-- Item Row -->
+<div class="group flex justify-between items-start py-1">
+<div class="flex-1 pr-4">
+<p class="text-body-md font-body-md text-primary">Sparkling Water</p>
+<p class="text-label-sm font-label-sm text-secondary">Qty 3</p>
+</div>
+<div class="flex items-center gap-3">
+<p class="text-body-md font-body-md text-primary font-medium">€13.50</p>
+</div>
+</div>
+<!-- Item Row -->
+<div class="group flex justify-between items-start py-1">
+<div class="flex-1 pr-4">
+<p class="text-body-md font-body-md text-primary">Tiramisu</p>
+<p class="text-label-sm font-label-sm text-secondary">Qty 2</p>
+</div>
+<div class="flex items-center gap-3">
+<p class="text-body-md font-body-md text-primary font-medium">€18.00</p>
+</div>
+</div>
+</div>
+<!-- Totals Section -->
+<div class="p-4 bg-surface-container-lowest border-t border-surface-variant border-dashed">
+<div class="space-y-3">
+<div class="flex justify-between items-center">
+<span class="text-body-md font-body-md text-secondary">Subtotal</span>
+<span class="text-body-md font-body-md text-primary">€94.00</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-body-md font-body-md text-secondary">Tax</span>
+<span class="text-body-md font-body-md text-primary">€6.50</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-body-md font-body-md text-secondary">Tip</span>
+<span class="text-body-md font-body-md text-primary">€12.00</span>
+</div>
+<div class="pt-3 mt-1 border-t border-surface-variant flex justify-between items-center">
+<span class="text-label-lg font-label-lg text-primary">Total</span>
+<span class="text-headline-md font-headline-md text-primary">€112.50</span>
+</div>
+</div>
+</div>
+<div class="receipt-edge-bottom bg-surface"></div>
+</div>
+<!-- Action Link -->
+<button class="w-full mt-6 py-4 flex items-center justify-between text-primary hover:bg-surface-container-low transition-colors rounded-xl px-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">receipt</span>
+<span class="text-body-md font-body-md font-medium">View original receipt</span>
+</div>
+<span class="material-symbols-outlined text-secondary">chevron_right</span>
+</button>
+</div>
+<!-- Bottom Action Bar (Fixed) -->
+<div class="fixed bottom-0 left-0 w-full md:absolute bg-surface/90 backdrop-blur-md p-4 pb-safe pt-4 border-t border-surface-variant z-50">
+<button class="w-full bg-primary text-on-primary py-4 rounded-xl text-label-lg font-label-lg shadow-sm hover:opacity-90 transition-opacity active:scale-[0.98]">
+                Continue
+            </button>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvenUp - Manual Receipt Entry</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-container": "#160066",
+                      "on-primary-container": "#848484",
+                      "primary": "#000000",
+                      "surface-variant": "#e2e2e2",
+                      "outline-variant": "#cfc4c5",
+                      "on-secondary-fixed-variant": "#474646",
+                      "secondary-fixed": "#e5e2e1",
+                      "secondary": "#5f5e5e",
+                      "surface": "#f9f9f9",
+                      "inverse-on-surface": "#f1f1f1",
+                      "error-container": "#ffdad6",
+                      "on-tertiary-fixed": "#160066",
+                      "outline": "#7e7576",
+                      "on-secondary-container": "#656464",
+                      "tertiary-fixed": "#e4dfff",
+                      "on-primary-fixed-variant": "#474747",
+                      "surface-bright": "#f9f9f9",
+                      "tertiary": "#000000",
+                      "secondary-container": "#e5e2e1",
+                      "on-primary-fixed": "#1b1b1b",
+                      "primary-fixed-dim": "#c6c6c6",
+                      "on-tertiary-container": "#7f70fb",
+                      "primary-container": "#1b1b1b",
+                      "on-primary": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "inverse-surface": "#2f3131",
+                      "surface-container-highest": "#e2e2e2",
+                      "background": "#f9f9f9",
+                      "on-error": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "primary-fixed": "#e2e2e2",
+                      "on-surface-variant": "#4c4546",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface": "#1a1c1c",
+                      "on-secondary": "#ffffff",
+                      "on-background": "#1a1c1c",
+                      "on-tertiary-fixed-variant": "#4029ba",
+                      "surface-container-low": "#f3f3f3",
+                      "surface-tint": "#5e5e5e",
+                      "surface-dim": "#dadada",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "on-secondary-fixed": "#1c1b1b",
+                      "surface-container-high": "#e8e8e8",
+                      "inverse-primary": "#c6c6c6",
+                      "error": "#ba1a1a",
+                      "surface-container": "#eeeeee",
+                      "tertiary-fixed-dim": "#c6bfff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-sm": "8px",
+                      "margin-desktop": "40px",
+                      "gutter": "16px",
+                      "margin-mobile": "20px",
+                      "stack-md": "16px",
+                      "unit": "4px",
+                      "stack-lg": "24px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "display-lg": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "label-lg": ["Inter"],
+                      "body-md": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "500"}],
+                      "display-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .fill-icon { font-variation-settings: 'FILL' 1; }
+        
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col items-center justify-center">
+<!-- Mobile Container (Simulated) -->
+<div class="w-full max-w-md h-[852px] bg-surface relative overflow-hidden flex flex-col shadow-2xl rounded-[40px] border-[8px] border-black my-8">
+<!-- Status Bar (Simulated) -->
+<div class="h-12 w-full flex justify-between items-center px-6 text-sm font-semibold pt-2 bg-surface z-50">
+<span>9:41</span>
+<div class="flex gap-2 items-center">
+<span class="material-symbols-outlined text-[16px]">signal_cellular_4_bar</span>
+<span class="material-symbols-outlined text-[16px]">wifi</span>
+<span class="material-symbols-outlined text-[16px]">battery_full</span>
+</div>
+</div>
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-4 h-16 bg-surface z-40 flex-shrink-0">
+<button class="w-10 h-10 flex items-center justify-center hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-primary text-2xl">arrow_back</span>
+</button>
+<h1 class="text-headline-md font-headline-md text-primary font-bold">Manual entry</h1>
+<button class="w-10 h-10 flex items-center justify-center hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-primary text-2xl">more_horiz</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto no-scrollbar px-margin-mobile pb-32">
+<div class="flex flex-col gap-stack-lg mt-4">
+<!-- Essentials Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-stack-md shadow-sm">
+<div class="flex justify-between items-end border-b border-outline-variant pb-2 focus-within:border-primary transition-colors">
+<div class="flex flex-col w-full">
+<label class="text-label-sm font-label-sm text-secondary mb-1">Merchant</label>
+<input class="bg-transparent border-none p-0 text-headline-md font-headline-md focus:ring-0 w-full placeholder:text-outline" placeholder="e.g. Trattoria" type="text" value="Dinner at Trattoria"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col border-b border-outline-variant pb-2 focus-within:border-primary transition-colors">
+<label class="text-label-sm font-label-sm text-secondary mb-1">Date</label>
+<input class="bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0 w-full" type="date" value="2024-05-18"/>
+</div>
+<div class="flex flex-col border-b border-outline-variant pb-2 focus-within:border-primary transition-colors">
+<label class="text-label-sm font-label-sm text-secondary mb-1">Currency</label>
+<div class="flex items-center justify-between">
+<span class="text-body-md font-body-md">USD</span>
+<span class="material-symbols-outlined text-secondary text-lg">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Items Section -->
+<div class="flex flex-col gap-stack-sm">
+<div class="flex justify-between items-center mb-2 px-1">
+<h2 class="text-label-lg font-label-lg text-primary">Items</h2>
+<span class="text-label-sm font-label-sm text-secondary">3 added</span>
+</div>
+<!-- Item Rows -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl flex flex-col shadow-sm divide-y divide-outline-variant">
+<!-- Row 1 -->
+<div class="flex items-center justify-between p-4 group">
+<div class="flex-1 mr-4">
+<input class="w-full bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0" placeholder="Item name" type="text" value="Margherita Pizza"/>
+</div>
+<div class="w-24 text-right">
+<input class="w-full bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0 text-right" placeholder="0.00" type="text" value="24.00"/>
+</div>
+<button class="ml-2 text-error opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-xl">remove_circle_outline</span>
+</button>
+</div>
+<!-- Row 2 -->
+<div class="flex items-center justify-between p-4 group">
+<div class="flex-1 mr-4">
+<input class="w-full bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0" placeholder="Item name" type="text" value="Spaghetti Carbonara"/>
+</div>
+<div class="w-24 text-right">
+<input class="w-full bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0 text-right" placeholder="0.00" type="text" value="28.00"/>
+</div>
+<button class="ml-2 text-error opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-xl">remove_circle_outline</span>
+</button>
+</div>
+<!-- Row 3 -->
+<div class="flex items-center justify-between p-4 group">
+<div class="flex-1 mr-4">
+<input class="w-full bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0" placeholder="Item name" type="text" value="House Wine (Bottle)"/>
+</div>
+<div class="w-24 text-right">
+<input class="w-full bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0 text-right" placeholder="0.00" type="text" value="48.00"/>
+</div>
+<button class="ml-2 text-error opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-xl">remove_circle_outline</span>
+</button>
+</div>
+<!-- Add Item Button -->
+<button class="flex items-center gap-2 p-4 text-secondary hover:bg-surface-container-low transition-colors w-full text-left">
+<span class="material-symbols-outlined text-xl">add_circle</span>
+<span class="text-body-md font-body-md">Add another item</span>
+</button>
+</div>
+</div>
+<!-- Fees & Totals Section -->
+<div class="flex flex-col gap-stack-sm mt-2">
+<h2 class="text-label-lg font-label-lg text-primary px-1">Fees &amp; Taxes</h2>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl flex flex-col shadow-sm divide-y divide-outline-variant">
+<div class="flex items-center justify-between p-4 group">
+<div class="flex-1 mr-4">
+<span class="text-body-md font-body-md text-secondary">Tax</span>
+</div>
+<div class="w-24 text-right">
+<input class="w-full bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0 text-right" placeholder="0.00" type="text" value="10.00"/>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 group">
+<div class="flex-1 mr-4">
+<span class="text-body-md font-body-md text-secondary">Tip</span>
+</div>
+<div class="w-24 text-right">
+<input class="w-full bg-transparent border-none p-0 text-body-md font-body-md focus:ring-0 text-right" placeholder="0.00" type="text" value="10.00"/>
+</div>
+</div>
+<!-- Grand Total -->
+<div class="flex items-center justify-between p-4 bg-surface-container-low rounded-b-xl">
+<span class="text-label-lg font-label-lg text-primary">Total Amount</span>
+<span class="text-headline-md font-headline-md text-primary">$120.00</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Action Bar -->
+<div class="absolute bottom-0 left-0 w-full p-4 bg-surface border-t border-outline-variant pb-safe z-50">
+<button class="w-full bg-primary text-on-primary py-4 rounded-xl text-label-lg font-label-lg flex justify-center items-center gap-2 hover:bg-inverse-surface transition-colors">
+                Continue
+            </button>
+</div>
+</div>
+</body></html>

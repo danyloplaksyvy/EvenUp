@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvenUp - Guest View</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#160066",
+                        "on-primary-container": "#848484",
+                        "primary": "#000000",
+                        "surface-variant": "#e2e2e2",
+                        "outline-variant": "#cfc4c5",
+                        "on-secondary-fixed-variant": "#474646",
+                        "secondary-fixed": "#e5e2e1",
+                        "secondary": "#5f5e5e",
+                        "surface": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#160066",
+                        "outline": "#7e7576",
+                        "on-secondary-container": "#656464",
+                        "tertiary-fixed": "#e4dfff",
+                        "on-primary-fixed-variant": "#474747",
+                        "surface-bright": "#f9f9f9",
+                        "tertiary": "#000000",
+                        "secondary-container": "#e5e2e1",
+                        "on-primary-fixed": "#1b1b1b",
+                        "primary-fixed-dim": "#c6c6c6",
+                        "on-tertiary-container": "#7f70fb",
+                        "primary-container": "#1b1b1b",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "surface-container-highest": "#e2e2e2",
+                        "background": "#f9f9f9",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e2e2e2",
+                        "on-surface-variant": "#4c4546",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#1a1c1c",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#4029ba",
+                        "surface-container-low": "#f3f3f3",
+                        "surface-tint": "#5e5e5e",
+                        "surface-dim": "#dadada",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "surface-container-high": "#e8e8e8",
+                        "inverse-primary": "#c6c6c6",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eeeeee",
+                        "tertiary-fixed-dim": "#c6bfff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "margin-desktop": "40px",
+                        "gutter": "16px",
+                        "margin-mobile": "20px",
+                        "stack-md": "16px",
+                        "unit": "4px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "500"}],
+                        "display-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        
+        /* Subtle pattern background for visual interest without clutter */
+        .bg-pattern {
+            background-image: radial-gradient(var(--tw-colors-surface-variant) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar from JSON Rules -->
+<header class="flex justify-between items-center w-full px-4 h-16 bg-surface dark:bg-surface top-0 full-width docked flat no shadows border-b border-surface-variant relative z-10">
+<div class="w-10 h-10 flex items-center justify-center">
+<!-- Guest view, minimal functionality on leading icon -->
+<button aria-label="Go back" class="text-primary dark:text-on-surface hover:opacity-80 transition-transform active:scale-95">
+<span aria-hidden="true" class="material-symbols-outlined">arrow_back</span>
+</button>
+</div>
+<div class="flex-1 flex justify-center">
+<span class="text-headline-md font-headline-md font-black text-primary dark:text-on-surface tracking-tight">EvenUp</span>
+</div>
+<div class="w-10 h-10 flex items-center justify-center">
+<button aria-label="Close" class="text-primary dark:text-on-surface hover:opacity-80 transition-transform active:scale-95">
+<span aria-hidden="true" class="material-symbols-outlined">close</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-md mx-auto px-margin-mobile py-stack-lg space-y-stack-lg relative z-0">
+<!-- Background decorative element -->
+<div class="absolute inset-0 bg-pattern opacity-50 pointer-events-none -z-10"></div>
+<!-- Hero Section: Total & Context -->
+<section class="flex flex-col items-center justify-center text-center space-y-stack-sm pt-4 pb-2">
+<div class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-surface-container-high border border-surface-variant mb-2">
+<span class="material-symbols-outlined text-[14px] mr-1 text-secondary">receipt_long</span>
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Shared Expense</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary">Bella Roma</h1>
+<div class="font-display-lg text-display-lg text-primary font-black tracking-tight leading-none">
+                €112.50
+            </div>
+<div class="flex items-center gap-2 mt-6 bg-surface-container-lowest border border-surface-variant px-4 py-2 rounded-full shadow-sm">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-[10px] font-bold">Y</div>
+<span class="font-label-sm text-label-sm text-on-surface">Paid by <span class="font-bold">You</span></span>
+</div>
+</section>
+<!-- Settlement Summary Card (Bento-style) -->
+<section class="bg-surface-container-lowest rounded-[20px] border border-surface-variant shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] overflow-hidden">
+<div class="p-stack-md border-b border-surface-variant bg-surface-container-low/50">
+<h2 class="font-label-lg text-label-lg text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">payments</span>
+                    Settlement Summary
+                </h2>
+</div>
+<div class="p-stack-md space-y-4">
+<!-- Settlement Item 1 -->
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-label-lg font-bold border border-tertiary-container/20">
+                            A
+                        </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-primary font-medium">Anna</span>
+<span class="font-label-sm text-label-sm text-secondary">owes You</span>
+</div>
+</div>
+<div class="font-headline-md text-headline-md text-primary">
+                        €31.90
+                    </div>
+</div>
+<hr class="border-surface-variant"/>
+<!-- Settlement Item 2 -->
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-label-lg font-bold border border-secondary-container/20">
+                            M
+                        </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-primary font-medium">Marco</span>
+<span class="font-label-sm text-label-sm text-secondary">owes You</span>
+</div>
+</div>
+<div class="font-headline-md text-headline-md text-primary">
+                        €45.60
+                    </div>
+</div>
+<!-- Your Share Summary (Implicit) -->
+<div class="mt-4 pt-4 border-t border-dashed border-surface-variant flex justify-between items-center bg-surface-container-low p-3 rounded-lg">
+<span class="font-label-sm text-label-sm text-secondary">Your share</span>
+<span class="font-body-md text-body-md text-primary font-medium">€35.00</span>
+</div>
+</div>
+</section>
+<!-- Detailed Breakdown (Receipt Style) -->
+<section class="bg-surface-container-lowest rounded-[20px] border border-surface-variant shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] overflow-hidden">
+<div class="p-stack-md border-b border-surface-variant flex justify-between items-center bg-surface-container-low/50">
+<h2 class="font-label-lg text-label-lg text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">list_alt</span>
+                    Item Breakdown
+                </h2>
+<span class="font-label-sm text-label-sm text-secondary">4 Items</span>
+</div>
+<div class="p-4 space-y-4">
+<!-- Line Item 1 -->
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1">
+<span class="font-body-md text-body-md text-primary">Pizza Margherita (x2)</span>
+<div class="flex items-center gap-1">
+<div class="w-5 h-5 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center text-[10px] font-bold">A</div>
+<div class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center text-[10px] font-bold">Y</div>
+</div>
+</div>
+<span class="font-body-md text-body-md text-primary">€24.00</span>
+</div>
+<!-- Line Item 2 -->
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1">
+<span class="font-body-md text-body-md text-primary">Spaghetti Carbonara</span>
+<div class="flex items-center gap-1">
+<div class="w-5 h-5 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[10px] font-bold">M</div>
+</div>
+</div>
+<span class="font-body-md text-body-md text-primary">€16.50</span>
+</div>
+<!-- Line Item 3 -->
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1">
+<span class="font-body-md text-body-md text-primary">House Wine (Carafe)</span>
+<div class="flex items-center gap-1">
+<div class="w-5 h-5 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center text-[10px] font-bold">A</div>
+<div class="w-5 h-5 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[10px] font-bold">M</div>
+<div class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center text-[10px] font-bold">Y</div>
+<span class="font-label-sm text-label-sm text-secondary ml-1">Split equally</span>
+</div>
+</div>
+<span class="font-body-md text-body-md text-primary">€30.00</span>
+</div>
+<!-- Line Item 4 -->
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1">
+<span class="font-body-md text-body-md text-primary">Tiramisu</span>
+<div class="flex items-center gap-1">
+<div class="w-5 h-5 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center text-[10px] font-bold">A</div>
+</div>
+</div>
+<span class="font-body-md text-body-md text-primary">€8.00</span>
+</div>
+<!-- Subtotals -->
+<div class="pt-4 mt-2 border-t border-surface-variant space-y-2">
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-secondary">Subtotal</span>
+<span class="font-body-md text-body-md text-primary">€78.50</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-secondary">Tax (22%)</span>
+<span class="font-body-md text-body-md text-primary">€17.27</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-secondary">Tip</span>
+<span class="font-body-md text-body-md text-primary">€16.73</span>
+</div>
+</div>
+<!-- Final Total -->
+<div class="pt-4 mt-2 border-t border-primary flex justify-between items-center">
+<span class="font-headline-md text-headline-md text-primary">Total</span>
+<span class="font-headline-md text-headline-md text-primary">€112.50</span>
+</div>
+</div>
+</section>
+<!-- Participants Quick List -->
+<section class="flex flex-col items-center justify-center space-y-3 pt-4">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Participants</span>
+<div class="flex items-center justify-center -space-x-3">
+<div class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-lg font-bold border-2 border-surface z-30 shadow-sm" title="You">Y</div>
+<div class="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-label-lg font-bold border-2 border-surface z-20 shadow-sm" title="Anna">A</div>
+<div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-label-lg font-bold border-2 border-surface z-10 shadow-sm" title="Marco">M</div>
+</div>
+</section>
+<!-- Read-Only Notice -->
+<div class="bg-surface-container-low border border-surface-variant rounded-lg p-3 text-center mt-8">
+<p class="font-label-sm text-label-sm text-secondary flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[16px]">info</span>
+                This is a read-only guest view.
+            </p>
+</div>
+</main>
+<!-- Footer Branding -->
+<footer class="w-full py-8 text-center pb-safe mt-auto">
+<div class="flex flex-col items-center justify-center opacity-60 hover:opacity-100 transition-opacity">
+<span class="font-label-sm text-label-sm text-secondary mb-1">Powered by</span>
+<span class="font-headline-md text-headline-md font-black text-primary tracking-tight">EvenUp</span>
+</div>
+</footer>
+</body></html>

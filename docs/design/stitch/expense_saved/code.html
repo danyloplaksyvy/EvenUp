@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvenUp - Expense Saved</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#160066",
+                        "on-primary-container": "#848484",
+                        "primary": "#000000",
+                        "surface-variant": "#e2e2e2",
+                        "outline-variant": "#cfc4c5",
+                        "on-secondary-fixed-variant": "#474646",
+                        "secondary-fixed": "#e5e2e1",
+                        "secondary": "#5f5e5e",
+                        "surface": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#160066",
+                        "outline": "#7e7576",
+                        "on-secondary-container": "#656464",
+                        "tertiary-fixed": "#e4dfff",
+                        "on-primary-fixed-variant": "#474747",
+                        "surface-bright": "#f9f9f9",
+                        "tertiary": "#000000",
+                        "secondary-container": "#e5e2e1",
+                        "on-primary-fixed": "#1b1b1b",
+                        "primary-fixed-dim": "#c6c6c6",
+                        "on-tertiary-container": "#7f70fb",
+                        "primary-container": "#1b1b1b",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "surface-container-highest": "#e2e2e2",
+                        "background": "#f9f9f9",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e2e2e2",
+                        "on-surface-variant": "#4c4546",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#1a1c1c",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#4029ba",
+                        "surface-container-low": "#f3f3f3",
+                        "surface-tint": "#5e5e5e",
+                        "surface-dim": "#dadada",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "surface-container-high": "#e8e8e8",
+                        "inverse-primary": "#c6c6c6",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eeeeee",
+                        "tertiary-fixed-dim": "#c6bfff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "margin-desktop": "40px",
+                        "gutter": "16px",
+                        "margin-mobile": "20px",
+                        "stack-md": "16px",
+                        "unit": "4px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter", "sans-serif"],
+                        "body-lg": ["Inter", "sans-serif"],
+                        "display-lg": ["Inter", "sans-serif"],
+                        "headline-lg-mobile": ["Inter", "sans-serif"],
+                        "label-sm": ["Inter", "sans-serif"],
+                        "headline-md": ["Inter", "sans-serif"],
+                        "label-lg": ["Inter", "sans-serif"],
+                        "body-md": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Safe area padding for mobile devices */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .pb-safe {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col relative overflow-hidden selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar: Suppressed leading for a focused completion screen, keeping trailing close -->
+<header class="flex justify-between items-center w-full px-4 h-16 bg-surface dark:bg-surface fixed top-0 z-20">
+<div class="w-10"></div> <!-- Spacer to balance layout -->
+<div class="text-headline-md font-headline-md font-black text-primary dark:text-on-surface"></div>
+<button aria-label="Close" class="w-10 h-10 flex items-center justify-center text-primary dark:text-on-surface hover:opacity-80 transition-transform active:scale-95 rounded-full">
+<span class="material-symbols-outlined" style="font-variation-settings: 'wght' 300;">close</span>
+</button>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col items-center justify-center px-6 pt-16 pb-[300px] max-w-md mx-auto w-full relative z-10">
+<!-- Success Animation / Graphic -->
+<div class="relative w-24 h-24 mb-10 flex items-center justify-center">
+<!-- Subtle expanding rings effect -->
+<div class="absolute inset-0 rounded-full bg-surface-container-high opacity-50 animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
+<div class="absolute inset-2 rounded-full border border-outline-variant bg-surface-container-lowest z-10 shadow-sm flex items-center justify-center">
+<span class="material-symbols-outlined text-[48px] text-primary" style="font-variation-settings: 'wght' 200, 'FILL' 0;">check</span>
+</div>
+</div>
+<!-- Typography -->
+<h1 class="text-display-lg font-display-lg text-primary text-center mb-4 tracking-tight">Expense saved</h1>
+<p class="text-body-lg font-body-lg text-secondary text-center max-w-[280px] mb-12">
+            Share the breakdown so everyone sees the same numbers.
+        </p>
+<!-- Link Card Container -->
+<div class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-2 flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+<div class="flex-1 overflow-hidden px-4">
+<p class="text-body-md font-body-md text-primary truncate opacity-80 select-all">
+                    evenup.app/e/A8xQ2Lm9
+                </p>
+</div>
+<button aria-label="Copy Link" class="w-10 h-10 flex-shrink-0 rounded-lg bg-surface-container flex items-center justify-center text-primary hover:bg-surface-variant transition-colors active:scale-95">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'wght' 300;">content_copy</span>
+</button>
+</div>
+</main>
+<!-- Bottom Action Area (Pinned) -->
+<div class="fixed bottom-0 left-0 w-full bg-gradient-to-t from-surface via-surface to-transparent pt-12 pb-6 px-4 z-20 pb-safe">
+<div class="max-w-md mx-auto flex flex-col gap-3">
+<!-- Primary Action -->
+<button class="w-full bg-primary text-on-primary rounded-[12px] h-14 flex items-center justify-center gap-2 text-label-lg font-label-lg hover:opacity-90 active:scale-[0.98] transition-all shadow-md">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'wght' 300;">ios_share</span>
+                Share link
+            </button>
+<!-- Secondary Action -->
+<button class="w-full bg-surface-container border border-outline-variant text-primary rounded-[12px] h-14 flex items-center justify-center gap-2 text-label-lg font-label-lg hover:bg-surface-variant active:scale-[0.98] transition-all">
+                Copy link
+            </button>
+<!-- Tertiary Action -->
+<button class="w-full bg-transparent text-secondary rounded-[12px] h-12 mt-2 flex items-center justify-center text-label-lg font-label-lg hover:text-primary transition-colors">
+                Add another expense
+            </button>
+</div>
+</div>
+<!-- Navigation Suppressed: This is a terminal success screen outside the main navigation loop. -->
+</body></html>

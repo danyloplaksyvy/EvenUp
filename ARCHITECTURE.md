@@ -196,3 +196,32 @@ After the pitch, split it into:
 :feature:review-expense
 :feature:share-expense
 ```
+
+---
+
+## Design reference integration
+
+The design reference files live in:
+
+```text
+docs/design/STITCH_REFERENCE.md
+docs/design/stitch/
+docs/design/original_refs/
+```
+
+Architecture rule:
+
+- Design reference files are documentation only.
+- Feature modules must not import or depend on files from `docs/`.
+- Stitch HTML must not be copied into production Android code.
+- Implement native Compose screens using `:core:designsystem` components.
+
+For UI implementation, use this dependency direction:
+
+```text
+:feature:expense-flow:impl -> :core:designsystem:api
+:feature:expense-flow:impl -> :core:navigation:api
+:feature:expense-flow:impl -> domain api modules
+```
+
+Do not introduce feature-to-design-file runtime dependencies.

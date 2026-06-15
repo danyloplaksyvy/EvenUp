@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Receipt Scan</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#160066",
+                        "on-primary-container": "#848484",
+                        "primary": "#000000",
+                        "surface-variant": "#e2e2e2",
+                        "outline-variant": "#cfc4c5",
+                        "on-secondary-fixed-variant": "#474646",
+                        "secondary-fixed": "#e5e2e1",
+                        "secondary": "#5f5e5e",
+                        "surface": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#160066",
+                        "outline": "#7e7576",
+                        "on-secondary-container": "#656464",
+                        "tertiary-fixed": "#e4dfff",
+                        "on-primary-fixed-variant": "#474747",
+                        "surface-bright": "#f9f9f9",
+                        "tertiary": "#000000",
+                        "secondary-container": "#e5e2e1",
+                        "on-primary-fixed": "#1b1b1b",
+                        "primary-fixed-dim": "#c6c6c6",
+                        "on-tertiary-container": "#7f70fb",
+                        "primary-container": "#1b1b1b",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "surface-container-highest": "#e2e2e2",
+                        "background": "#f9f9f9",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e2e2e2",
+                        "on-surface-variant": "#4c4546",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#1a1c1c",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#4029ba",
+                        "surface-container-low": "#f3f3f3",
+                        "surface-tint": "#5e5e5e",
+                        "surface-dim": "#dadada",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "surface-container-high": "#e8e8e8",
+                        "inverse-primary": "#c6c6c6",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eeeeee",
+                        "tertiary-fixed-dim": "#c6bfff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "margin-desktop": "40px",
+                        "gutter": "16px",
+                        "margin-mobile": "20px",
+                        "stack-md": "16px",
+                        "unit": "4px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Custom subtle pulsing animation for the scanning guide */
+        @keyframes scan-pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; border-color: #000; }
+        }
+        .animate-scan {
+            animation: scan-pulse 3s infinite ease-in-out;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface h-screen w-full flex flex-col antialiased overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface text-primary flex justify-between items-center w-full px-4 h-16 z-10 shrink-0">
+<button aria-label="Close" class="p-2 hover:opacity-80 transition-opacity active:scale-95 flex items-center justify-center rounded-full">
+<span class="material-symbols-outlined text-primary">close</span>
+</button>
+<h1 class="text-headline-md font-headline-md font-bold text-primary">Scan receipt</h1>
+<div class="w-10"></div> <!-- Spacer to balance header -->
+</header>
+<!-- Main Content Area: Camera Viewport -->
+<main class="flex-1 relative flex flex-col bg-inverse-surface w-full max-w-md mx-auto">
+<!-- Simulated Camera Feed Background -->
+<div class="absolute inset-0 bg-cover bg-center z-0" data-alt="A first-person perspective looking down through a smartphone camera lens at a slightly crumpled, detailed white restaurant receipt lying flat on a dark wooden cafe table. The lighting is bright, clear, and natural, creating a high-contrast, minimalist aesthetic. The focus is sharp on the receipt details, suggesting a digital scanning process in a modern fintech application context." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDLGSnAJrMiDTJgEau9g_w-2UPwcocK5dz_oI-eK2AH0V3l371Jr95YLpBlJQq2lVAIDeLfU5f_zNEWDLjTKKmy9U6DcauipdmBiIb3ibWcXU-FyPoSCf7ql2_L0Ve_R1q_8IwtWMNJuWQTRkduwv3cmfFmzN-N6MlKUlhN933JrkEnx7957tqJGekBYOzVkL2zDAGS4oa1Z3pxcN7eZrBsLNpmmoprZfdl_T4BVnld99fB6Vzt2QDAmQ3VezrnE-FcmQ2-wit6kGAU');">
+<!-- Darken overlay to make guides pop -->
+<div class="absolute inset-0 bg-black/40"></div>
+</div>
+<!-- Scanning Guides -->
+<div class="flex-1 relative z-10 p-6 flex flex-col items-center justify-center pointer-events-none">
+<!-- Reticle / Bounding Box -->
+<div class="w-full max-w-xs aspect-[3/4] border-2 border-white/50 rounded-2xl relative animate-scan">
+<!-- Corner accents -->
+<div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-2xl"></div>
+<div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-2xl"></div>
+<div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-2xl"></div>
+<div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-2xl"></div>
+</div>
+<p class="mt-8 text-on-primary text-body-md font-body-md text-center bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm">Align receipt within the frame</p>
+</div>
+<!-- Bottom Controls Bar -->
+<div class="bg-surface w-full p-6 pb-10 flex flex-col items-center gap-6 z-20 rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.05)] shrink-0">
+<!-- Shutter Button -->
+<button class="relative w-20 h-20 rounded-full border-4 border-surface-variant bg-surface flex items-center justify-center group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2" id="btn-capture">
+<div class="w-16 h-16 rounded-full bg-primary group-hover:bg-primary/90 group-active:scale-90 transition-all duration-200"></div>
+</button>
+<!-- Gallery Option -->
+<button class="flex items-center gap-2 px-4 py-2 text-label-lg font-label-lg text-secondary hover:text-primary transition-colors rounded-full hover:bg-surface-variant">
+<span class="material-symbols-outlined text-[20px]">photo_library</span>
+                Choose from gallery
+            </button>
+</div>
+<!-- OVERLAYS (Stacked within the relative main container for scoping) -->
+<!-- Loading Overlay (Initially Hidden) -->
+<div class="absolute inset-0 z-50 bg-surface/95 backdrop-blur-md flex flex-col items-center justify-center p-6 hidden transition-opacity duration-300 opacity-0" id="overlay-loading">
+<div class="relative mb-6">
+<span class="material-symbols-outlined text-[48px] text-surface-variant">receipt_long</span>
+<span class="material-symbols-outlined animate-spin text-[48px] text-primary absolute inset-0">autorenew</span>
+</div>
+<h2 class="text-headline-md font-headline-md text-primary mb-3 text-center">Reading receipt...</h2>
+<p class="text-body-md font-body-md text-secondary text-center max-w-[280px]">Detecting items, tax, tip, and total. This usually takes just a second.</p>
+</div>
+<!-- Error Overlay (Initially Hidden) -->
+<div class="absolute inset-0 z-50 bg-surface flex flex-col items-center justify-center p-6 hidden transition-opacity duration-300 opacity-0" id="overlay-error">
+<div class="w-16 h-16 rounded-full bg-error-container flex items-center justify-center mb-6">
+<span class="material-symbols-outlined text-[32px] text-error fill">warning</span>
+</div>
+<h2 class="text-headline-md font-headline-md text-primary mb-3 text-center">We couldn't read this receipt</h2>
+<p class="text-body-md font-body-md text-secondary text-center max-w-[300px] mb-10">Make sure the receipt is fully visible, well-lit, and text is clear.</p>
+<div class="w-full flex flex-col gap-3 max-w-sm">
+<button class="w-full py-4 rounded-xl bg-primary text-on-primary text-label-lg font-label-lg text-center hover:bg-primary/90 active:scale-[0.98] transition-all" id="btn-try-again">
+                    Try again
+                </button>
+<button class="w-full py-4 rounded-xl bg-surface-variant text-primary text-label-lg font-label-lg text-center hover:bg-surface-container-high active:scale-[0.98] transition-all">
+                    Enter manually
+                </button>
+</div>
+</div>
+</main>
+<!-- Interaction Script -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnCapture = document.getElementById('btn-capture');
+            const btnTryAgain = document.getElementById('btn-try-again');
+            const overlayLoading = document.getElementById('overlay-loading');
+            const overlayError = document.getElementById('overlay-error');
+
+            function showOverlay(overlay) {
+                overlay.classList.remove('hidden');
+                // Small delay to allow display:block to apply before animating opacity
+                setTimeout(() => {
+                    overlay.classList.remove('opacity-0');
+                    overlay.classList.add('opacity-100');
+                }, 10);
+            }
+
+            function hideOverlay(overlay) {
+                overlay.classList.remove('opacity-100');
+                overlay.classList.add('opacity-0');
+                // Wait for transition before hiding
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 300);
+            }
+
+            // Simulate capture process
+            btnCapture.addEventListener('click', () => {
+                showOverlay(overlayLoading);
+                
+                // Simulate network request/processing delay, then show error state for demonstration
+                setTimeout(() => {
+                    hideOverlay(overlayLoading);
+                    setTimeout(() => {
+                        showOverlay(overlayError);
+                    }, 300);
+                }, 2500);
+            });
+
+            // Reset flow
+            btnTryAgain.addEventListener('click', () => {
+                hideOverlay(overlayError);
+            });
+        });
+    </script>
+</body></html>

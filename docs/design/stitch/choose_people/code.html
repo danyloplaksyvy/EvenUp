@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvenUp - Who was involved?</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#160066",
+                        "on-primary-container": "#848484",
+                        "primary": "#000000",
+                        "surface-variant": "#e2e2e2",
+                        "outline-variant": "#cfc4c5",
+                        "on-secondary-fixed-variant": "#474646",
+                        "secondary-fixed": "#e5e2e1",
+                        "secondary": "#5f5e5e",
+                        "surface": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#160066",
+                        "outline": "#7e7576",
+                        "on-secondary-container": "#656464",
+                        "tertiary-fixed": "#e4dfff",
+                        "on-primary-fixed-variant": "#474747",
+                        "surface-bright": "#f9f9f9",
+                        "tertiary": "#000000",
+                        "secondary-container": "#e5e2e1",
+                        "on-primary-fixed": "#1b1b1b",
+                        "primary-fixed-dim": "#c6c6c6",
+                        "on-tertiary-container": "#7f70fb",
+                        "primary-container": "#1b1b1b",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#2f3131",
+                        "surface-container-highest": "#e2e2e2",
+                        "background": "#f9f9f9",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e2e2e2",
+                        "on-surface-variant": "#4c4546",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#1a1c1c",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#4029ba",
+                        "surface-container-low": "#f3f3f3",
+                        "surface-tint": "#5e5e5e",
+                        "surface-dim": "#dadada",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "surface-container-high": "#e8e8e8",
+                        "inverse-primary": "#c6c6c6",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eeeeee",
+                        "tertiary-fixed-dim": "#c6bfff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "margin-desktop": "40px",
+                        "gutter": "16px",
+                        "margin-mobile": "20px",
+                        "stack-md": "16px",
+                        "unit": "4px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "500"}],
+                        "display-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen flex justify-center">
+<div class="w-full max-w-md bg-surface-container-lowest min-h-screen relative shadow-sm border-x border-outline-variant flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-4 h-16 bg-surface-container-lowest sticky top-0 z-10 border-b border-surface-variant">
+<button class="text-on-surface hover:opacity-80 transition-transform active:scale-95 flex items-center justify-center p-2 rounded-full">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="text-headline-md font-headline-md font-bold text-primary flex-1 text-center">Who was involved?</h1>
+<div class="w-10"></div> <!-- Spacer for centering -->
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto pb-32">
+<!-- Selected People Section -->
+<section class="p-gutter pt-stack-md">
+<h2 class="text-label-lg font-label-lg text-secondary mb-stack-sm">Selected</h2>
+<!-- Horizontal scroll for selected users -->
+<div class="flex overflow-x-auto hide-scrollbar gap-stack-sm pb-2">
+<!-- You (Selected) -->
+<div class="flex flex-col items-center gap-unit shrink-0 relative group">
+<div class="w-14 h-14 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center text-body-lg font-body-lg shadow-sm">
+                            Y
+                        </div>
+<button class="absolute -top-1 -right-1 w-5 h-5 bg-surface-container-lowest rounded-full border border-outline-variant flex items-center justify-center text-secondary hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[14px]" data-icon="close">close</span>
+</button>
+<span class="text-label-sm font-label-sm text-on-surface">You</span>
+</div>
+<!-- Anna -->
+<div class="flex flex-col items-center gap-unit shrink-0 relative group">
+<div class="w-14 h-14 rounded-full overflow-hidden shadow-sm bg-surface-variant">
+<img alt="Anna" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEKx6aFO-jYlpy6q8tvtMNGVXS6vTvh5aVoiJYkQZptuCDluCbBl_p52bzlq3ARbEQiuh-sMTSv6hs1Bojd2YZCPSdHy3yuVIlH-kOXcxT1bB422tf5_AXJydzsjgxfQj_nrlVpDyKiMf0q3hAx4Vn_LkOmc6yiCHbPXC6kQCnmLrFTT-VvPNMrgbuH7Gv66bTQcVjiSCVeYDmjAfI5b1psr_lHlB_euyQo51QKto5C0wN-iK6A_AyIfGN_6Bi5uY5j2NmwE0UR3tS"/>
+</div>
+<button class="absolute -top-1 -right-1 w-5 h-5 bg-surface-container-lowest rounded-full border border-outline-variant flex items-center justify-center text-secondary hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[14px]" data-icon="close">close</span>
+</button>
+<span class="text-label-sm font-label-sm text-on-surface">Anna</span>
+</div>
+<!-- Ben -->
+<div class="flex flex-col items-center gap-unit shrink-0 relative group">
+<div class="w-14 h-14 rounded-full overflow-hidden shadow-sm bg-surface-variant">
+<img alt="Ben" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHWA8CQeikMFlKt0mfQeMpNpoRDcVOEwUqOn-rFzNx1gfzFQghXADjSXFa7n8OiflyaL3PT1NR5d9AoqQPqkALuvnDMh6kjUQlZw3PkSFXs0CJyjhWnIpa6pdtn7o2wAvfUvroeiHLleSlYsYNBQVgy_GG5xL4F2O3ue6KKyKuoysnHvF6BZYMt8i3lo8NjZcdPxYerJN8eCyljTykg_9euvolAANWBHti0_pPp7arlF7ETdjLiyD-lrrclwBaDzkcVfnMUHyD0Mk6"/>
+</div>
+<button class="absolute -top-1 -right-1 w-5 h-5 bg-surface-container-lowest rounded-full border border-outline-variant flex items-center justify-center text-secondary hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[14px]" data-icon="close">close</span>
+</button>
+<span class="text-label-sm font-label-sm text-on-surface">Ben</span>
+</div>
+<!-- Chris -->
+<div class="flex flex-col items-center gap-unit shrink-0 relative group">
+<div class="w-14 h-14 rounded-full overflow-hidden shadow-sm bg-surface-variant">
+<img alt="Chris" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBt34Q4gFZmOdak2wlwef_5Wvhvgjf5YWgVhEYShx7zu38TnqVaQ9V_FFuUf_GtqNbVUxiGJgcs5FLE4FR2QGh2Zzu6XmY-OgIdHFtZOkYQ2BtuDj7EFuDkGA_O1M0c8n81TZizvzq1JD2pO-3korJVhvCrsyO5xRdYgZeXq9bjS2NDQYflfP-k_NwV01ynDafYXs49sMNjdS9UoOGqAqctyYZ2Is0QE8oudH21dnHGxDiv77oiniJv1tsJUZ_1s0Gn9qDG19Rq7nLx"/>
+</div>
+<button class="absolute -top-1 -right-1 w-5 h-5 bg-surface-container-lowest rounded-full border border-outline-variant flex items-center justify-center text-secondary hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[14px]" data-icon="close">close</span>
+</button>
+<span class="text-label-sm font-label-sm text-on-surface">Chris</span>
+</div>
+</div>
+</section>
+<!-- Search Input -->
+<section class="px-gutter mb-stack-md">
+<div class="relative flex items-center w-full h-12 bg-surface-container-low rounded-xl border border-transparent focus-within:border-primary transition-colors">
+<span class="material-symbols-outlined absolute left-4 text-secondary" data-icon="search">search</span>
+<input class="w-full h-full bg-transparent border-none focus:ring-0 pl-12 pr-4 text-body-md text-on-surface placeholder-secondary rounded-xl" placeholder="Search or add a person" type="text"/>
+</div>
+</section>
+<!-- Suggestions List -->
+<section class="px-gutter pb-stack-lg border-b border-surface-variant">
+<h2 class="text-label-lg font-label-lg text-secondary mb-stack-sm">Suggested</h2>
+<div class="flex flex-col">
+<!-- Maya -->
+<button class="flex items-center justify-between py-3 hover:bg-surface-container-low transition-colors rounded-lg px-2 -mx-2">
+<div class="flex items-center gap-stack-md">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-variant">
+<img alt="Maya" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDl13flvnodPi0WuisONb6UKQe7XbFrsg3H17hADSoHLoFDlK-o0V_oaz07k6u9D33InMMUOTt4kDjVYtgV_JeGCgq1INSMC7aenQ021AF7C-xlEa2c4NCKlZInv41ga0a-uRuniSR1qcCw8rye95DwlKXlBuWWYk-6aarR1zDaZEXpDlIIhGvcjk4qLh_1rBiWflq6RXA7wUJ2FdM4Zqu4b-lYLWTpyHeMZMYZBiWijjtveDFaY_utwAGasm3lN9ok9UoFcQ1DrjEo"/>
+</div>
+<span class="text-body-md font-body-md text-on-surface">Maya</span>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="add">add</span>
+</button>
+<!-- Alex -->
+<button class="flex items-center justify-between py-3 hover:bg-surface-container-low transition-colors rounded-lg px-2 -mx-2">
+<div class="flex items-center gap-stack-md">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-variant">
+<img alt="Alex" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPRilQ3NLUqD1Ud4Ul3tshstqceGoDvApAl__OZ_pqbapsGsml5hdU-4wpO1la0qfxzaeprjgw6P9VGdhkifvj5iCiopPPIuJEb6XpprbpN9bjMSuVCNBvZqIzZwy8p1araVILRjbeVWWmxMTtDxxIvakZcRY-T1ltQrY5UMrMUgC3q8ODah04hmol1xaA6NnMAOg0EwMPhSNxksj2h_lVdNKktWDhvYuPveLiJPttiFoRZBtUVLoBW4DbaKqXx1feQpuiPKoc-Tpg"/>
+</div>
+<span class="text-body-md font-body-md text-on-surface">Alex</span>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="add">add</span>
+</button>
+<!-- Sophie -->
+<button class="flex items-center justify-between py-3 hover:bg-surface-container-low transition-colors rounded-lg px-2 -mx-2">
+<div class="flex items-center gap-stack-md">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-variant">
+<img alt="Sophie" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWdkr7nmtm7SD1FfwIx-6GrQYiypPahDnjTulZs5arJup2EuCiTnyrQee4ZYCvIy786BKNMXQ1ejLKIT_7zQo6hIFi0hqBr2iTFMyK2QtzjE933Kb7BABlNnEDsZmJc4gfhOnjUnNb0zOxRDh-L-PjldmeGIjDmTW0tnrDQjeZko6H7Us2uz5VgclFseVIrU4lle_DKsCE5ks_U0Z9EXsSksOVJeo5gqwXGvCDVUqbtB9f_h6Y3a8-ZJgOgBO2_HQ2h8jf-NbdpaZL"/>
+</div>
+<span class="text-body-md font-body-md text-on-surface">Sophie</span>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="add">add</span>
+</button>
+</div>
+</section>
+<!-- Who Paid Section (New requirement) -->
+<section class="p-gutter pt-stack-md">
+<h2 class="text-label-lg font-label-lg text-secondary mb-stack-sm">Who paid?</h2>
+<div class="grid grid-cols-2 gap-stack-sm">
+<!-- You (Payer selected) -->
+<button class="flex items-center gap-stack-sm p-3 rounded-xl border-2 border-primary bg-surface-container-lowest transition-all">
+<div class="w-8 h-8 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center text-label-sm font-label-sm">
+                            Y
+                        </div>
+<span class="text-body-md font-body-md text-on-surface font-semibold">You</span>
+</button>
+<!-- Anna -->
+<button class="flex items-center gap-stack-sm p-3 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-variant transition-all">
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-variant">
+<img alt="Anna" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhU0VzQOhAlPw4JSr_XT9bwLScG4R3BP8a6A8Pv7sl2GiXIVyhMH_g0H5U3T7CfPruEINbrsf6K4qW1ILE3GmLSEEertIaBMfc3Z8MpUiJnCwMkXTr3bZbJH4aNVRHDYj3K1NQbfHgmtkwkXmqSjwhsgxxxEEHxb8xuUPeuFJ9bQhSBg3wTjSY4QyQlop5l6YluhSr79fpzUeaf_N705bDjJtvNzM74ivaU88o1R9Twxmdx8Gffj5bhAUpe4xhJUy8omVSYUkiYC2q"/>
+</div>
+<span class="text-body-md font-body-md text-on-surface">Anna</span>
+</button>
+<!-- Ben -->
+<button class="flex items-center gap-stack-sm p-3 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-variant transition-all">
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-variant">
+<img alt="Ben" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYfyxipNQI7DQE-LSBXJegUM6n2VeCLqdlrlv0uhQFAio_YGFM7K-Ort9M1MJ-DtZO3XoI5vMkuyJLvJm6qZWgcUCydvXEF4TzwpF20qWseMoq_gbvSz5JjFb00lzoB6OsBZsrpMhQdE0Z_oxyH0sxnPvyXPjjLFpuiEpGjrKCyzS8w5j5XifQEPGZcAkrx4wPfM0oPA_7mwIGHwHg5AA8UnWug7Yje0zhEMFenFQ0MrtasGX4cqBlfb4MWS9A71uL3dRUMEQvioK3"/>
+</div>
+<span class="text-body-md font-body-md text-on-surface">Ben</span>
+</button>
+<!-- Chris -->
+<button class="flex items-center gap-stack-sm p-3 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-variant transition-all">
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-variant">
+<img alt="Chris" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQvKyNaYuev5KkSyWEUfS689dGpYQFxmrYzRj3mGCVNdNzkc5S2OHDm7B5GaWb-luVGpiFyuu51WAhOy7Uqr-5h1u7v-MVnRSWSppGCJAqeqM2OOttbdjOKkWgia1_eV2g0yu9CuBBs16QEUvVXlYT9vv36bMhZl4CmJNCTdZWqGaZYt6QjIXXS4eHG2O_ooo0pL209NCL-r_X2b9mbYjycGP9KC8AH7oZIS-9v5Rsy-2nfPywdJydkmONypNtj3fLb19YNiNA8i47"/>
+</div>
+<span class="text-body-md font-body-md text-on-surface">Chris</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Bottom Action Bar -->
+<div class="fixed bottom-0 w-full max-w-md bg-surface-container-lowest p-gutter border-t border-surface-variant z-20">
+<button class="w-full bg-primary text-on-primary py-4 rounded-xl text-label-lg font-label-lg font-bold hover:bg-surface-tint active:scale-[0.98] transition-all flex justify-center items-center">
+                Continue
+            </button>
+</div>
+</div>
+</body></html>

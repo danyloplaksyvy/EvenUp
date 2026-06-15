@@ -4,6 +4,15 @@
 
 These instructions apply to the Cloudflare Worker backend.
 
+## Required context for backend work
+
+Before backend implementation, read:
+
+- root `AGENTS.md`
+- `API_CONTRACT.md`
+- `MVP_SCOPE.md`
+- `docs/design/STITCH_REFERENCE.md` only when rendering the guest web page
+
 ## Backend responsibilities
 
 The Worker must:
@@ -22,6 +31,15 @@ Do not store receipt images unless explicitly requested.
 Guest links are public but must be unguessable.
 Use random base62 share IDs, preferably 8-12 characters.
 Return safe error messages to clients.
+
+## Guest web design rules
+
+For `GET /e/:shareId`, use the guest view reference:
+
+- `docs/design/stitch/guest_view_web/screen.png`
+- `docs/design/stitch/guest_view_web/code.html`
+
+The guest page must be mobile-first, read-only, white/black, and visually consistent with the Android app. It does not need to use the Android design system, but it should preserve the same product hierarchy and tone.
 
 ## D1 MVP schema
 

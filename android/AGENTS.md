@@ -4,6 +4,19 @@
 
 These instructions apply to the Android app.
 
+## Required context for Android work
+
+Before Android implementation, read:
+
+- root `AGENTS.md`
+- `ARCHITECTURE.md`
+- `MVP_SCOPE.md`
+- `CALCULATIONS.md` for domain/calculation work
+- `DESIGN_SYSTEM.md` for UI work
+- `docs/design/STITCH_REFERENCE.md` for UI work
+
+For screen implementation, inspect the matching Stitch folder under `docs/design/stitch/`.
+
 ## Architecture
 
 Use real Gradle modules and API/implementation separation.
@@ -46,6 +59,28 @@ Each screen should have:
 
 ViewModels must not contain split calculation logic.
 They should call domain use cases.
+
+## Design implementation rules
+
+The Stitch export under `docs/design/stitch/` is a visual reference only.
+Do not copy generated HTML/CSS into Compose.
+Do not implement web-specific Tailwind classes.
+Translate layout and hierarchy into native Compose using the design system.
+
+Feature screens should use design system tokens/components, for example:
+
+- EvenUpPrimaryButton
+- EvenUpSecondaryButton
+- EvenUpCard
+- EvenUpTextField
+- EvenUpMoneyField
+- EvenUpParticipantAvatar
+- EvenUpBottomSheet
+- EvenUpBottomActionBar
+- EvenUpValidationMessage
+
+Do not hardcode colors in feature screens.
+If a reusable component is missing, add it to `:core:designsystem` rather than duplicating styling in a feature screen.
 
 ## Naming conventions
 
