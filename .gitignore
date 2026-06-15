@@ -21,13 +21,7 @@ local.properties
 *.key
 
 # Android Studio / IntelliJ local state
-.idea/caches/
-.idea/libraries/
-.idea/modules.xml
-.idea/workspace.xml
-.idea/navEditor.xml
-.idea/assetWizardSettings.xml
-.idea/deploymentTargetSelector.xml
+.idea/
 
 # Kotlin / Java tooling
 .kotlin/
