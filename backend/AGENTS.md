@@ -76,3 +76,25 @@ npm run dev
 ```
 
 If commands do not exist yet, add minimal scripts and document them.
+
+## Local Worker commands
+
+Run Worker commands from `backend/`:
+
+```bash
+npm install
+npm test
+npm run typecheck
+npm run dev
+```
+
+Local health check:
+
+```bash
+curl http://localhost:8787/health
+```
+
+Secrets and bindings for later milestones:
+
+- Configure `OPENAI_API_KEY` as a Worker secret when implementing receipt parsing in T054.
+- Add the `EXPENSES_DB` D1 binding when implementing persistence in T051.

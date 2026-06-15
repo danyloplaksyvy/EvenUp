@@ -494,7 +494,7 @@ Done when:
 
 ## T050 - Create Cloudflare Worker baseline
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 

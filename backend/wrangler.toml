@@ -1,0 +1,6 @@
+name = "evenup-worker"
+main = "src/index.js"
+compatibility_date = "2026-06-15"
+
+[vars]
+PUBLIC_BASE_URL = "http://localhost:8787"
