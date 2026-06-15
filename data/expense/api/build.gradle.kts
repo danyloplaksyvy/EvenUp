@@ -3,7 +3,8 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":domain:expense:api"))
-    implementation(project(":domain:participant:api"))
-    implementation(project(":domain:receipt:api"))
+    api(project(":data:sharing:api"))
+    api(project(":domain:expense:api"))
+    api(project(":domain:participant:api"))
+    api(project(":domain:receipt:api"))
 }

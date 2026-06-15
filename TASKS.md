@@ -648,7 +648,7 @@ Done when:
 
 ## T060 - Implement network core
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -667,7 +667,7 @@ Done when:
 
 ## T061A - Implement receipt repository and DTO mapper
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -687,7 +687,7 @@ Done when:
 
 ## T062A - Implement expense save repository
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
