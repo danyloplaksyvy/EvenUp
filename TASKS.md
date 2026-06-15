@@ -513,7 +513,7 @@ Done when:
 
 ## T051 - Add D1 migration
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -532,7 +532,7 @@ Done when:
 
 ## T052 - Implement save finalized expense endpoint
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -553,7 +553,7 @@ Done when:
 
 ## T053 - Implement fetch public expense endpoint
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -573,7 +573,7 @@ Done when:
 
 ## T054 - Implement receipt parse endpoint
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -600,7 +600,7 @@ Done when:
 
 ## T061 - Implement guest web page
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -626,7 +626,7 @@ Done when:
 
 ## T062 - Implement guest web error states
 
-Status: TODO
+Status: DONE
 Priority: P1
 Scope:
 

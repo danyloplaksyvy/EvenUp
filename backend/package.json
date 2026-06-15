@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:migrate:local": "wrangler d1 migrations apply evenup-expenses --local",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "test": "node --test",
