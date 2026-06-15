@@ -1,3 +1,6 @@
+import com.android.build.api.dsl.ApplicationExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,7 +10,7 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-android {
+extensions.configure<ApplicationExtension>("android") {
     namespace = "com.dps.evenup"
     compileSdk = 37
 
@@ -40,12 +43,15 @@ android {
 }
 
 kotlin {
-    jvmToolchain(11)
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
+    }
 }
 
 dependencies {
     implementation(project(":core:camera:impl"))
     implementation(project(":core:datastore:impl"))
+    implementation(project(":core:designsystem:api"))
     implementation(project(":core:designsystem:impl"))
     implementation(project(":core:navigation:impl"))
     implementation(project(":core:network:impl"))

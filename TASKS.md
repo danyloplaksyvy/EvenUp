@@ -183,7 +183,7 @@ Done when:
 
 ## T005 - Implement design tokens and app theme
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
