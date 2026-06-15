@@ -212,7 +212,7 @@ Done when:
 
 ## T006 - Implement base design system components
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
