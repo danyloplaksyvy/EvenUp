@@ -280,7 +280,7 @@ Done when:
 
 ## T010 - Define domain value objects
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -312,7 +312,7 @@ Validation:
 
 ## T011 - Define receipt and participant models
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -330,7 +330,7 @@ Done when:
 
 ## T012 - Define assignment and fee allocation models
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
