@@ -48,6 +48,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:camera:api"))
     implementation(project(":core:camera:impl"))
     implementation(project(":core:datastore:api"))
     implementation(project(":core:datastore:impl"))
@@ -61,6 +62,7 @@ dependencies {
     implementation(project(":data:expense:api"))
     implementation(project(":data:participant:api"))
     implementation(project(":data:participant:impl"))
+    implementation(project(":data:receipt:api"))
     implementation(project(":data:receipt:impl"))
     implementation(project(":data:sharing:api"))
     implementation(project(":data:sharing:impl"))

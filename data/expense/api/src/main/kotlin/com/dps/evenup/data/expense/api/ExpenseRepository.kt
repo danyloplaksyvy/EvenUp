@@ -18,5 +18,13 @@ interface ExpenseDraftRepository {
 
 class ExpenseDataException(
     message: String,
+    val reason: ExpenseDataFailureReason = ExpenseDataFailureReason.Unknown,
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
+
+enum class ExpenseDataFailureReason {
+    Connection,
+    Timeout,
+    Rejected,
+    Unknown,
+}

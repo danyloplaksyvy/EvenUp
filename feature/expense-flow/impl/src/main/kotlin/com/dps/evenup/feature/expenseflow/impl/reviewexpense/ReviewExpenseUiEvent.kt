@@ -5,5 +5,7 @@ sealed interface ReviewExpenseUiEvent {
 
     data object SaveClick : ReviewExpenseUiEvent
 
+    data object SaveRetryClick : ReviewExpenseUiEvent
+
     data object BackClick : ReviewExpenseUiEvent
 }

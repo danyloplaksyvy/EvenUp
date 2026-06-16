@@ -2,7 +2,9 @@ package com.dps.evenup.data.receipt.impl
 
 import com.dps.evenup.core.network.api.WorkerApiClient
 import com.dps.evenup.core.network.api.WorkerApiResult
+import com.dps.evenup.core.network.api.WorkerNetworkError
 import com.dps.evenup.data.receipt.api.ReceiptDataException
+import com.dps.evenup.data.receipt.api.ReceiptDataFailureReason
 import com.dps.evenup.data.receipt.api.ReceiptImageParseRequest
 import com.dps.evenup.data.receipt.api.ReceiptRepository
 import com.dps.evenup.domain.receipt.api.CurrencyCode
@@ -29,7 +31,10 @@ class WorkerReceiptRepository(
         val requestBody = json.encodeToString(request.toDto())
         val response = workerApiClient.postJson("/v1/receipts/parse", requestBody)
         return when (response) {
-            is WorkerApiResult.Failure -> throw ReceiptDataException("Receipt parse request failed.")
+            is WorkerApiResult.Failure -> throw ReceiptDataException(
+                message = "Receipt parse request failed.",
+                reason = response.error.toReceiptFailureReason(),
+            )
             is WorkerApiResult.Success -> mapReceipt(response.response.body)
         }
     }
@@ -38,13 +43,13 @@ class WorkerReceiptRepository(
         val dto = try {
             json.decodeFromString<ReceiptParseResponseDto>(body)
         } catch (error: SerializationException) {
-            throw ReceiptDataException("Receipt parse response was invalid.", error)
+            throw ReceiptDataException("Receipt parse response was invalid.", cause = error)
         }
 
         return try {
             dto.toDomain()
         } catch (error: IllegalArgumentException) {
-            throw ReceiptDataException("Receipt parse response contained invalid values.", error)
+            throw ReceiptDataException("Receipt parse response contained invalid values.", cause = error)
         }
     }
 
@@ -54,6 +59,16 @@ class WorkerReceiptRepository(
         localeHint = localeHint,
         currencyHint = currencyHint,
     )
+}
+
+private fun WorkerNetworkError.toReceiptFailureReason(): ReceiptDataFailureReason = when (this) {
+    WorkerNetworkError.ConnectionFailed,
+    WorkerNetworkError.InvalidBaseUrl,
+    WorkerNetworkError.InvalidPath,
+    -> ReceiptDataFailureReason.Connection
+    WorkerNetworkError.Timeout -> ReceiptDataFailureReason.Timeout
+    is WorkerNetworkError.HttpFailure -> ReceiptDataFailureReason.ParseRejected
+    WorkerNetworkError.Unknown -> ReceiptDataFailureReason.Unknown
 }
 
 private fun ReceiptParseResponseDto.toDomain(): Receipt = Receipt(

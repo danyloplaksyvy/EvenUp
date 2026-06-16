@@ -28,6 +28,7 @@ import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpCard
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
+import com.dps.evenup.core.designsystem.api.EvenUpPrimaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpParticipantAvatar
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
 import com.dps.evenup.core.designsystem.api.EvenUpTopBar
@@ -90,7 +91,11 @@ private fun ReviewExpenseContent(
                 EvenUpValidationMessage(message = error)
             }
             uiState.submitError?.let { error ->
-                EvenUpValidationMessage(message = error)
+                SaveErrorCard(
+                    message = error,
+                    onRetry = { onEvent(ReviewExpenseUiEvent.SaveRetryClick) },
+                    retryEnabled = uiState.canSave && !uiState.isSaving,
+                )
             }
         }
         EvenUpBottomActionBar(
@@ -98,6 +103,27 @@ private fun ReviewExpenseContent(
             onPrimaryClick = { onEvent(ReviewExpenseUiEvent.SaveClick) },
             primaryEnabled = uiState.canSave && !uiState.isSaving,
             modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+}
+
+@Composable
+private fun SaveErrorCard(
+    message: String,
+    onRetry: () -> Unit,
+    retryEnabled: Boolean,
+) {
+    EvenUpCard {
+        Text(
+            text = "Save failed",
+            style = EvenUpTheme.typography.sectionTitle,
+            color = EvenUpTheme.colors.textPrimary,
+        )
+        EvenUpValidationMessage(message = message)
+        EvenUpPrimaryButton(
+            text = "Try saving again",
+            onClick = onRetry,
+            enabled = retryEnabled,
         )
     }
 }

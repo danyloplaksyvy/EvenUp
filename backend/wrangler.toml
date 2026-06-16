@@ -3,10 +3,9 @@ main = "src/index.js"
 compatibility_date = "2026-06-15"
 
 [vars]
-PUBLIC_BASE_URL = "http://localhost:8787"
+PUBLIC_BASE_URL = "https://evenup-worker.danyaplaksyvy.workers.dev"
 
 [[d1_databases]]
 binding = "EXPENSES_DB"
-database_name = "evenup-expenses"
-database_id = "local-evenup-expenses"
-migrations_dir = "migrations"
+database_name = "evenup-expenses-db"
+database_id = "f157e75b-9a20-4739-b3a1-012864f91591"

@@ -1034,7 +1034,7 @@ Done when:
 
 ## T110 - Add CameraX capture
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1051,7 +1051,7 @@ Done when:
 
 ## T111 - Add Android Photo Picker gallery import
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1068,7 +1068,7 @@ Done when:
 
 ## T071 - Implement Receipt Scan screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1088,7 +1088,7 @@ Done when:
 
 ## T112 - Integrate OpenAI receipt parsing through Worker
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1113,7 +1113,7 @@ Done when:
 
 ## T120 - Implement validation and error states
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1134,7 +1134,7 @@ Done when:
 
 ## T121 - Domain regression test suite
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1150,7 +1150,7 @@ Done when:
 
 ## T122 - End-to-end manual flow smoke test
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1167,7 +1167,7 @@ Done when:
 
 ## T123 - End-to-end receipt scan smoke test
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1186,7 +1186,7 @@ Done when:
 
 ## T124 - Final UI polish pass
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1210,7 +1210,7 @@ Done when:
 
 ## T900 - Architecture and scope review
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 

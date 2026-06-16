@@ -15,5 +15,13 @@ data class ReceiptImageParseRequest(
 
 class ReceiptDataException(
     message: String,
+    val reason: ReceiptDataFailureReason = ReceiptDataFailureReason.Unknown,
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
+
+enum class ReceiptDataFailureReason {
+    Connection,
+    Timeout,
+    ParseRejected,
+    Unknown,
+}

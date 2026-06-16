@@ -1,9 +1,14 @@
 package com.dps.evenup.di
 
 import android.content.Context
+import android.content.ContentResolver
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.core.DataStore
+import com.dps.evenup.core.camera.api.ReceiptCaptureTargetFactory
+import com.dps.evenup.core.camera.api.ReceiptImageReader
+import com.dps.evenup.core.camera.impl.DefaultReceiptCaptureTargetFactory
+import com.dps.evenup.core.camera.impl.DefaultReceiptImageReader
 import com.dps.evenup.core.datastore.api.StringDataStore
 import com.dps.evenup.core.datastore.impl.PreferencesStringDataStore
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
@@ -12,6 +17,8 @@ import com.dps.evenup.data.expense.impl.DataStoreExpenseDraftRepository
 import com.dps.evenup.data.expense.impl.WorkerExpenseRepository
 import com.dps.evenup.data.participant.api.SavedParticipantRepository
 import com.dps.evenup.data.participant.impl.DataStoreSavedParticipantRepository
+import com.dps.evenup.data.receipt.api.ReceiptRepository
+import com.dps.evenup.data.receipt.impl.WorkerReceiptRepository
 import com.dps.evenup.data.sharing.api.ShareLinkResponseMapper
 import com.dps.evenup.data.sharing.impl.DefaultShareLinkResponseMapper
 import com.dps.evenup.core.network.api.WorkerApiClient
@@ -63,13 +70,37 @@ object ReceiptDraftModule {
 
     @Provides
     @Singleton
-    fun provideWorkerApiConfig(): WorkerApiConfig = WorkerApiConfig("http://10.0.2.2:8787")
+    fun provideWorkerApiConfig(): WorkerApiConfig = WorkerApiConfig("https://evenup-worker.danyaplaksyvy.workers.dev")
 
     @Provides
     @Singleton
     fun provideWorkerApiClient(
         config: WorkerApiConfig,
     ): WorkerApiClient = DefaultWorkerApiClient(config)
+
+    @Provides
+    @Singleton
+    fun provideContentResolver(
+        @ApplicationContext context: Context,
+    ): ContentResolver = context.contentResolver
+
+    @Provides
+    @Singleton
+    fun provideReceiptImageReader(
+        contentResolver: ContentResolver,
+    ): ReceiptImageReader = DefaultReceiptImageReader(contentResolver)
+
+    @Provides
+    @Singleton
+    fun provideReceiptCaptureTargetFactory(
+        @ApplicationContext context: Context,
+    ): ReceiptCaptureTargetFactory = DefaultReceiptCaptureTargetFactory(context)
+
+    @Provides
+    @Singleton
+    fun provideReceiptRepository(
+        workerApiClient: WorkerApiClient,
+    ): ReceiptRepository = WorkerReceiptRepository(workerApiClient)
 
     @Provides
     fun provideShareLinkResponseMapper(): ShareLinkResponseMapper = DefaultShareLinkResponseMapper()

@@ -49,6 +49,7 @@ import com.dps.evenup.core.designsystem.api.EvenUpTextField
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
 import com.dps.evenup.core.designsystem.api.EvenUpTopBar
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
+import com.dps.evenup.core.designsystem.api.EvenUpValidationSeverity
 
 @Composable
 fun AssignItemsScreen(
@@ -199,6 +200,12 @@ private fun ReceiptAssignmentCard(
                     },
                     onClick = { onEvent(AssignItemsUiEvent.ItemTapped(item.id)) },
                 )
+                if (item.assignmentState != AssignItemsItemState.Assigned) {
+                    EvenUpValidationMessage(
+                        message = item.assignmentWarning,
+                        severity = EvenUpValidationSeverity.Warning,
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -523,7 +530,10 @@ private fun SplitSheetFooter(
         textAlign = TextAlign.Center,
     )
     sheet.error?.let { error ->
-        EvenUpValidationMessage(message = error)
+        EvenUpValidationMessage(
+            message = error,
+            severity = EvenUpValidationSeverity.Warning,
+        )
     }
     EvenUpPrimaryButton(
         text = "Save split",
@@ -531,6 +541,13 @@ private fun SplitSheetFooter(
         enabled = sheet.canSave,
     )
 }
+
+private val AssignItemsReceiptItemUiState.assignmentWarning: String
+    get() = when (assignmentState) {
+        AssignItemsItemState.Unassigned -> "This item is not assigned yet. Tap a person, then tap this item."
+        AssignItemsItemState.Partial -> "This item is only partially assigned. Use Edit split to finish it."
+        AssignItemsItemState.Assigned -> ""
+    }
 
 private fun AssignItemsItemState.toDesignState(): EvenUpReceiptItemState {
     return when (this) {

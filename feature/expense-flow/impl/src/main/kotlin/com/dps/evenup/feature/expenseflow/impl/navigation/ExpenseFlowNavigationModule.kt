@@ -2,9 +2,12 @@ package com.dps.evenup.feature.expenseflow.impl.navigation
 
 import com.dps.evenup.core.navigation.api.EvenUpEntryProviderInstaller
 import com.dps.evenup.core.navigation.api.EvenUpNavigator
+import com.dps.evenup.core.camera.api.ReceiptCaptureTargetFactory
+import com.dps.evenup.core.camera.api.ReceiptImageReader
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.expense.api.ExpenseRepository
 import com.dps.evenup.data.participant.api.SavedParticipantRepository
+import com.dps.evenup.data.receipt.api.ReceiptRepository
 import com.dps.evenup.domain.expense.api.AllocateFeesUseCase
 import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
@@ -26,7 +29,7 @@ import com.dps.evenup.feature.expenseflow.impl.expensesaved.ExpenseSavedRoute
 import com.dps.evenup.feature.expenseflow.impl.feesallocation.FeesAllocationRoute
 import com.dps.evenup.feature.expenseflow.impl.manualentry.ManualReceiptEntryRoute
 import com.dps.evenup.feature.expenseflow.impl.newexpense.NewExpenseRoute
-import com.dps.evenup.feature.expenseflow.impl.placeholder.ExpenseFlowPlaceholderRoute
+import com.dps.evenup.feature.expenseflow.impl.receiptscan.ReceiptScanRoute
 import com.dps.evenup.feature.expenseflow.impl.receiptreview.ReceiptReviewRoute
 import com.dps.evenup.feature.expenseflow.impl.reviewexpense.ReviewExpenseRoute
 import dagger.Module
@@ -44,6 +47,9 @@ object ExpenseFlowNavigationModule {
         navigator: EvenUpNavigator,
         draftRepository: ExpenseDraftRepository,
         expenseRepository: ExpenseRepository,
+        receiptRepository: ReceiptRepository,
+        receiptImageReader: ReceiptImageReader,
+        receiptCaptureTargetFactory: ReceiptCaptureTargetFactory,
         savedParticipantRepository: SavedParticipantRepository,
         allocateFees: AllocateFeesUseCase,
         calculateSummary: CalculateExpenseSummaryUseCase,
@@ -60,10 +66,15 @@ object ExpenseFlowNavigationModule {
                 )
             }
             entry<ReceiptScanDestination> {
-                ExpenseFlowPlaceholderRoute(
-                    title = "Scan receipt",
-                    message = "Receipt capture will be added in its milestone task.",
+                ReceiptScanRoute(
+                    draftRepository = draftRepository,
+                    receiptRepository = receiptRepository,
+                    receiptImageReader = receiptImageReader,
+                    receiptCaptureTargetFactory = receiptCaptureTargetFactory,
+                    validateReceipt = validateReceipt,
                     onBack = navigator::navigateBack,
+                    onManualEntry = { navigator.navigate(ManualEntryDestination) },
+                    onContinue = { navigator.navigate(ReceiptReviewDestination) },
                 )
             }
             entry<ManualEntryDestination> {

@@ -35,6 +35,7 @@ class ReviewExpensePresenter(
             ReviewExpenseUiEvent.CalculationDetailsToggled -> state.copy(detailsExpanded = !state.detailsExpanded)
             ReviewExpenseUiEvent.BackClick,
             ReviewExpenseUiEvent.SaveClick,
+            ReviewExpenseUiEvent.SaveRetryClick,
             -> state
         }
     }

@@ -9,6 +9,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
+import com.dps.evenup.data.expense.api.ExpenseDataException
+import com.dps.evenup.data.expense.api.ExpenseDataFailureReason
 import com.dps.evenup.data.expense.api.ExpenseRepository
 import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
@@ -35,6 +37,40 @@ fun ReviewExpenseRoute(
     val coroutineScope = rememberCoroutineScope()
     var uiState by remember { mutableStateOf(ReviewExpenseUiState()) }
 
+    fun saveExpense() {
+        coroutineScope.launch {
+            uiState = uiState.copy(isSaving = true, submitError = null)
+            uiState = try {
+                when (val result = presenter.saveDraft()) {
+                    is SaveReviewExpenseResult.Saved -> {
+                        onSaved(result.shareUrl)
+                        uiState.copy(isSaving = false)
+                    }
+                    SaveReviewExpenseResult.MissingDraft -> uiState.copy(
+                        isSaving = false,
+                        missingDraft = true,
+                        submitError = "No expense draft was found.",
+                    )
+                    is SaveReviewExpenseResult.Invalid -> uiState.copy(
+                        isSaving = false,
+                        validationError = result.message,
+                        canSave = false,
+                    )
+                }
+            } catch (error: ExpenseDataException) {
+                uiState.copy(
+                    isSaving = false,
+                    submitError = error.toUserMessage(),
+                )
+            } catch (_: RuntimeException) {
+                uiState.copy(
+                    isSaving = false,
+                    submitError = "Could not save expense. Try again.",
+                )
+            }
+        }
+    }
+
     LaunchedEffect(presenter) {
         uiState = try {
             presenter.load()
@@ -51,34 +87,9 @@ fun ReviewExpenseRoute(
         onEvent = { event ->
             when (event) {
                 ReviewExpenseUiEvent.BackClick -> onBack()
-                ReviewExpenseUiEvent.SaveClick -> {
-                    coroutineScope.launch {
-                        uiState = uiState.copy(isSaving = true, submitError = null)
-                        uiState = try {
-                            when (val result = presenter.saveDraft()) {
-                                is SaveReviewExpenseResult.Saved -> {
-                                    onSaved(result.shareUrl)
-                                    uiState.copy(isSaving = false)
-                                }
-                                SaveReviewExpenseResult.MissingDraft -> uiState.copy(
-                                    isSaving = false,
-                                    missingDraft = true,
-                                    submitError = "No expense draft was found.",
-                                )
-                                is SaveReviewExpenseResult.Invalid -> uiState.copy(
-                                    isSaving = false,
-                                    validationError = result.message,
-                                    canSave = false,
-                                )
-                            }
-                        } catch (_: RuntimeException) {
-                            uiState.copy(
-                                isSaving = false,
-                                submitError = "Could not save expense. Try again.",
-                            )
-                        }
-                    }
-                }
+                ReviewExpenseUiEvent.SaveClick,
+                ReviewExpenseUiEvent.SaveRetryClick,
+                -> saveExpense()
                 else -> {
                     coroutineScope.launch {
                         uiState = try {
@@ -92,4 +103,11 @@ fun ReviewExpenseRoute(
         },
         modifier = modifier,
     )
+}
+
+private fun ExpenseDataException.toUserMessage(): String = when (reason) {
+    ExpenseDataFailureReason.Connection -> "No internet connection. Check your connection and try saving again."
+    ExpenseDataFailureReason.Timeout -> "Saving took too long. Try again."
+    ExpenseDataFailureReason.Rejected -> "The expense could not be saved. Review the details and try again."
+    ExpenseDataFailureReason.Unknown -> "Could not save expense. Try again."
 }

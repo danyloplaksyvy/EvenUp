@@ -40,13 +40,13 @@ class DataStoreExpenseDraftRepository(
         val dto = try {
             json.decodeFromString<ExpenseDraftDto>(storedValue)
         } catch (error: SerializationException) {
-            throw ExpenseDataException("Stored expense draft was invalid.", error)
+            throw ExpenseDataException("Stored expense draft was invalid.", cause = error)
         }
 
         return try {
             dto.toDomain()
         } catch (error: IllegalArgumentException) {
-            throw ExpenseDataException("Stored expense draft contained invalid values.", error)
+            throw ExpenseDataException("Stored expense draft contained invalid values.", cause = error)
         }
     }
 

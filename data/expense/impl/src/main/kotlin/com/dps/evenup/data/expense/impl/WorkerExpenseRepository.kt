@@ -2,8 +2,10 @@ package com.dps.evenup.data.expense.impl
 
 import com.dps.evenup.core.network.api.WorkerApiClient
 import com.dps.evenup.core.network.api.WorkerApiResult
+import com.dps.evenup.core.network.api.WorkerNetworkError
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.expense.api.ExpenseDataException
+import com.dps.evenup.data.expense.api.ExpenseDataFailureReason
 import com.dps.evenup.data.expense.api.ExpenseRepository
 import com.dps.evenup.data.sharing.api.SavedShareLink
 import com.dps.evenup.data.sharing.api.ShareLinkResponseMapper
@@ -37,7 +39,10 @@ class WorkerExpenseRepository(
         val requestBody = json.encodeToString(payload.toDto())
         val response = workerApiClient.postJson("/v1/expenses", requestBody)
         return when (response) {
-            is WorkerApiResult.Failure -> throw ExpenseDataException("Expense save request failed.")
+            is WorkerApiResult.Failure -> throw ExpenseDataException(
+                message = "Expense save request failed.",
+                reason = response.error.toExpenseFailureReason(),
+            )
             is WorkerApiResult.Success -> mapSaveResponse(response.response.body).also {
                 draftRepository?.clearDraft()
             }
@@ -48,7 +53,7 @@ class WorkerExpenseRepository(
         val dto = try {
             json.decodeFromString<SaveExpenseResponseDto>(body)
         } catch (error: SerializationException) {
-            throw ExpenseDataException("Expense save response was invalid.", error)
+            throw ExpenseDataException("Expense save response was invalid.", cause = error)
         }
 
         return try {
@@ -58,9 +63,19 @@ class WorkerExpenseRepository(
                 shareUrl = dto.shareUrl,
             )
         } catch (error: IllegalArgumentException) {
-            throw ExpenseDataException("Expense save response contained invalid values.", error)
+            throw ExpenseDataException("Expense save response contained invalid values.", cause = error)
         }
     }
+}
+
+private fun WorkerNetworkError.toExpenseFailureReason(): ExpenseDataFailureReason = when (this) {
+    WorkerNetworkError.ConnectionFailed,
+    WorkerNetworkError.InvalidBaseUrl,
+    WorkerNetworkError.InvalidPath,
+    -> ExpenseDataFailureReason.Connection
+    WorkerNetworkError.Timeout -> ExpenseDataFailureReason.Timeout
+    is WorkerNetworkError.HttpFailure -> ExpenseDataFailureReason.Rejected
+    WorkerNetworkError.Unknown -> ExpenseDataFailureReason.Unknown
 }
 
 private fun FinalizedExpensePayload.toDto(): SaveExpenseRequestDto = SaveExpenseRequestDto(
