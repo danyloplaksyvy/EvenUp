@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":core:designsystem:api"))
     implementation(project(":core:navigation:api"))
     implementation(project(":data:expense:api"))
+    implementation(project(":data:participant:api"))
     implementation(project(":domain:expense:api"))
     implementation(project(":domain:participant:api"))
     implementation(project(":domain:receipt:api"))

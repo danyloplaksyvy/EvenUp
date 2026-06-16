@@ -14,6 +14,11 @@ class DefaultEvenUpNavigator(
         backStack.add(destination)
     }
 
+    override fun replaceAll(destination: NavKey) {
+        backStack.clear()
+        backStack.add(destination)
+    }
+
     override fun navigateBack(): Boolean {
         if (backStack.size <= 1) {
             return false

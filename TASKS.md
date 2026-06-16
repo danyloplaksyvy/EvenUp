@@ -787,7 +787,7 @@ Done when:
 
 ## T073 - Implement Receipt Review screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -806,7 +806,7 @@ Done when:
 
 ## T080 - Implement Choose People screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -826,7 +826,7 @@ Done when:
 
 ## T081 - Implement saved participant names UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -846,7 +846,7 @@ Done when:
 
 ## T090 - Implement Assign Items screen skeleton
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -865,7 +865,7 @@ Done when:
 
 ## T091 - Implement full item assignment UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -883,7 +883,7 @@ Done when:
 
 ## T092 - Implement quantity assignment UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -902,7 +902,7 @@ Done when:
 
 ## T093 - Implement Item Split bottom sheet
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -921,7 +921,7 @@ Done when:
 
 ## T094 - Implement shared/custom/percentage split UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -940,7 +940,7 @@ Done when:
 
 ## T100 - Implement Fees Allocation screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -959,7 +959,7 @@ Done when:
 
 ## T101 - Implement Review Expense screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -978,7 +978,7 @@ Done when:
 
 ## T102 - Implement calculation details UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -995,7 +995,7 @@ Done when:
 
 ## T103 - Implement Saved and Share screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1014,7 +1014,7 @@ Done when:
 
 ## T104 - Implement Android share sheet
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 

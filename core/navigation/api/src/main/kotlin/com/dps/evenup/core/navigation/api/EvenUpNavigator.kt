@@ -8,5 +8,7 @@ interface EvenUpNavigator {
 
     fun navigate(destination: NavKey)
 
+    fun replaceAll(destination: NavKey)
+
     fun navigateBack(): Boolean
 }

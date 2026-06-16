@@ -13,4 +13,21 @@ data object ReceiptScanDestination : NavKey
 data object ManualEntryDestination : NavKey
 
 @Serializable
+data object ReceiptReviewDestination : NavKey
+
+@Serializable
 data object ChoosePeopleDestination : NavKey
+
+@Serializable
+data object AssignItemsDestination : NavKey
+
+@Serializable
+data object FeesAllocationDestination : NavKey
+
+@Serializable
+data object ReviewExpenseDestination : NavKey
+
+@Serializable
+data class ExpenseSavedDestination(
+    val shareUrl: String,
+) : NavKey
