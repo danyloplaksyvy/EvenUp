@@ -6,13 +6,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
 enum class EvenUpValidationSeverity {
@@ -95,7 +101,7 @@ fun EvenUpErrorState(
         message = message,
         modifier = modifier,
         accentColor = EvenUpTheme.colors.error,
-        marker = "!",
+        icon = Icons.Filled.ErrorOutline,
         actionText = retryText,
         onActionClick = onRetryClick,
     )
@@ -114,7 +120,7 @@ fun EvenUpSuccessState(
         message = message,
         modifier = modifier,
         accentColor = EvenUpTheme.colors.success,
-        marker = "OK",
+        icon = Icons.Filled.CheckCircle,
         actionText = actionText,
         onActionClick = onActionClick,
     )
@@ -125,7 +131,7 @@ private fun EvenUpStateContent(
     title: String,
     message: String,
     accentColor: Color,
-    marker: String,
+    icon: ImageVector,
     modifier: Modifier = Modifier,
     actionText: String? = null,
     onActionClick: (() -> Unit)? = null,
@@ -142,10 +148,12 @@ private fun EvenUpStateContent(
             color = accentColor.copy(alpha = 0.12f),
             contentColor = accentColor,
         ) {
-            Text(
-                text = marker,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                style = EvenUpTheme.typography.sectionTitle,
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier
+                    .padding(12.dp)
+                    .size(28.dp),
             )
         }
         Text(

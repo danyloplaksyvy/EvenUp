@@ -13,14 +13,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
@@ -52,6 +56,7 @@ fun EvenUpTopBar(
     modifier: Modifier = Modifier,
     onNavigationClick: (() -> Unit)? = null,
     navigationContentDescription: String = "Navigate back",
+    navigationIcon: ImageVector = Icons.Filled.Close,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -72,10 +77,10 @@ fun EvenUpTopBar(
                     onClick = onNavigationClick,
                     modifier = Modifier.align(Alignment.CenterStart),
                 ) {
-                    Text(
-                        text = "X",
-                        style = EvenUpTheme.typography.button,
-                        color = EvenUpTheme.colors.textPrimary,
+                    Icon(
+                        imageVector = navigationIcon,
+                        contentDescription = null,
+                        tint = EvenUpTheme.colors.textPrimary,
                     )
                 }
             }

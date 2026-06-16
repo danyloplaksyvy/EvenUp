@@ -59,13 +59,13 @@ fun NewExpenseScreen(
                     NewExpenseActionCard(
                         title = "Scan receipt",
                         description = "Snap a photo to auto-fill details",
-                        marker = "R",
+                        icon = ScanReceiptIcon,
                         onClick = { onEvent(NewExpenseUiEvent.ScanReceiptClick) },
                     )
                     NewExpenseActionCard(
                         title = "Enter manually",
                         description = "Fill in the details yourself",
-                        marker = "M",
+                        icon = EnterManuallyIcon,
                         onClick = { onEvent(NewExpenseUiEvent.EnterManuallyClick) },
                     )
                 }

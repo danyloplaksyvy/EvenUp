@@ -2,11 +2,11 @@ package com.dps.evenup.feature.expenseflow.impl.newexpense
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.dps.evenup.feature.expenseflow.api.ExpenseFlowDestination
 
 @Composable
 fun NewExpenseRoute(
-    onDestinationSelected: (ExpenseFlowDestination) -> Unit,
+    onScanReceipt: () -> Unit,
+    onEnterManually: () -> Unit,
     modifier: Modifier = Modifier,
     onClose: (() -> Unit)? = null,
 ) {
@@ -14,8 +14,8 @@ fun NewExpenseRoute(
         uiState = NewExpenseUiState(),
         onEvent = { event ->
             when (event) {
-                NewExpenseUiEvent.ScanReceiptClick -> onDestinationSelected(ExpenseFlowDestination.RECEIPT_SCAN)
-                NewExpenseUiEvent.EnterManuallyClick -> onDestinationSelected(ExpenseFlowDestination.MANUAL_ENTRY)
+                NewExpenseUiEvent.ScanReceiptClick -> onScanReceipt()
+                NewExpenseUiEvent.EnterManuallyClick -> onEnterManually()
                 NewExpenseUiEvent.CloseClick -> onClose?.invoke()
             }
         },

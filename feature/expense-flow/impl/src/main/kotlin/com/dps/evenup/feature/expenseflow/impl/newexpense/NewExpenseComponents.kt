@@ -10,12 +10,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
@@ -46,7 +51,7 @@ internal fun NewExpenseHero(
 internal fun NewExpenseActionCard(
     title: String,
     description: String,
-    marker: String,
+    icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -74,11 +79,10 @@ internal fun NewExpenseActionCard(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = marker,
-                    style = EvenUpTheme.typography.button,
-                    color = EvenUpTheme.colors.textPrimary,
-                    textAlign = TextAlign.Center,
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = EvenUpTheme.colors.textPrimary,
                 )
             }
             Column(
@@ -98,11 +102,15 @@ internal fun NewExpenseActionCard(
                     color = EvenUpTheme.colors.textSecondary,
                 )
             }
-            Text(
-                text = ">",
-                style = EvenUpTheme.typography.sectionTitle,
-                color = EvenUpTheme.colors.textSecondary,
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = EvenUpTheme.colors.textSecondary,
             )
         }
     }
 }
+
+internal val ScanReceiptIcon: ImageVector = Icons.AutoMirrored.Filled.ReceiptLong
+
+internal val EnterManuallyIcon: ImageVector = Icons.Filled.EditNote

@@ -1,6 +1,5 @@
 plugins {
     id("evenup.android.library")
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
 }
 
