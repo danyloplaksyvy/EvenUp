@@ -3,5 +3,5 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":domain:participant:api"))
+    api(project(":domain:participant:api"))
 }

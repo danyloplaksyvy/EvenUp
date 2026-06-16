@@ -1,5 +1,12 @@
 plugins {
     id("evenup.android.compose.library")
+    alias(libs.plugins.kotlin.android)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+    }
 }
 
 dependencies {
@@ -13,6 +20,7 @@ dependencies {
     implementation(project(":feature:expense-flow:api"))
 
     implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.lifecycle.runtime.ktx)

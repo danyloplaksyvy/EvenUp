@@ -2,6 +2,7 @@ package com.dps.evenup.data.expense.impl
 
 import com.dps.evenup.core.network.api.WorkerApiClient
 import com.dps.evenup.core.network.api.WorkerApiResult
+import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.expense.api.ExpenseDataException
 import com.dps.evenup.data.expense.api.ExpenseRepository
 import com.dps.evenup.data.sharing.api.SavedShareLink
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.Json
 class WorkerExpenseRepository(
     private val workerApiClient: WorkerApiClient,
     private val shareLinkResponseMapper: ShareLinkResponseMapper,
+    private val draftRepository: ExpenseDraftRepository? = null,
     private val json: Json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -36,7 +38,9 @@ class WorkerExpenseRepository(
         val response = workerApiClient.postJson("/v1/expenses", requestBody)
         return when (response) {
             is WorkerApiResult.Failure -> throw ExpenseDataException("Expense save request failed.")
-            is WorkerApiResult.Success -> mapSaveResponse(response.response.body)
+            is WorkerApiResult.Success -> mapSaveResponse(response.response.body).also {
+                draftRepository?.clearDraft()
+            }
         }
     }
 

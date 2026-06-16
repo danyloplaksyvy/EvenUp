@@ -707,7 +707,7 @@ Done when:
 
 ## T063 - Implement local draft persistence
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -725,7 +725,7 @@ Done when:
 
 ## T064 - Implement saved participant persistence
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -748,7 +748,7 @@ Done when:
 
 ## T070 - Implement New Expense screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 

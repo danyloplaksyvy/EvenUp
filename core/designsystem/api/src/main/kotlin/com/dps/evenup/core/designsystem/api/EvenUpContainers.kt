@@ -2,19 +2,26 @@ package com.dps.evenup.core.designsystem.api
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -36,6 +43,52 @@ fun EvenUpCard(
             verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
             content = content,
         )
+    }
+}
+
+@Composable
+fun EvenUpTopBar(
+    title: String,
+    modifier: Modifier = Modifier,
+    onNavigationClick: (() -> Unit)? = null,
+    navigationContentDescription: String = "Navigate back",
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = EvenUpTheme.colors.background,
+        contentColor = EvenUpTheme.colors.textPrimary,
+        shadowElevation = 0.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .statusBarsPadding()
+                .height(64.dp)
+                .padding(horizontal = EvenUpTheme.spacing.space8),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (onNavigationClick != null) {
+                EvenUpIconButton(
+                    contentDescription = navigationContentDescription,
+                    onClick = onNavigationClick,
+                    modifier = Modifier.align(Alignment.CenterStart),
+                ) {
+                    Text(
+                        text = "X",
+                        style = EvenUpTheme.typography.button,
+                        color = EvenUpTheme.colors.textPrimary,
+                    )
+                }
+            }
+            Text(
+                text = title,
+                style = EvenUpTheme.typography.sectionTitle,
+                color = EvenUpTheme.colors.textPrimary,
+                textAlign = TextAlign.Center,
+            )
+            Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+                Box(modifier = Modifier.width(44.dp))
+            }
+        }
     }
 }
 
