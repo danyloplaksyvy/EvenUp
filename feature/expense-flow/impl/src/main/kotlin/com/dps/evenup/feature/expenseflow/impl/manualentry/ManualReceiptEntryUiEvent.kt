@@ -9,6 +9,8 @@ sealed interface ManualReceiptEntryUiEvent {
 
     data class ItemNameChanged(val itemId: String, val value: String) : ManualReceiptEntryUiEvent
 
+    data class ItemQuantityChanged(val itemId: String, val value: String) : ManualReceiptEntryUiEvent
+
     data class ItemAmountChanged(val itemId: String, val value: String) : ManualReceiptEntryUiEvent
 
     data object AddItemClick : ManualReceiptEntryUiEvent

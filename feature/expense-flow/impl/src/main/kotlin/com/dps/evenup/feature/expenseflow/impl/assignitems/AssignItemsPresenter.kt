@@ -61,6 +61,7 @@ class AssignItemsPresenter(
             )
             is AssignItemsUiEvent.ItemTapped -> assignItemToSelectedParticipant(state, event.itemId)
             is AssignItemsUiEvent.ItemSplitClick -> openSplitSheet(state, event.itemId)
+            AssignItemsUiEvent.ApplyEqualSplitClick -> applyEqualSplitToAllItems(state)
             AssignItemsUiEvent.SplitDismissed -> state.copy(splitSheet = null)
             is AssignItemsUiEvent.SplitModeSelected -> updateSplitMode(state, event.mode)
             is AssignItemsUiEvent.SplitQuantityChanged -> updateSplitQuantity(state, event.participantId, event.delta)
@@ -154,6 +155,31 @@ class AssignItemsPresenter(
             subtotalLabel = formatMoney(MoneyMinor(items.sumOf { item -> item.totalPrice.value })),
             progressLabel = "$assignedItemCount of ${items.size} items assigned",
             canContinue = items.isNotEmpty() && assignedItemCount == items.size,
+        )
+    }
+
+    private suspend fun applyEqualSplitToAllItems(state: AssignItemsUiState): AssignItemsUiState {
+        val draft = draftRepository.getDraft()
+            ?: return state.copy(missingDraft = true, submitError = "No expense draft was found.")
+        if (draft.participants.size < 2) {
+            return state.copy(fieldErrors = mapOf("assignment" to "Add at least two people to split equally."))
+        }
+
+        val participantIds = draft.participants.map { participant -> participant.id.value }
+        val assignments = draft.receipt.items.map { item -> item.sharedEqualAssignment(participantIds) }
+        val selectedParticipantId = state.selectedParticipantId ?: draft.participants.first().id.value
+        return buildState(
+            merchantName = draft.receipt.merchantName,
+            dateLabel = draft.receipt.transactionDateLabel,
+            participants = draft.participants,
+            items = draft.receipt.items,
+            assignments = assignments,
+            selectedParticipantId = selectedParticipantId,
+            isLoading = false,
+        ).copy(
+            fieldErrors = emptyMap(),
+            submitError = null,
+            splitSheet = null,
         )
     }
 
@@ -311,6 +337,20 @@ class AssignItemsPresenter(
                     amount = totalPrice,
                 ),
             ),
+        )
+    }
+
+    private fun ReceiptItem.sharedEqualAssignment(participantIds: List<String>): ItemAssignment {
+        val amounts = allocateEqual(totalPrice.value, participantIds)
+        return ItemAssignment(
+            receiptItemId = id,
+            mode = ItemAssignmentMode.SharedEqual,
+            shares = participantIds.map { participantId ->
+                ItemParticipantShare(
+                    participantId = ParticipantId(participantId),
+                    amount = MoneyMinor(amounts.getValue(participantId)),
+                )
+            },
         )
     }
 

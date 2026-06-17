@@ -7,6 +7,8 @@ sealed interface AssignItemsUiEvent {
 
     data class ItemSplitClick(val itemId: String) : AssignItemsUiEvent
 
+    data object ApplyEqualSplitClick : AssignItemsUiEvent
+
     data object SplitDismissed : AssignItemsUiEvent
 
     data class SplitModeSelected(val mode: AssignItemsSplitMode) : AssignItemsUiEvent

@@ -25,6 +25,8 @@ sealed interface ReceiptReviewUiEvent {
 
     data class RemoveFeeClick(val feeId: String) : ReceiptReviewUiEvent
 
+    data class SubtotalChanged(val value: String) : ReceiptReviewUiEvent
+
     data class TotalChanged(val value: String) : ReceiptReviewUiEvent
 
     data object ContinueClick : ReceiptReviewUiEvent

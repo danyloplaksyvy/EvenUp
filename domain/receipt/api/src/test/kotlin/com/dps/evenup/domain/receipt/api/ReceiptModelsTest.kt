@@ -27,9 +27,11 @@ class ReceiptModelsTest {
             fees = listOf(fee),
             total = MoneyMinor(2_640),
             transactionDateLabel = "2026-06-15",
+            subtotal = MoneyMinor(2_400),
         )
 
         assertEquals(MoneyMinor(2_640), receipt.total)
+        assertEquals(MoneyMinor(2_400), receipt.subtotal)
         assertEquals(FeeType.Tax, receipt.fees.single().type)
     }
 }

@@ -25,8 +25,15 @@ class DefaultValidateReceiptUseCase : ValidateReceiptUseCase {
 
             val itemTotal = receipt.items.sumOf { it.totalPrice.value }
             val feeTotal = receipt.fees.sumOf { it.amount.value }
-            if (itemTotal + feeTotal != receipt.total.value) {
-                add(ReceiptValidationError.TotalMismatch)
+            val subtotal = receipt.subtotal
+            if (subtotal != null) {
+                if (itemTotal != subtotal.value || subtotal.value + feeTotal != receipt.total.value) {
+                    add(ReceiptValidationError.TotalMismatch)
+                }
+            } else {
+                if (itemTotal + feeTotal != receipt.total.value) {
+                    add(ReceiptValidationError.TotalMismatch)
+                }
             }
         }
 

@@ -14,10 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +34,9 @@ import com.dps.evenup.core.designsystem.api.EvenUpTextField
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
 import com.dps.evenup.core.designsystem.api.EvenUpTopBar
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
+import com.dps.evenup.feature.expenseflow.impl.receiptentry.CurrencySelector
+import com.dps.evenup.feature.expenseflow.impl.receiptentry.DeleteReceiptRowButton
+import com.dps.evenup.feature.expenseflow.impl.receiptentry.ReceiptDatePickerField
 
 @Composable
 fun ReceiptReviewScreen(
@@ -91,7 +91,6 @@ private fun ReceiptReviewContent(
             ReceiptReviewDetailsCard(uiState = uiState, onEvent = onEvent)
             ReceiptReviewItemsCard(uiState = uiState, onEvent = onEvent)
             ReceiptReviewFeesCard(uiState = uiState, onEvent = onEvent)
-            ReceiptReviewOriginalReceiptRow()
             uiState.submitError?.let { error ->
                 EvenUpValidationMessage(message = error)
             }
@@ -121,7 +120,10 @@ private fun ReceiptReviewSummary(uiState: ReceiptReviewUiState) {
                 style = EvenUpTheme.typography.caption,
                 color = EvenUpTheme.colors.textSecondary,
             )
-            ReceiptReviewStatusPill(text = uiState.statusLabel, isValid = uiState.fieldErrors.isEmpty())
+            ReceiptReviewStatusPill(
+                text = uiState.statusLabel,
+                isValid = uiState.fieldErrors.isEmpty(),
+            )
         }
         Text(
             text = uiState.summaryTotalLabel,
@@ -172,25 +174,19 @@ private fun ReceiptReviewDetailsCard(
             supportingText = uiState.fieldErrors["merchant"],
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12)) {
-            EvenUpTextField(
-                value = uiState.dateLabel,
-                onValueChange = { onEvent(ReceiptReviewUiEvent.DateChanged(it)) },
-                label = "Date",
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-            )
-            EvenUpTextField(
-                value = uiState.currencyCode,
-                onValueChange = { onEvent(ReceiptReviewUiEvent.CurrencyChanged(it)) },
-                label = "Currency",
-                modifier = Modifier.weight(1f),
-                isError = uiState.fieldErrors.containsKey("currency"),
-                supportingText = uiState.fieldErrors["currency"],
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    keyboardType = KeyboardType.Ascii,
-                ),
+        ReceiptDatePickerField(
+            value = uiState.dateLabel,
+            onDateSelected = { onEvent(ReceiptReviewUiEvent.DateChanged(it)) },
+        )
+        CurrencySelector(
+            selectedCurrencyCode = uiState.currencyCode,
+            onCurrencySelected = { onEvent(ReceiptReviewUiEvent.CurrencyChanged(it)) },
+        )
+        uiState.fieldErrors["currency"]?.let { error ->
+            Text(
+                text = error,
+                style = EvenUpTheme.typography.caption,
+                color = EvenUpTheme.colors.error,
             )
         }
     }
@@ -258,17 +254,23 @@ private fun ReceiptReviewItemRow(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
         }
-        EvenUpMoneyField(
-            value = item.amount,
-            onValueChange = { onEvent(ReceiptReviewUiEvent.ItemAmountChanged(item.id, it)) },
-            label = "Amount",
-            isError = fieldErrors.containsKey("item_amount_${item.id}"),
-            supportingText = fieldErrors["item_amount_${item.id}"],
-        )
-        if (canRemove) {
-            EvenUpTextButton(
-                text = "Delete item",
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+            verticalAlignment = Alignment.Top,
+        ) {
+            EvenUpMoneyField(
+                value = item.amount,
+                onValueChange = { onEvent(ReceiptReviewUiEvent.ItemAmountChanged(item.id, it)) },
+                label = "Amount",
+                modifier = Modifier.weight(1f),
+                isError = fieldErrors.containsKey("item_amount_${item.id}"),
+                supportingText = fieldErrors["item_amount_${item.id}"],
+            )
+            DeleteReceiptRowButton(
+                contentDescription = "Delete item",
                 onClick = { onEvent(ReceiptReviewUiEvent.RemoveItemClick(item.id)) },
+                enabled = canRemove,
+                modifier = Modifier.padding(top = EvenUpTheme.spacing.space12),
             )
         }
     }
@@ -300,6 +302,15 @@ private fun ReceiptReviewFeesCard(
                 onClick = { onEvent(ReceiptReviewUiEvent.AddFeeClick) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            uiState.subtotalAmount?.let { subtotal ->
+                EvenUpMoneyField(
+                    value = subtotal,
+                    onValueChange = { onEvent(ReceiptReviewUiEvent.SubtotalChanged(it)) },
+                    label = "Subtotal",
+                    isError = uiState.fieldErrors.containsKey("subtotal"),
+                    supportingText = uiState.fieldErrors["subtotal"],
+                )
+            }
             EvenUpMoneyField(
                 value = uiState.totalAmount,
                 onValueChange = { onEvent(ReceiptReviewUiEvent.TotalChanged(it)) },
@@ -344,40 +355,6 @@ private fun ReceiptReviewFeeRow(
             text = "Delete fee",
             onClick = { onEvent(ReceiptReviewUiEvent.RemoveFeeClick(fee.id)) },
         )
-    }
-}
-
-@Composable
-private fun ReceiptReviewOriginalReceiptRow() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = EvenUpTheme.shapes.input,
-        color = EvenUpTheme.colors.background,
-        contentColor = EvenUpTheme.colors.textPrimary,
-    ) {
-        Row(
-            modifier = Modifier.padding(vertical = EvenUpTheme.spacing.space12),
-            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space16),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-                tint = EvenUpTheme.colors.textSecondary,
-            )
-            Text(
-                text = "View original receipt",
-                modifier = Modifier.weight(1f),
-                style = EvenUpTheme.typography.bodyStrong,
-                color = EvenUpTheme.colors.textPrimary,
-            )
-            Icon(
-                imageVector = Icons.Filled.ChevronRight,
-                contentDescription = null,
-                tint = EvenUpTheme.colors.textSecondary,
-            )
-        }
     }
 }
 

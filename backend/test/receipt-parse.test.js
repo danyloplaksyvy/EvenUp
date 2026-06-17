@@ -13,7 +13,10 @@ const parsedReceipt = {
       name: "Pasta",
       quantity: 2,
       unitPriceMinor: 1800,
-      totalPriceMinor: 3600
+      totalPriceMinor: 3600,
+      confidence: 0.92,
+      candidatesMinor: [3600],
+      needsReview: false
     }
   ],
   fees: [
@@ -25,7 +28,9 @@ const parsedReceipt = {
   ],
   subtotalMinor: 3600,
   totalMinor: 4200,
-  confidence: 0.92
+  confidence: 0.92,
+  corrections: [],
+  reviewWarnings: []
 };
 
 test("POST /v1/receipts/parse calls OpenAI and returns strict receipt JSON", async () => {
@@ -57,6 +62,125 @@ test("POST /v1/receipts/parse calls OpenAI and returns strict receipt JSON", asy
   const requestBody = JSON.parse(calls[0].options.body);
   assert.equal(requestBody.text.format.name, "receipt_parse");
   assert.match(JSON.stringify(requestBody), /data:image\/jpeg;base64,ZmFrZS1pbWFnZQ==/);
+});
+
+test("POST /v1/receipts/parse reconciles a single candidate against subtotal", async () => {
+  const receiptWithMisreadItem = {
+    merchantName: "Taberna do Mercado",
+    transactionDate: "2016-09-06",
+    currency: "GBP",
+    items: [
+      item("Super Bock", 2, 500, [500], 0.94, false),
+      item("Sparkling Water", 1, 300, [300], 0.94, false),
+      item("Cappucino", 1, 260, [260], 0.92, false),
+      item("Espresso", 1, 200, [200], 0.92, false),
+      item("Rissol", 2, 580, [580, 560], 0.62, true),
+      item("Serra Da Estrela", 1, 890, [890], 0.92, false),
+      item("Chourico Vinho Tinto", 1, 790, [790], 0.92, false),
+      item("Octopus Peppers", 1, 900, [900], 0.92, false),
+      item("Dorset Char", 1, 600, [600], 0.92, false),
+      item("Bifana", 1, 800, [800], 0.92, false)
+    ],
+    fees: [
+      {
+        type: "SERVICE_FEE",
+        label: "Service Charge",
+        amountMinor: 725
+      }
+    ],
+    subtotalMinor: 5800,
+    totalMinor: 6525,
+    confidence: 0.84,
+    corrections: [],
+    reviewWarnings: []
+  };
+
+  const response = await handleRequest(
+    jsonRequest("http://localhost/v1/receipts/parse", {
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      mimeType: "image/jpeg",
+      localeHint: "en-GB",
+      currencyHint: "GBP"
+    }),
+    {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_FETCH: async () =>
+        Response.json({
+          output_text: JSON.stringify(receiptWithMisreadItem)
+        })
+    }
+  );
+
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.items[4].name, "Rissol");
+  assert.equal(body.items[4].totalPriceMinor, 560);
+  assert.equal(body.items[4].unitPriceMinor, 280);
+  assert.deepEqual(body.items[4].candidatesMinor, [560, 580]);
+  assert.deepEqual(body.corrections, [
+    {
+      field: "items[4].totalPriceMinor",
+      itemName: "Rissol",
+      fromMinor: 580,
+      toMinor: 560,
+      reason: "Corrected to match printed subtotal 5800; digit likely misread."
+    }
+  ]);
+});
+
+test("POST /v1/receipts/parse returns warning when mismatch remains unresolved", async () => {
+  const calls = [];
+  const mismatchedReceipt = {
+    ...parsedReceipt,
+    subtotalMinor: 3500,
+    totalMinor: 4100
+  };
+
+  const response = await handleRequest(
+    jsonRequest("http://localhost/v1/receipts/parse", {
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      mimeType: "image/jpeg"
+    }),
+    {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_FETCH: async (url, options) => {
+        calls.push(JSON.parse(options.body).text.format.name);
+        return Response.json({
+          output_text: JSON.stringify(mismatchedReceipt)
+        });
+      }
+    }
+  );
+
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls, ["receipt_parse", "receipt_parse_audit"]);
+  assert.match(body.reviewWarnings[0], /does not match printed subtotal/);
+});
+
+test("POST /v1/receipts/parse uses auditor only when deterministic reconciliation fails", async () => {
+  const calls = [];
+  const response = await handleRequest(
+    jsonRequest("http://localhost/v1/receipts/parse", {
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      mimeType: "image/jpeg"
+    }),
+    {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_FETCH: async (url, options) => {
+        calls.push(JSON.parse(options.body).text.format.name);
+        return Response.json({
+          output_text: JSON.stringify(parsedReceipt)
+        });
+      }
+    }
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, ["receipt_parse"]);
 });
 
 test("POST /v1/receipts/parse returns retry-friendly error for invalid request", async () => {
@@ -104,5 +228,17 @@ function receiptParseError() {
       code: "RECEIPT_PARSE_FAILED",
       message: "Could not read this receipt. Please try again or enter it manually."
     }
+  };
+}
+
+function item(name, quantity, totalPriceMinor, candidatesMinor, confidence, needsReview) {
+  return {
+    name,
+    quantity,
+    unitPriceMinor: totalPriceMinor / quantity,
+    totalPriceMinor,
+    confidence,
+    candidatesMinor,
+    needsReview
   };
 }

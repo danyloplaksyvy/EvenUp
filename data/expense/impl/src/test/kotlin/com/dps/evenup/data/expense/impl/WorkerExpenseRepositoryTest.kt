@@ -55,6 +55,7 @@ class WorkerExpenseRepositoryTest {
         assertEquals("/v1/expenses", worker.lastPath)
         assertTrue(worker.lastBody.contains(""""schemaVersion":1"""))
         assertTrue(worker.lastBody.contains(""""payerParticipantId":"p1""""))
+        assertTrue(worker.lastBody.contains(""""subtotalMinor":1000"""))
     }
 
     @Test
@@ -80,6 +81,7 @@ class WorkerExpenseRepositoryTest {
                 ReceiptItem(ReceiptItemId("item-1"), "Meal", Quantity(1), MoneyMinor(1_000), MoneyMinor(1_000)),
             ),
             fees = listOf(ReceiptFee(FeeId("fee-1"), FeeType.Tax, "Tax", MoneyMinor(200))),
+            subtotal = MoneyMinor(1_000),
             total = MoneyMinor(1_200),
         ),
         participants = listOf(

@@ -94,6 +94,7 @@ private fun Receipt.toDto(): ReceiptDto = ReceiptDto(
     currency = currencyCode.value,
     items = items.map { item -> item.toDto() },
     fees = fees.map { fee -> fee.toDto() },
+    subtotalMinor = subtotal?.value,
     totalMinor = total.value,
 )
 
@@ -183,6 +184,7 @@ private data class ReceiptDto(
     val currency: String,
     val items: List<ReceiptItemDto>,
     val fees: List<ReceiptFeeDto>,
+    val subtotalMinor: Long?,
     val totalMinor: Long,
 )
 

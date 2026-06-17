@@ -28,7 +28,9 @@ const receiptResponseSchema = {
     "fees",
     "subtotalMinor",
     "totalMinor",
-    "confidence"
+    "confidence",
+    "corrections",
+    "reviewWarnings"
   ],
   properties: {
     merchantName: { type: "string" },
@@ -39,12 +41,26 @@ const receiptResponseSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "quantity", "unitPriceMinor", "totalPriceMinor"],
+        required: [
+          "name",
+          "quantity",
+          "unitPriceMinor",
+          "totalPriceMinor",
+          "confidence",
+          "candidatesMinor",
+          "needsReview"
+        ],
         properties: {
           name: { type: "string" },
           quantity: { type: "number" },
           unitPriceMinor: { type: "integer" },
-          totalPriceMinor: { type: "integer" }
+          totalPriceMinor: { type: "integer" },
+          confidence: { type: "number" },
+          candidatesMinor: {
+            type: "array",
+            items: { type: "integer" }
+          },
+          needsReview: { type: "boolean" }
         }
       }
     },
@@ -66,7 +82,26 @@ const receiptResponseSchema = {
     },
     subtotalMinor: { type: "integer" },
     totalMinor: { type: "integer" },
-    confidence: { type: "number" }
+    confidence: { type: "number" },
+    corrections: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["field", "itemName", "fromMinor", "toMinor", "reason"],
+        properties: {
+          field: { type: "string" },
+          itemName: { type: ["string", "null"] },
+          fromMinor: { type: "integer" },
+          toMinor: { type: "integer" },
+          reason: { type: "string" }
+        }
+      }
+    },
+    reviewWarnings: {
+      type: "array",
+      items: { type: "string" }
+    }
   }
 };
 
@@ -362,12 +397,18 @@ async function parseReceipt(request, env) {
       return jsonResponse(RECEIPT_PARSE_ERROR, 502);
     }
 
-    const receipt = JSON.parse(outputText);
+    const receipt = normalizeParsedReceipt(JSON.parse(outputText));
     if (!isValidParsedReceipt(receipt)) {
       return jsonResponse(RECEIPT_PARSE_ERROR, 502);
     }
 
-    return jsonResponse(receipt);
+    const reconciledReceipt = reconcileReceiptSubtotal(receipt);
+    if (isReceiptSubtotalReconciled(reconciledReceipt)) {
+      return jsonResponse(reconciledReceipt);
+    }
+
+    const auditedReceipt = await auditReceiptIfNeeded(payload, reconciledReceipt, env, fetcher);
+    return jsonResponse(auditedReceipt);
   } catch {
     return jsonResponse(RECEIPT_PARSE_ERROR, 502);
   }
@@ -414,7 +455,10 @@ function openAiReceiptRequest(payload, env) {
               "Preserve visible receipt item order.",
               "Use null for transactionDate if no date is visible.",
               "Use fee type DISCOUNT for discounts and keep discount amountMinor negative.",
-              "Do not invent items or prices."
+              "Do not invent items or prices.",
+              "For each item, return candidatesMinor with the parsed totalPriceMinor first and any visually plausible alternatives after it.",
+              "Set item confidence between 0 and 1 and needsReview true for ambiguous item prices.",
+              "Return empty corrections and reviewWarnings arrays in the first extraction pass."
             ].join(" ")
           }
         ]
@@ -444,6 +488,243 @@ function openAiReceiptRequest(payload, env) {
   };
 }
 
+function openAiReceiptAuditRequest(payload, extractedReceipt, env) {
+  const currencyHint = typeof payload.currencyHint === "string" ? payload.currencyHint : "unknown";
+  const localeHint = typeof payload.localeHint === "string" ? payload.localeHint : "unknown";
+
+  return {
+    model: env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
+    input: [
+      {
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: [
+              "You are a receipt parsing auditor for a shared expense app.",
+              "Return strict JSON only through the requested schema.",
+              "Validate that item totals sum to subtotalMinor and subtotalMinor plus fees equals totalMinor.",
+              "If there is a mismatch, identify likely OCR price mistakes from the image.",
+              "Do not invent items. Prefer corrections where digits are visually similar.",
+              "Return corrected JSON, corrections, and reviewWarnings."
+            ].join(" ")
+          }
+        ]
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: [
+              `Audit this extracted receipt. Locale hint: ${localeHint}. Currency hint: ${currencyHint}.`,
+              "Extracted JSON:",
+              JSON.stringify(extractedReceipt)
+            ].join("\n")
+          },
+          {
+            type: "input_image",
+            image_url: `data:${payload.mimeType};base64,${payload.imageBase64}`
+          }
+        ]
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "receipt_parse_audit",
+        strict: true,
+        schema: receiptResponseSchema
+      }
+    }
+  };
+}
+
+function normalizeParsedReceipt(receipt) {
+  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
+    return receipt;
+  }
+
+  const items = Array.isArray(receipt.items)
+    ? receipt.items.map((item) => {
+        const totalPriceMinor = Number.isInteger(item?.totalPriceMinor) ? item.totalPriceMinor : 0;
+        const candidates = Array.isArray(item?.candidatesMinor) ? item.candidatesMinor.filter(Number.isInteger) : [];
+        return {
+          ...item,
+          confidence: typeof item?.confidence === "number" ? item.confidence : receipt.confidence || 0,
+          candidatesMinor: uniqueIntegers([totalPriceMinor, ...candidates]),
+          needsReview: Boolean(item?.needsReview)
+        };
+      })
+    : [];
+
+  return {
+    ...receipt,
+    items,
+    fees: Array.isArray(receipt.fees) ? receipt.fees : [],
+    corrections: Array.isArray(receipt.corrections) ? receipt.corrections : [],
+    reviewWarnings: Array.isArray(receipt.reviewWarnings) ? receipt.reviewWarnings : []
+  };
+}
+
+function uniqueIntegers(values) {
+  return Array.from(new Set(values.filter(Number.isInteger)));
+}
+
+function reconcileReceiptSubtotal(receipt) {
+  if (!isValidParsedReceipt(receipt) || !Number.isInteger(receipt.subtotalMinor)) {
+    return receipt;
+  }
+
+  const itemSum = sumItemTotals(receipt.items);
+  if (itemSum === receipt.subtotalMinor) {
+    return withTotalMismatchWarningIfNeeded(receipt);
+  }
+
+  const replacement = chooseSingleCandidateReplacement(receipt.items, receipt.subtotalMinor);
+  if (!replacement) {
+    return withTotalMismatchWarningIfNeeded(
+      withReviewWarning(
+        receipt,
+        `Receipt item sum ${itemSum} does not match printed subtotal ${receipt.subtotalMinor}.`
+      )
+    );
+  }
+
+  const items = receipt.items.map((item, index) => {
+    if (index !== replacement.index) return item;
+
+    return {
+      ...item,
+      totalPriceMinor: replacement.toMinor,
+      unitPriceMinor: correctedUnitPrice(item, replacement.toMinor),
+      needsReview: true,
+      candidatesMinor: uniqueIntegers([replacement.toMinor, item.totalPriceMinor, ...item.candidatesMinor])
+    };
+  });
+
+  const correction = {
+    field: `items[${replacement.index}].totalPriceMinor`,
+    itemName: receipt.items[replacement.index].name || null,
+    fromMinor: replacement.fromMinor,
+    toMinor: replacement.toMinor,
+    reason: `Corrected to match printed subtotal ${receipt.subtotalMinor}; digit likely misread.`
+  };
+
+  return withTotalMismatchWarningIfNeeded({
+    ...receipt,
+    items,
+    corrections: [...receipt.corrections, correction]
+  });
+}
+
+function chooseSingleCandidateReplacement(items, targetSubtotal) {
+  const currentSum = sumItemTotals(items);
+  const options = [];
+
+  items.forEach((item, index) => {
+    const fromMinor = item.totalPriceMinor;
+    for (const candidate of item.candidatesMinor || []) {
+      if (candidate === fromMinor) continue;
+      if (currentSum - fromMinor + candidate !== targetSubtotal) continue;
+      options.push({
+        index,
+        fromMinor,
+        toMinor: candidate,
+        confidence: typeof item.confidence === "number" ? item.confidence : 0,
+        delta: Math.abs(candidate - fromMinor),
+        needsReview: Boolean(item.needsReview)
+      });
+    }
+  });
+
+  options.sort((left, right) => {
+    if (left.needsReview !== right.needsReview) return left.needsReview ? -1 : 1;
+    if (left.confidence !== right.confidence) return right.confidence - left.confidence;
+    return left.delta - right.delta;
+  });
+
+  return options[0] || null;
+}
+
+function sumItemTotals(items) {
+  return items.reduce((sum, item) => sum + item.totalPriceMinor, 0);
+}
+
+function sumFeeAmounts(fees) {
+  return fees.reduce((sum, fee) => sum + fee.amountMinor, 0);
+}
+
+function correctedUnitPrice(item, totalPriceMinor) {
+  const quantity = item.quantity;
+  if (Number.isInteger(quantity) && quantity > 0 && totalPriceMinor % quantity === 0) {
+    return totalPriceMinor / quantity;
+  }
+
+  return item.unitPriceMinor;
+}
+
+function withReviewWarning(receipt, warning) {
+  if (receipt.reviewWarnings.includes(warning)) return receipt;
+  return {
+    ...receipt,
+    reviewWarnings: [...receipt.reviewWarnings, warning]
+  };
+}
+
+function withTotalMismatchWarningIfNeeded(receipt) {
+  const feeSum = sumFeeAmounts(receipt.fees);
+  const expectedTotal = receipt.subtotalMinor + feeSum;
+  if (expectedTotal === receipt.totalMinor) {
+    return receipt;
+  }
+
+  return withReviewWarning(
+    receipt,
+    `Receipt subtotal plus fees ${expectedTotal} does not match printed total ${receipt.totalMinor}.`
+  );
+}
+
+function isReceiptSubtotalReconciled(receipt) {
+  return (
+    !Number.isInteger(receipt.subtotalMinor) ||
+    (sumItemTotals(receipt.items) === receipt.subtotalMinor &&
+      receipt.subtotalMinor + sumFeeAmounts(receipt.fees) === receipt.totalMinor)
+  );
+}
+
+async function auditReceiptIfNeeded(payload, receipt, env, fetcher) {
+  try {
+    const response = await fetcher(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(openAiReceiptAuditRequest(payload, receipt, env))
+    });
+
+    const responseJson = await response.json();
+    if (!response.ok) {
+      return receipt;
+    }
+
+    const outputText = extractOpenAiOutputText(responseJson);
+    if (!outputText) {
+      return receipt;
+    }
+
+    const auditedReceipt = normalizeParsedReceipt(JSON.parse(outputText));
+    if (!isValidParsedReceipt(auditedReceipt)) {
+      return receipt;
+    }
+
+    return reconcileReceiptSubtotal(auditedReceipt);
+  } catch {
+    return receipt;
+  }
+}
+
 function extractOpenAiOutputText(responseJson) {
   if (typeof responseJson.output_text === "string") {
     return responseJson.output_text;
@@ -468,7 +749,53 @@ function isValidParsedReceipt(receipt) {
     typeof receipt.merchantName === "string" &&
     typeof receipt.currency === "string" &&
     Array.isArray(receipt.items) &&
-    typeof receipt.totalMinor === "number"
+    receipt.items.every(isValidParsedReceiptItem) &&
+    Array.isArray(receipt.fees) &&
+    receipt.fees.every(isValidParsedReceiptFee) &&
+    Number.isInteger(receipt.subtotalMinor) &&
+    Number.isInteger(receipt.totalMinor) &&
+    typeof receipt.confidence === "number" &&
+    Array.isArray(receipt.corrections) &&
+    receipt.corrections.every(isValidParsedCorrection) &&
+    Array.isArray(receipt.reviewWarnings) &&
+    receipt.reviewWarnings.every((warning) => typeof warning === "string")
+  );
+}
+
+function isValidParsedReceiptItem(item) {
+  return (
+    item &&
+    typeof item === "object" &&
+    typeof item.name === "string" &&
+    typeof item.quantity === "number" &&
+    Number.isInteger(item.unitPriceMinor) &&
+    Number.isInteger(item.totalPriceMinor) &&
+    typeof item.confidence === "number" &&
+    Array.isArray(item.candidatesMinor) &&
+    item.candidatesMinor.every(Number.isInteger) &&
+    typeof item.needsReview === "boolean"
+  );
+}
+
+function isValidParsedReceiptFee(fee) {
+  return (
+    fee &&
+    typeof fee === "object" &&
+    typeof fee.type === "string" &&
+    typeof fee.label === "string" &&
+    Number.isInteger(fee.amountMinor)
+  );
+}
+
+function isValidParsedCorrection(correction) {
+  return (
+    correction &&
+    typeof correction === "object" &&
+    typeof correction.field === "string" &&
+    (typeof correction.itemName === "string" || correction.itemName === null) &&
+    Number.isInteger(correction.fromMinor) &&
+    Number.isInteger(correction.toMinor) &&
+    typeof correction.reason === "string"
   );
 }
 

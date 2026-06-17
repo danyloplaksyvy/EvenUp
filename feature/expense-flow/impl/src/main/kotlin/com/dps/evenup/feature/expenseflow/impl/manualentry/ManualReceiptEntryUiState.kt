@@ -18,5 +18,6 @@ data class ManualReceiptEntryUiState(
 data class ManualReceiptItemUiState(
     val id: String,
     val name: String = "",
+    val quantity: String = "1",
     val amount: String = "",
 )

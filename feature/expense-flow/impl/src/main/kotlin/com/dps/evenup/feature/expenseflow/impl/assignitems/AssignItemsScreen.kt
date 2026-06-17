@@ -44,6 +44,7 @@ import com.dps.evenup.core.designsystem.api.EvenUpPrimaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpReceiptAssignee
 import com.dps.evenup.core.designsystem.api.EvenUpReceiptItemRow
 import com.dps.evenup.core.designsystem.api.EvenUpReceiptItemState
+import com.dps.evenup.core.designsystem.api.EvenUpSecondaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextField
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
@@ -108,6 +109,11 @@ private fun AssignItemsContent(
                 textAlign = TextAlign.Center,
             )
             ParticipantSelector(uiState = uiState, onEvent = onEvent)
+            EvenUpSecondaryButton(
+                text = "Split all equally",
+                onClick = { onEvent(AssignItemsUiEvent.ApplyEqualSplitClick) },
+                enabled = uiState.canApplyEqualSplit,
+            )
             ReceiptAssignmentCard(uiState = uiState, onEvent = onEvent)
             uiState.fieldErrors["assignment"]?.let { error ->
                 EvenUpValidationMessage(message = error)

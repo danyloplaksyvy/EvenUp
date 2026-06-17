@@ -12,6 +12,7 @@ import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,8 +62,10 @@ fun ReceiptScanRoute(
     }
     var uiState by remember { mutableStateOf(ReceiptScanUiState()) }
 
-    DisposableEffect(cameraController, lifecycleOwner) {
-        cameraController.bindToLifecycle(lifecycleOwner)
+    DisposableEffect(cameraController, lifecycleOwner, uiState.cameraPermissionGranted) {
+        if (uiState.cameraPermissionGranted) {
+            cameraController.bindToLifecycle(lifecycleOwner)
+        }
         onDispose { cameraController.unbind() }
     }
 
@@ -127,11 +130,25 @@ fun ReceiptScanRoute(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            captureReceipt()
+            uiState = uiState.copy(
+                cameraPermissionGranted = true,
+                errorMessage = null,
+            )
         } else {
             uiState = uiState.copy(
+                cameraPermissionGranted = false,
                 errorMessage = "Camera permission is needed to scan a receipt.",
             )
+        }
+    }
+
+    LaunchedEffect(cameraPermissionLauncher) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            uiState = uiState.copy(cameraPermissionGranted = true)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -142,12 +159,8 @@ fun ReceiptScanRoute(
             when (event) {
                 ReceiptScanUiEvent.BackClick -> onBack()
                 ReceiptScanUiEvent.CaptureClick -> {
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
-                    ) {
+                    if (uiState.cameraPermissionGranted) {
                         captureReceipt()
-                    } else {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                     }
                 }
                 ReceiptScanUiEvent.GalleryClick -> {

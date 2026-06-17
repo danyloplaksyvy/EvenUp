@@ -39,6 +39,45 @@ class DefaultValidateReceiptUseCaseTest {
         assertTrue(ReceiptValidationError.TotalMismatch in result.errors)
     }
 
+    @Test
+    fun `subtotal validates item sum before fees`() {
+        val result = useCase.validate(
+            validReceipt().copy(
+                subtotal = MoneyMinor(1_000),
+                total = MoneyMinor(1_200),
+            ),
+        )
+
+        assertTrue(result.isValid)
+    }
+
+    @Test
+    fun `subtotal mismatch returns total mismatch error`() {
+        val result = useCase.validate(
+            validReceipt().copy(
+                items = listOf(validItem().copy(totalPrice = MoneyMinor(1_020))),
+                subtotal = MoneyMinor(1_000),
+                total = MoneyMinor(1_200),
+            ),
+        )
+
+        assertFalse(result.isValid)
+        assertTrue(ReceiptValidationError.TotalMismatch in result.errors)
+    }
+
+    @Test
+    fun `subtotal plus fees must equal total`() {
+        val result = useCase.validate(
+            validReceipt().copy(
+                subtotal = MoneyMinor(1_000),
+                total = MoneyMinor(1_210),
+            ),
+        )
+
+        assertFalse(result.isValid)
+        assertTrue(ReceiptValidationError.TotalMismatch in result.errors)
+    }
+
     private fun validReceipt(): Receipt = Receipt(
         merchantName = "Bella Roma",
         currencyCode = CurrencyCode("EUR"),

@@ -11,13 +11,18 @@ data class ReceiptReviewUiState(
     val currencyCode: String = "USD",
     val items: List<ReceiptReviewItemUiState> = emptyList(),
     val fees: List<ReceiptReviewFeeUiState> = emptyList(),
+    val subtotalAmount: String? = null,
     val totalAmount: String = "",
     val fieldErrors: Map<String, String> = emptyMap(),
     val submitError: String? = null,
 ) {
     val itemCountLabel: String = "${items.size} items"
     val summaryTotalLabel: String = formatCurrency(totalAmount, currencyCode)
-    val statusLabel: String = if (fieldErrors.isEmpty() && submitError == null) "Looks good" else "Needs review"
+    val statusLabel: String = if (fieldErrors.isEmpty() && submitError == null) {
+        "Looks good"
+    } else {
+        "Needs review"
+    }
 }
 
 data class ReceiptReviewItemUiState(

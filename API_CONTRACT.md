@@ -66,7 +66,10 @@ Response:
       "name": "Pasta",
       "quantity": 2,
       "unitPriceMinor": 1800,
-      "totalPriceMinor": 3600
+      "totalPriceMinor": 3600,
+      "confidence": 0.92,
+      "candidatesMinor": [3600, 3500],
+      "needsReview": false
     }
   ],
   "fees": [
@@ -83,7 +86,17 @@ Response:
   ],
   "subtotalMinor": 10350,
   "totalMinor": 12050,
-  "confidence": 0.92
+  "confidence": 0.92,
+  "corrections": [
+    {
+      "field": "items[0].totalPriceMinor",
+      "itemName": "Pasta",
+      "fromMinor": 3500,
+      "toMinor": 3600,
+      "reason": "Corrected to match printed subtotal."
+    }
+  ],
+  "reviewWarnings": []
 }
 ```
 
@@ -106,11 +119,15 @@ Validation requirements:
 - totalMinor required
 - currency required or inferred
 - all money values returned in minor units
+- item totals must be reconciled against subtotal when possible
+- ambiguous item prices should include candidate minor-unit totals
+- automatic corrections must be returned in `corrections`
 
 Client behavior:
 
 - Parsed receipt must be editable by the user.
 - Parse failure must allow retry or manual fallback.
+- Parse corrections should be shown as non-blocking review notes.
 
 ## POST /v1/expenses
 

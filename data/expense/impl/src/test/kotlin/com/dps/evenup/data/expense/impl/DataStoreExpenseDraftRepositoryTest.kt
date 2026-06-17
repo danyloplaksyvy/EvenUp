@@ -29,6 +29,9 @@ import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptFee
 import com.dps.evenup.domain.receipt.api.ReceiptItem
 import com.dps.evenup.domain.receipt.api.ReceiptItemId
+import com.dps.evenup.domain.receipt.api.ReceiptItemParseMetadata
+import com.dps.evenup.domain.receipt.api.ReceiptParseCorrection
+import com.dps.evenup.domain.receipt.api.ReceiptParseMetadata
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -54,6 +57,52 @@ class DataStoreExpenseDraftRepositoryTest {
         repository.clearDraft()
 
         assertNull(repository.getDraft())
+    }
+
+    @Test
+    fun `old draft JSON without subtotal or parse metadata still restores`() = runBlocking {
+        val store = FakeStringDataStore()
+        store.write(
+            "expense_draft_json",
+            """
+                {
+                  "id": "draft-1",
+                  "receipt": {
+                    "merchantName": "Cafe",
+                    "currency": "USD",
+                    "transactionDateLabel": "2026-06-16",
+                    "items": [
+                      {
+                        "id": "item-1",
+                        "name": "Meal",
+                        "quantity": 1,
+                        "unitPriceMinor": 1000,
+                        "totalPriceMinor": 1000
+                      }
+                    ],
+                    "fees": [
+                      {
+                        "id": "fee-1",
+                        "type": "Tax",
+                        "label": "Tax",
+                        "amountMinor": 200
+                      }
+                    ],
+                    "totalMinor": 1200
+                  },
+                  "participants": [],
+                  "payerId": "pending-payer",
+                  "itemAssignments": [],
+                  "feeAllocations": []
+                }
+            """.trimIndent(),
+        )
+
+        val restoredDraft = DataStoreExpenseDraftRepository(store).getDraft()
+
+        assertNull(restoredDraft?.receipt?.subtotal)
+        assertTrue(restoredDraft?.receipt?.parseMetadata?.corrections.orEmpty().isEmpty())
+        assertTrue(restoredDraft?.receipt?.items?.single()?.parseMetadata?.candidates.orEmpty().isEmpty())
     }
 
     @Test
@@ -137,9 +186,34 @@ class DataStoreExpenseDraftRepositoryTest {
         transactionDateLabel = "2026-06-16",
         items = listOf(
             ReceiptItem(ReceiptItemId("item-1"), "Meal", Quantity(1), MoneyMinor(1_000), MoneyMinor(1_000)),
+            ReceiptItem(
+                id = ReceiptItemId("item-2"),
+                name = "Dessert",
+                quantity = Quantity(1),
+                unitPrice = MoneyMinor(300),
+                totalPrice = MoneyMinor(300),
+                parseMetadata = ReceiptItemParseMetadata(
+                    confidence = 0.72,
+                    candidates = listOf(MoneyMinor(300), MoneyMinor(380)),
+                    needsReview = true,
+                ),
+            ),
         ),
         fees = listOf(ReceiptFee(FeeId("fee-1"), FeeType.Tax, "Tax", MoneyMinor(200))),
-        total = MoneyMinor(1_200),
+        subtotal = MoneyMinor(1_300),
+        total = MoneyMinor(1_500),
+        parseMetadata = ReceiptParseMetadata(
+            corrections = listOf(
+                ReceiptParseCorrection(
+                    field = "items[1].totalPriceMinor",
+                    itemName = "Dessert",
+                    from = MoneyMinor(380),
+                    to = MoneyMinor(300),
+                    reason = "Corrected to match subtotal.",
+                ),
+            ),
+            reviewWarnings = listOf("Check Dessert"),
+        ),
     )
 
     private fun participants(): List<Participant> = listOf(

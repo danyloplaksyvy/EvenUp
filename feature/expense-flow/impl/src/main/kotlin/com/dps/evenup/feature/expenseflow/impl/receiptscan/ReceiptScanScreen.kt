@@ -89,6 +89,7 @@ fun ReceiptScanScreen(
         }
         ReceiptScanActions(
             captureEnabled = uiState.captureEnabled,
+            galleryEnabled = uiState.galleryEnabled,
             onCapture = { onEvent(ReceiptScanUiEvent.CaptureClick) },
             onGallery = { onEvent(ReceiptScanUiEvent.GalleryClick) },
         )
@@ -150,6 +151,7 @@ private fun ReceiptFrameOverlay(
 @Composable
 private fun ReceiptScanActions(
     captureEnabled: Boolean,
+    galleryEnabled: Boolean,
     onCapture: () -> Unit,
     onGallery: () -> Unit,
 ) {
@@ -185,7 +187,7 @@ private fun ReceiptScanActions(
             }
             OutlinedButton(
                 onClick = onGallery,
-                enabled = captureEnabled,
+                enabled = galleryEnabled,
                 modifier = Modifier.fillMaxWidth(),
                 shape = EvenUpTheme.shapes.button,
                 colors = ButtonDefaults.outlinedButtonColors(

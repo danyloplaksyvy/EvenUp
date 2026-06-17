@@ -39,6 +39,11 @@ class ManualReceiptEntryPresenter(
                     if (item.id == event.itemId) item.copy(name = event.value) else item
                 },
             )
+            is ManualReceiptEntryUiEvent.ItemQuantityChanged -> clearedState.copy(
+                items = state.items.map { item ->
+                    if (item.id == event.itemId) item.copy(quantity = event.value.filter(Char::isDigit).take(3)) else item
+                },
+            )
             is ManualReceiptEntryUiEvent.ItemAmountChanged -> clearedState.copy(
                 items = state.items.map { item ->
                     if (item.id == event.itemId) item.copy(amount = event.value) else item
@@ -101,21 +106,25 @@ class ManualReceiptEntryPresenter(
 
         val receiptItems = items.mapIndexedNotNull { index, item ->
             val name = item.name.trim()
+            val quantity = item.quantity.toIntOrNull()
             val amount = parseMoneyMinor(item.amount)
             if (name.isBlank()) {
                 errors["item_name_${item.id}"] = "Required."
             }
+            if (quantity == null || quantity <= 0) {
+                errors["item_quantity_${item.id}"] = "Use 1 or more."
+            }
             if (amount == null || amount.value <= 0) {
                 errors["item_amount_${item.id}"] = "Enter an amount."
             }
-            if (name.isBlank() || amount == null || amount.value <= 0) {
+            if (name.isBlank() || quantity == null || quantity <= 0 || amount == null || amount.value <= 0) {
                 null
             } else {
                 ReceiptItem(
                     id = ReceiptItemId("item-${index + 1}"),
                     name = name,
-                    quantity = Quantity(1),
-                    unitPrice = amount,
+                    quantity = Quantity(quantity),
+                    unitPrice = MoneyMinor(amount.value / quantity),
                     totalPrice = amount,
                 )
             }

@@ -1,5 +1,6 @@
 package com.dps.evenup.feature.expenseflow.impl.receiptreview
 
+import android.util.Log
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.domain.receipt.api.CurrencyCode
 import com.dps.evenup.domain.receipt.api.FeeId
@@ -27,6 +28,7 @@ class ReceiptReviewPresenter(
         )
 
         val receipt = draft.receipt
+        receipt.logParseNotes()
         return ReceiptReviewUiState(
             isLoading = false,
             merchantName = receipt.merchantName,
@@ -48,6 +50,7 @@ class ReceiptReviewPresenter(
                     amount = formatMoneyMinor(fee.amount),
                 )
             },
+            subtotalAmount = receipt.subtotal?.let(::formatMoneyMinor),
             totalAmount = formatMoneyMinor(receipt.total),
         )
     }
@@ -102,6 +105,7 @@ class ReceiptReviewPresenter(
             is ReceiptReviewUiEvent.RemoveFeeClick -> clearedState.copy(
                 fees = state.fees.filterNot { fee -> fee.id == event.feeId },
             )
+            is ReceiptReviewUiEvent.SubtotalChanged -> clearedState.copy(subtotalAmount = event.value)
             is ReceiptReviewUiEvent.TotalChanged -> clearedState.copy(totalAmount = event.value)
             ReceiptReviewUiEvent.BackClick,
             ReceiptReviewUiEvent.ContinueClick,
@@ -188,6 +192,13 @@ class ReceiptReviewPresenter(
         if (total == null || total.value < 0) {
             errors["total"] = "Enter the receipt total."
         }
+        val subtotal = subtotalAmount?.let { amount ->
+            val parsedSubtotal = parseMoneyMinor(amount)
+            if (parsedSubtotal == null || parsedSubtotal.value < 0) {
+                errors["subtotal"] = "Enter the receipt subtotal."
+            }
+            parsedSubtotal
+        }
 
         if (errors.isNotEmpty()) {
             return ReceiptReviewBuildResult.Invalid(errors)
@@ -201,6 +212,7 @@ class ReceiptReviewPresenter(
                 items = receiptItems,
                 fees = receiptFees,
                 total = requireNotNull(total),
+                subtotal = subtotal,
             ),
         )
     }
@@ -214,6 +226,20 @@ class ReceiptReviewPresenter(
             ReceiptValidationError.NonPositiveFeeAmount -> "fees" to "Fees must be positive."
             ReceiptValidationError.TotalMismatch -> "total" to "Total must equal items plus fees."
             ReceiptValidationError.NegativeTotal -> "total" to "Total cannot be negative."
+        }
+    }
+
+    private fun Receipt.logParseNotes() {
+        parseMetadata.corrections.forEach { correction ->
+            val itemLabel = correction.itemName?.takeIf { it.isNotBlank() } ?: "receipt item"
+            Log.i(
+                TAG,
+                "Corrected $itemLabel from ${formatCurrency(formatMoneyMinor(correction.from), currencyCode.value)} " +
+                    "to ${formatCurrency(formatMoneyMinor(correction.to), currencyCode.value)}. Reason: ${correction.reason}",
+            )
+        }
+        parseMetadata.reviewWarnings.forEach { warning ->
+            Log.w(TAG, warning)
         }
     }
 
@@ -242,6 +268,10 @@ class ReceiptReviewPresenter(
     private fun nextFeeId(fees: List<ReceiptReviewFeeUiState>): String {
         val nextNumber = fees.mapNotNull { fee -> fee.id.removePrefix("fee-").toIntOrNull() }.maxOrNull() ?: 0
         return "fee-${nextNumber + 1}"
+    }
+
+    private companion object {
+        const val TAG = "ReceiptReview"
     }
 }
 

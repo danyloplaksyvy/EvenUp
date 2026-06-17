@@ -16,6 +16,9 @@ import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptFee
 import com.dps.evenup.domain.receipt.api.ReceiptItem
 import com.dps.evenup.domain.receipt.api.ReceiptItemId
+import com.dps.evenup.domain.receipt.api.ReceiptItemParseMetadata
+import com.dps.evenup.domain.receipt.api.ReceiptParseCorrection
+import com.dps.evenup.domain.receipt.api.ReceiptParseMetadata
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -71,14 +74,22 @@ private fun WorkerNetworkError.toReceiptFailureReason(): ReceiptDataFailureReaso
     WorkerNetworkError.Unknown -> ReceiptDataFailureReason.Unknown
 }
 
-private fun ReceiptParseResponseDto.toDomain(): Receipt = Receipt(
-    merchantName = merchantName.trim().ifEmpty { throw IllegalArgumentException("Merchant name is required.") },
-    currencyCode = CurrencyCode(currency.uppercase()),
-    items = items.mapIndexed { index, item -> item.toDomain(index) },
-    fees = fees.mapIndexed { index, fee -> fee.toDomain(index) },
-    total = MoneyMinor(totalMinor),
-    transactionDateLabel = transactionDate,
-)
+private fun ReceiptParseResponseDto.toDomain(): Receipt {
+    val receipt = Receipt(
+        merchantName = merchantName.trim().ifEmpty { throw IllegalArgumentException("Merchant name is required.") },
+        currencyCode = CurrencyCode(currency.uppercase()),
+        items = items.mapIndexed { index, item -> item.toDomain(index) },
+        fees = fees.mapIndexed { index, fee -> fee.toDomain(index) },
+        total = MoneyMinor(totalMinor),
+        transactionDateLabel = transactionDate,
+        subtotal = subtotalMinor?.let(::MoneyMinor),
+        parseMetadata = ReceiptParseMetadata(
+            corrections = corrections.map { correction -> correction.toDomain() },
+            reviewWarnings = reviewWarnings.map { warning -> warning.trim() }.filter { warning -> warning.isNotEmpty() },
+        ),
+    )
+    return receipt.reconcileSubtotalIfNeeded()
+}
 
 private fun ReceiptItemDto.toDomain(index: Int): ReceiptItem {
     val quantityInt = quantity.toInt()
@@ -93,6 +104,11 @@ private fun ReceiptItemDto.toDomain(index: Int): ReceiptItem {
         quantity = Quantity(quantityInt),
         unitPrice = MoneyMinor(unitPriceMinor),
         totalPrice = MoneyMinor(totalPriceMinor),
+        parseMetadata = ReceiptItemParseMetadata(
+            confidence = confidence?.coerceIn(0.0, 1.0),
+            candidates = candidatesMinor.distinct().map(::MoneyMinor),
+            needsReview = needsReview,
+        ),
     )
 }
 
@@ -128,9 +144,11 @@ private data class ReceiptParseResponseDto(
     val currency: String,
     val items: List<ReceiptItemDto>,
     val fees: List<ReceiptFeeDto> = emptyList(),
-    val subtotalMinor: Long,
+    val subtotalMinor: Long? = null,
     val totalMinor: Long,
     val confidence: Double,
+    val corrections: List<ReceiptParseCorrectionDto> = emptyList(),
+    val reviewWarnings: List<String> = emptyList(),
 )
 
 @Serializable
@@ -139,6 +157,9 @@ private data class ReceiptItemDto(
     val quantity: Double,
     val unitPriceMinor: Long,
     val totalPriceMinor: Long,
+    val confidence: Double? = null,
+    val candidatesMinor: List<Long> = emptyList(),
+    val needsReview: Boolean = false,
 )
 
 @Serializable
@@ -146,4 +167,117 @@ private data class ReceiptFeeDto(
     val type: String,
     val label: String,
     val amountMinor: Long,
+)
+
+@Serializable
+private data class ReceiptParseCorrectionDto(
+    val field: String,
+    val itemName: String? = null,
+    val fromMinor: Long,
+    val toMinor: Long,
+    val reason: String,
+)
+
+private fun ReceiptParseCorrectionDto.toDomain(): ReceiptParseCorrection = ReceiptParseCorrection(
+    field = field,
+    itemName = itemName,
+    from = MoneyMinor(fromMinor),
+    to = MoneyMinor(toMinor),
+    reason = reason,
+)
+
+private fun Receipt.reconcileSubtotalIfNeeded(): Receipt {
+    val subtotalValue = subtotal?.value ?: return this
+    val itemSum = items.sumOf { item -> item.totalPrice.value }
+    if (itemSum == subtotalValue) return this
+
+    val candidateCorrection = candidateCorrections(subtotalValue).singleOrNull() ?: return this
+    val correctedItems = items.mapIndexed { index, item ->
+        if (index == candidateCorrection.index) {
+            val correctedTotal = MoneyMinor(candidateCorrection.toMinor)
+            item.copy(
+                totalPrice = correctedTotal,
+                unitPrice = correctedUnitPrice(item, correctedTotal),
+                parseMetadata = item.parseMetadata.copy(
+                    candidates = (listOf(correctedTotal, item.totalPrice) + item.parseMetadata.candidates).distinct(),
+                    needsReview = true,
+                ),
+            )
+        } else {
+            item
+        }
+    }
+
+    return copy(
+        items = correctedItems,
+        parseMetadata = parseMetadata.copy(
+            corrections = parseMetadata.corrections + ReceiptParseCorrection(
+                field = "items[${candidateCorrection.index}].totalPriceMinor",
+                itemName = candidateCorrection.itemName,
+                from = MoneyMinor(candidateCorrection.fromMinor),
+                to = MoneyMinor(candidateCorrection.toMinor),
+                reason = "Corrected locally to match printed subtotal; digit likely misread.",
+            ),
+        ),
+    )
+}
+
+private fun Receipt.candidateCorrections(subtotalValue: Long): List<SubtotalCorrectionCandidate> {
+    val itemSum = items.sumOf { item -> item.totalPrice.value }
+    return items.flatMapIndexed { index, item ->
+        val candidates = (item.parseMetadata.candidates.map { candidate -> candidate.value } +
+            visuallySimilarSingleDigitTotals(item.totalPrice.value))
+            .distinct()
+            .filter { candidate -> candidate > 0 && candidate != item.totalPrice.value }
+
+        candidates.mapNotNull { candidate ->
+            if (itemSum - item.totalPrice.value + candidate == subtotalValue) {
+                SubtotalCorrectionCandidate(
+                    index = index,
+                    itemName = item.name,
+                    fromMinor = item.totalPrice.value,
+                    toMinor = candidate,
+                )
+            } else {
+                null
+            }
+        }
+    }.distinct()
+}
+
+private fun visuallySimilarSingleDigitTotals(value: Long): List<Long> {
+    val digits = value.toString()
+    return digits.flatMapIndexed { index, digit ->
+        visuallySimilarDigits[digit].orEmpty().mapNotNull { replacement ->
+            digits.replaceRange(index, index + 1, replacement.toString()).toLongOrNull()
+        }
+    }
+}
+
+private fun correctedUnitPrice(
+    item: ReceiptItem,
+    correctedTotal: MoneyMinor,
+): MoneyMinor {
+    val quantity = item.quantity.value
+    return if (correctedTotal.value % quantity == 0L) {
+        MoneyMinor(correctedTotal.value / quantity)
+    } else {
+        item.unitPrice
+    }
+}
+
+private data class SubtotalCorrectionCandidate(
+    val index: Int,
+    val itemName: String,
+    val fromMinor: Long,
+    val toMinor: Long,
+)
+
+private val visuallySimilarDigits = mapOf(
+    '0' to listOf('6', '8'),
+    '3' to listOf('8'),
+    '5' to listOf('6'),
+    '6' to listOf('0', '5', '8'),
+    '8' to listOf('0', '3', '6', '9'),
+    '9' to listOf('8'),
 )

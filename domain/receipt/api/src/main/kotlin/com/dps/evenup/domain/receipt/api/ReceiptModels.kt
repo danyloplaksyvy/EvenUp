@@ -7,6 +7,8 @@ data class Receipt(
     val fees: List<ReceiptFee>,
     val total: MoneyMinor,
     val transactionDateLabel: String? = null,
+    val subtotal: MoneyMinor? = null,
+    val parseMetadata: ReceiptParseMetadata = ReceiptParseMetadata(),
 )
 
 data class ReceiptItem(
@@ -15,6 +17,7 @@ data class ReceiptItem(
     val quantity: Quantity,
     val unitPrice: MoneyMinor,
     val totalPrice: MoneyMinor,
+    val parseMetadata: ReceiptItemParseMetadata = ReceiptItemParseMetadata(),
 )
 
 data class ReceiptFee(
@@ -30,3 +33,22 @@ enum class FeeType {
     ServiceFee,
     Other,
 }
+
+data class ReceiptParseMetadata(
+    val corrections: List<ReceiptParseCorrection> = emptyList(),
+    val reviewWarnings: List<String> = emptyList(),
+)
+
+data class ReceiptItemParseMetadata(
+    val confidence: Double? = null,
+    val candidates: List<MoneyMinor> = emptyList(),
+    val needsReview: Boolean = false,
+)
+
+data class ReceiptParseCorrection(
+    val field: String,
+    val itemName: String?,
+    val from: MoneyMinor,
+    val to: MoneyMinor,
+    val reason: String,
+)

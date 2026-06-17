@@ -15,7 +15,9 @@ data class AssignItemsUiState(
     val canContinue: Boolean = false,
     val fieldErrors: Map<String, String> = emptyMap(),
     val submitError: String? = null,
-)
+) {
+    val canApplyEqualSplit: Boolean = participants.size >= 2 && items.isNotEmpty() && !isSaving
+}
 
 data class AssignItemsParticipantUiState(
     val id: String,

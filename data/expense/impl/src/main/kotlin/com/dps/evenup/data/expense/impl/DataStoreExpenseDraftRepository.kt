@@ -23,6 +23,9 @@ import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptFee
 import com.dps.evenup.domain.receipt.api.ReceiptItem
 import com.dps.evenup.domain.receipt.api.ReceiptItemId
+import com.dps.evenup.domain.receipt.api.ReceiptItemParseMetadata
+import com.dps.evenup.domain.receipt.api.ReceiptParseCorrection
+import com.dps.evenup.domain.receipt.api.ReceiptParseMetadata
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -88,6 +91,9 @@ private fun Receipt.toDraftDto(): DraftReceiptDto = DraftReceiptDto(
     items = items.map { item -> item.toDraftDto() },
     fees = fees.map { fee -> fee.toDraftDto() },
     totalMinor = total.value,
+    subtotalMinor = subtotal?.value,
+    corrections = parseMetadata.corrections.map { correction -> correction.toDraftDto() },
+    reviewWarnings = parseMetadata.reviewWarnings,
 )
 
 private fun DraftReceiptDto.toDomain(): Receipt = Receipt(
@@ -97,6 +103,11 @@ private fun DraftReceiptDto.toDomain(): Receipt = Receipt(
     items = items.map { item -> item.toDomain() },
     fees = fees.map { fee -> fee.toDomain() },
     total = MoneyMinor(totalMinor),
+    subtotal = subtotalMinor?.let(::MoneyMinor),
+    parseMetadata = ReceiptParseMetadata(
+        corrections = corrections.map { correction -> correction.toDomain() },
+        reviewWarnings = reviewWarnings,
+    ),
 )
 
 private fun ReceiptItem.toDraftDto(): DraftReceiptItemDto = DraftReceiptItemDto(
@@ -105,6 +116,9 @@ private fun ReceiptItem.toDraftDto(): DraftReceiptItemDto = DraftReceiptItemDto(
     quantity = quantity.value,
     unitPriceMinor = unitPrice.value,
     totalPriceMinor = totalPrice.value,
+    confidence = parseMetadata.confidence,
+    candidatesMinor = parseMetadata.candidates.map { candidate -> candidate.value },
+    needsReview = parseMetadata.needsReview,
 )
 
 private fun DraftReceiptItemDto.toDomain(): ReceiptItem = ReceiptItem(
@@ -113,6 +127,11 @@ private fun DraftReceiptItemDto.toDomain(): ReceiptItem = ReceiptItem(
     quantity = Quantity(quantity),
     unitPrice = MoneyMinor(unitPriceMinor),
     totalPrice = MoneyMinor(totalPriceMinor),
+    parseMetadata = ReceiptItemParseMetadata(
+        confidence = confidence,
+        candidates = candidatesMinor.map(::MoneyMinor),
+        needsReview = needsReview,
+    ),
 )
 
 private fun ReceiptFee.toDraftDto(): DraftReceiptFeeDto = DraftReceiptFeeDto(
@@ -127,6 +146,22 @@ private fun DraftReceiptFeeDto.toDomain(): ReceiptFee = ReceiptFee(
     type = FeeType.valueOf(type),
     label = label,
     amount = MoneyMinor(amountMinor),
+)
+
+private fun ReceiptParseCorrection.toDraftDto(): DraftReceiptParseCorrectionDto = DraftReceiptParseCorrectionDto(
+    field = field,
+    itemName = itemName,
+    fromMinor = from.value,
+    toMinor = to.value,
+    reason = reason,
+)
+
+private fun DraftReceiptParseCorrectionDto.toDomain(): ReceiptParseCorrection = ReceiptParseCorrection(
+    field = field,
+    itemName = itemName,
+    from = MoneyMinor(fromMinor),
+    to = MoneyMinor(toMinor),
+    reason = reason,
 )
 
 private fun Participant.toDraftDto(): DraftParticipantDto = DraftParticipantDto(
@@ -209,6 +244,9 @@ private data class DraftReceiptDto(
     val items: List<DraftReceiptItemDto>,
     val fees: List<DraftReceiptFeeDto>,
     val totalMinor: Long,
+    val subtotalMinor: Long? = null,
+    val corrections: List<DraftReceiptParseCorrectionDto> = emptyList(),
+    val reviewWarnings: List<String> = emptyList(),
 )
 
 @Serializable
@@ -218,6 +256,18 @@ private data class DraftReceiptItemDto(
     val quantity: Int,
     val unitPriceMinor: Long,
     val totalPriceMinor: Long,
+    val confidence: Double? = null,
+    val candidatesMinor: List<Long> = emptyList(),
+    val needsReview: Boolean = false,
+)
+
+@Serializable
+private data class DraftReceiptParseCorrectionDto(
+    val field: String,
+    val itemName: String? = null,
+    val fromMinor: Long,
+    val toMinor: Long,
+    val reason: String,
 )
 
 @Serializable

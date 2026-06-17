@@ -30,6 +30,9 @@ import com.dps.evenup.core.designsystem.api.EvenUpTextButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextField
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
 import com.dps.evenup.core.designsystem.api.EvenUpTopBar
+import com.dps.evenup.feature.expenseflow.impl.receiptentry.CurrencySelector
+import com.dps.evenup.feature.expenseflow.impl.receiptentry.DeleteReceiptRowButton
+import com.dps.evenup.feature.expenseflow.impl.receiptentry.ReceiptDatePickerField
 
 @Composable
 fun ManualReceiptEntryScreen(
@@ -84,26 +87,19 @@ private fun ManualReceiptEssentialsCard(
             supportingText = uiState.fieldErrors["merchant"],
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12)) {
-            EvenUpTextField(
-                value = uiState.dateLabel,
-                onValueChange = { onEvent(ManualReceiptEntryUiEvent.DateChanged(it)) },
-                label = "Date",
-                placeholder = "2026-06-16",
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-            )
-            EvenUpTextField(
-                value = uiState.currencyCode,
-                onValueChange = { onEvent(ManualReceiptEntryUiEvent.CurrencyChanged(it)) },
-                label = "Currency",
-                modifier = Modifier.weight(1f),
-                isError = uiState.fieldErrors.containsKey("currency"),
-                supportingText = uiState.fieldErrors["currency"],
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    keyboardType = KeyboardType.Ascii,
-                ),
+        ReceiptDatePickerField(
+            value = uiState.dateLabel,
+            onDateSelected = { onEvent(ManualReceiptEntryUiEvent.DateChanged(it)) },
+        )
+        CurrencySelector(
+            selectedCurrencyCode = uiState.currencyCode,
+            onCurrencySelected = { onEvent(ManualReceiptEntryUiEvent.CurrencyChanged(it)) },
+        )
+        uiState.fieldErrors["currency"]?.let { error ->
+            Text(
+                text = error,
+                style = EvenUpTheme.typography.caption,
+                color = EvenUpTheme.colors.error,
             )
         }
     }
@@ -169,34 +165,41 @@ private fun ManualReceiptItemRow(
     onEvent: (ManualReceiptEntryUiEvent) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
+        EvenUpTextField(
+            value = item.name,
+            onValueChange = { onEvent(ManualReceiptEntryUiEvent.ItemNameChanged(item.id, it)) },
+            label = "Item ${itemIndex + 1}",
+            placeholder = "Item name",
+            isError = fieldErrors.containsKey("item_name_${item.id}"),
+            supportingText = fieldErrors["item_name_${item.id}"],
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+        )
         Row(
             horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
             verticalAlignment = Alignment.Top,
         ) {
             EvenUpTextField(
-                value = item.name,
-                onValueChange = { onEvent(ManualReceiptEntryUiEvent.ItemNameChanged(item.id, it)) },
-                label = "Item ${itemIndex + 1}",
-                placeholder = "Item name",
-                modifier = Modifier.weight(1f),
-                isError = fieldErrors.containsKey("item_name_${item.id}"),
-                supportingText = fieldErrors["item_name_${item.id}"],
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                value = item.quantity,
+                onValueChange = { onEvent(ManualReceiptEntryUiEvent.ItemQuantityChanged(item.id, it)) },
+                label = "Qty",
+                modifier = Modifier.width(84.dp),
+                isError = fieldErrors.containsKey("item_quantity_${item.id}"),
+                supportingText = fieldErrors["item_quantity_${item.id}"],
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
             EvenUpMoneyField(
                 value = item.amount,
                 onValueChange = { onEvent(ManualReceiptEntryUiEvent.ItemAmountChanged(item.id, it)) },
                 label = "Amount",
-                modifier = Modifier.width(132.dp),
+                modifier = Modifier.weight(1f),
                 isError = fieldErrors.containsKey("item_amount_${item.id}"),
                 supportingText = fieldErrors["item_amount_${item.id}"],
             )
-        }
-        if (canRemove) {
-            EvenUpTextButton(
-                text = "Remove item",
+            DeleteReceiptRowButton(
+                contentDescription = "Delete item",
                 onClick = { onEvent(ManualReceiptEntryUiEvent.RemoveItemClick(item.id)) },
-                modifier = Modifier.fillMaxWidth(),
+                enabled = canRemove,
+                modifier = Modifier.padding(top = EvenUpTheme.spacing.space12),
             )
         }
     }
