@@ -1,38 +1,58 @@
 package com.dps.evenup.feature.expenseflow.impl.receiptreview
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,47 +63,134 @@ import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
 import com.dps.evenup.core.designsystem.api.EvenUpMoneyField
 import com.dps.evenup.core.designsystem.api.EvenUpPrimaryButton
-import com.dps.evenup.core.designsystem.api.EvenUpTextButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextField
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
-import com.dps.evenup.core.designsystem.api.EvenUpTopBar
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
 import com.dps.evenup.core.designsystem.api.EvenUpValidationSeverity
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.CurrencySelector
-import com.dps.evenup.feature.expenseflow.impl.receiptentry.DeleteReceiptRowButton
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.ReceiptDatePickerField
 
-private val ReceiptReviewFooterClearance = 132.dp
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiptReviewScreen(
     uiState: ReceiptReviewUiState,
     onEvent: (ReceiptReviewUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        EvenUpTopBar(
-            title = "Receipt review",
-            onNavigationClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
-            navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        )
-        when {
-            uiState.isLoading -> EvenUpLoadingState(
-                message = "Loading receipt...",
-                modifier = Modifier.weight(1f),
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val showStickyBackButton by remember {
+        derivedStateOf {
+            scrollBehavior.state.collapsedFraction >= 1f
+        }
+    }
+    Scaffold(
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = EvenUpTheme.colors.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = "Receipt review",
+                        style = EvenUpTheme.typography.sectionTitle,
+                        color = EvenUpTheme.colors.textPrimary,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { onEvent(ReceiptReviewUiEvent.BackClick) }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Navigate back",
+                            tint = EvenUpTheme.colors.textPrimary,
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = EvenUpTheme.colors.background,
+                    scrolledContainerColor = EvenUpTheme.colors.background,
+                    navigationIconContentColor = EvenUpTheme.colors.textPrimary,
+                    titleContentColor = EvenUpTheme.colors.textPrimary,
+                ),
             )
-            uiState.missingDraft -> EvenUpErrorState(
-                title = "Receipt unavailable",
-                message = uiState.submitError ?: "Start a new receipt to continue.",
-                modifier = Modifier.weight(1f),
-                retryText = "Go back",
-                onRetryClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
-            )
-            else -> ReceiptReviewContent(
-                uiState = uiState,
-                onEvent = onEvent,
-                modifier = Modifier.weight(1f),
-            )
+        },
+        bottomBar = {
+            if (!uiState.isLoading && !uiState.missingDraft) {
+                ReceiptReviewBottomBar(uiState = uiState, onEvent = onEvent)
+            }
+        },
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
+                uiState.isLoading -> EvenUpLoadingState(
+                    message = "Loading receipt...",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                )
+
+                uiState.missingDraft -> EvenUpErrorState(
+                    title = "Receipt unavailable",
+                    message = uiState.submitError ?: "Start a new receipt to continue.",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    retryText = "Go back",
+                    onRetryClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
+                )
+
+                else -> ReceiptReviewContent(
+                    uiState = uiState,
+                    onEvent = onEvent,
+                    contentPadding = innerPadding,
+                )
+            }
+
+            AnimatedVisibility(
+                visible = showStickyBackButton,
+                modifier = Modifier.align(Alignment.TopStart),
+                enter = fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 180,
+                        easing = FastOutSlowInEasing,
+                    ),
+                ) + scaleIn(
+                    initialScale = 0.88f,
+                    animationSpec = tween(
+                        durationMillis = 180,
+                        easing = FastOutSlowInEasing,
+                    ),
+                ) + slideInVertically(
+                    initialOffsetY = { -it / 3 },
+                    animationSpec = tween(
+                        durationMillis = 180,
+                        easing = FastOutSlowInEasing,
+                    ),
+                ),
+                exit = fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 120,
+                        easing = FastOutSlowInEasing,
+                    ),
+                ) + scaleOut(
+                    targetScale = 0.88f,
+                    animationSpec = tween(
+                        durationMillis = 120,
+                        easing = FastOutSlowInEasing,
+                    ),
+                ) + slideOutVertically(
+                    targetOffsetY = { -it / 3 },
+                    animationSpec = tween(
+                        durationMillis = 120,
+                        easing = FastOutSlowInEasing,
+                    ),
+                ),
+            ) {
+                StickyBackButton(
+                    onClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
+                )
+            }
         }
     }
 }
@@ -92,36 +199,68 @@ fun ReceiptReviewScreen(
 private fun ReceiptReviewContent(
     uiState: ReceiptReviewUiState,
     onEvent: (ReceiptReviewUiEvent) -> Unit,
-    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues,
 ) {
-    Box(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = EvenUpTheme.spacing.space20)
-                .padding(top = EvenUpTheme.spacing.space16),
-            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space20),
-        ) {
-            ReceiptReviewHeader(uiState = uiState)
-            ReceiptReviewDetailsCard(uiState = uiState, onEvent = onEvent)
-            ReceiptReviewItemsCard(uiState = uiState, onEvent = onEvent)
-            ReceiptReviewAdjustmentsCard(uiState = uiState, onEvent = onEvent)
-            ReceiptReviewTotalsCard(uiState = uiState, onEvent = onEvent)
-            uiState.submitError?.let { error ->
-                EvenUpValidationMessage(message = error)
-            }
-            Spacer(modifier = Modifier.height(ReceiptReviewFooterClearance))
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(contentPadding)
+            .padding(horizontal = EvenUpTheme.spacing.space20)
+            .padding(top = EvenUpTheme.spacing.space16, bottom = EvenUpTheme.spacing.space24),
+        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space20),
+    ) {
+        ReceiptReviewHeader(uiState = uiState)
+        ReceiptReviewDetailsCard(uiState = uiState, onEvent = onEvent)
+        ReceiptReviewItemsCard(uiState = uiState, onEvent = onEvent)
+        ReceiptReviewAdjustmentsCard(uiState = uiState, onEvent = onEvent)
+        ReceiptReviewTotalsCard(uiState = uiState, onEvent = onEvent)
+        uiState.submitError?.let { error ->
+            EvenUpValidationMessage(message = error)
         }
-        EvenUpBottomActionBar(
-            primaryText = if (uiState.isSaving) "Saving..." else "Continue",
-            onPrimaryClick = { onEvent(ReceiptReviewUiEvent.ContinueClick) },
-            primaryEnabled = !uiState.isSaving,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
     }
     ReceiptReviewEditSheet(uiState = uiState, onEvent = onEvent)
+}
+
+@Composable
+private fun ReceiptReviewBottomBar(
+    uiState: ReceiptReviewUiState,
+    onEvent: (ReceiptReviewUiEvent) -> Unit,
+) {
+    EvenUpBottomActionBar(
+        primaryText = if (uiState.isSaving) "Saving..." else "Continue",
+        onPrimaryClick = { onEvent(ReceiptReviewUiEvent.ContinueClick) },
+        primaryEnabled = !uiState.isSaving,
+    )
+}
+
+@Composable
+private fun StickyBackButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(start = EvenUpTheme.spacing.space8, top = EvenUpTheme.spacing.space8)
+            .size(48.dp)
+            .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = "Navigate back"
+            },
+        shape = EvenUpTheme.shapes.avatar,
+        color = EvenUpTheme.colors.background,
+        contentColor = EvenUpTheme.colors.textPrimary,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.border),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null,
+            )
+        }
+    }
 }
 
 @Composable
@@ -236,10 +375,9 @@ private fun ReceiptReviewItemsCard(
                     HorizontalDivider(color = EvenUpTheme.colors.divider)
                 }
             }
-            EvenUpTextButton(
+            SecondaryListActionRow(
                 text = "+ Add item",
                 onClick = { onEvent(ReceiptReviewUiEvent.AddItemClick) },
-                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -289,6 +427,12 @@ private fun ReceiptReviewItemRow(
             color = if (hasError) EvenUpTheme.colors.error else EvenUpTheme.colors.textPrimary,
             textAlign = TextAlign.End,
         )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = EvenUpTheme.colors.textTertiary,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -308,7 +452,7 @@ private fun ReceiptReviewAdjustmentsCard(
                     text = "No adjustments",
                     style = EvenUpTheme.typography.bodySmall,
                     color = EvenUpTheme.colors.textSecondary,
-                    textAlign = TextAlign.Center,
+                    textAlign = TextAlign.Start,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -324,10 +468,9 @@ private fun ReceiptReviewAdjustmentsCard(
                     HorizontalDivider(color = EvenUpTheme.colors.divider)
                 }
             }
-            EvenUpTextButton(
+            SecondaryListActionRow(
                 text = "+ Add adjustment",
                 onClick = { onEvent(ReceiptReviewUiEvent.AddFeeClick) },
-                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -366,6 +509,43 @@ private fun ReceiptReviewAdjustmentRow(
             color = if (hasError) EvenUpTheme.colors.error else EvenUpTheme.colors.textPrimary,
             textAlign = TextAlign.End,
         )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = EvenUpTheme.colors.textTertiary,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+@Composable
+private fun SecondaryListActionRow(
+    text: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = text
+            }
+            .padding(vertical = EvenUpTheme.spacing.space12),
+        horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Add,
+            contentDescription = null,
+            tint = EvenUpTheme.colors.textPrimary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = text.removePrefix("+ "),
+            style = EvenUpTheme.typography.button,
+            color = EvenUpTheme.colors.textPrimary,
+        )
     }
 }
 
@@ -381,9 +561,9 @@ private fun ReceiptReviewTotalsCard(
             SummaryRow(label = "Adjustments", value = uiState.adjustmentsTotalLabel)
             HorizontalDivider(color = EvenUpTheme.colors.divider)
             ReviewValueRow(
-                label = "Receipt total override",
+                label = "Receipt total",
                 value = uiState.receiptTotalLabel,
-                supportingText = "Tap to edit receipt total",
+                supportingText = "Tap to edit scanned total",
                 isError = uiState.reconciliation.isMismatch || uiState.fieldErrors.containsKey("total"),
                 onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.ReceiptTotal)) },
             )
@@ -525,7 +705,7 @@ private fun editSheetTitle(target: ReceiptReviewEditTarget?): String = when (tar
     ReceiptReviewEditTarget.Merchant -> "Edit merchant"
     ReceiptReviewEditTarget.Date -> "Edit date"
     ReceiptReviewEditTarget.Currency -> "Edit currency"
-    ReceiptReviewEditTarget.ReceiptTotal -> "Receipt total override"
+    ReceiptReviewEditTarget.ReceiptTotal -> "Edit receipt total"
     is ReceiptReviewEditTarget.Item -> "Edit item"
     is ReceiptReviewEditTarget.Fee -> "Edit adjustment"
     null -> ""
@@ -579,7 +759,7 @@ private fun ReceiptTotalEditContent(
     EvenUpMoneyField(
         value = uiState.totalAmount,
         onValueChange = { onEvent(ReceiptReviewUiEvent.TotalChanged(it)) },
-        label = "Receipt total override",
+        label = "Scanned receipt total",
         isError = uiState.fieldErrors.containsKey("total") || uiState.reconciliation.isMismatch,
         supportingText = uiState.fieldErrors["total"],
     )
@@ -603,39 +783,92 @@ private fun ItemEditContent(
     EvenUpTextField(
         value = item.name,
         onValueChange = { onEvent(ReceiptReviewUiEvent.ItemNameChanged(item.id, it)) },
-        label = "Item",
+        label = "Item name",
         isError = fieldErrors.containsKey("item_name_${item.id}"),
         supportingText = fieldErrors["item_name_${item.id}"],
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
     )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
-        verticalAlignment = Alignment.Top,
-    ) {
-        EvenUpTextField(
-            value = item.quantity,
-            onValueChange = { onEvent(ReceiptReviewUiEvent.ItemQuantityChanged(item.id, it)) },
-            label = "Qty",
-            modifier = Modifier.weight(0.44f),
-            isError = fieldErrors.containsKey("item_quantity_${item.id}"),
-            supportingText = fieldErrors["item_quantity_${item.id}"],
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+    QuantityStepper(
+        quantity = item.quantity.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+        onDecrease = { onEvent(ReceiptReviewUiEvent.ItemQuantityStepped(item.id, -1)) },
+        onIncrease = { onEvent(ReceiptReviewUiEvent.ItemQuantityStepped(item.id, 1)) },
+        canDecrease = (item.quantity.toIntOrNull() ?: 1) > 1,
+        error = fieldErrors["item_quantity_${item.id}"],
+    )
+    EvenUpMoneyField(
+        value = item.amount,
+        onValueChange = { onEvent(ReceiptReviewUiEvent.ItemAmountChanged(item.id, it)) },
+        label = "Line total",
+        isError = fieldErrors.containsKey("item_amount_${item.id}"),
+        supportingText = fieldErrors["item_amount_${item.id}"],
+    )
+    DestructiveActionRow(
+        text = "Delete item",
+        enabled = canRemove,
+        onClick = { onEvent(ReceiptReviewUiEvent.RemoveItemClick(item.id)) },
+    )
+}
+
+@Composable
+private fun QuantityStepper(
+    quantity: Int,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+    canDecrease: Boolean,
+    error: String?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
+        Text(
+            text = "Quantity",
+            style = EvenUpTheme.typography.bodySmall,
+            color = EvenUpTheme.colors.textSecondary,
         )
-        EvenUpMoneyField(
-            value = item.amount,
-            onValueChange = { onEvent(ReceiptReviewUiEvent.ItemAmountChanged(item.id, it)) },
-            label = "Line total",
-            modifier = Modifier.weight(1f),
-            isError = fieldErrors.containsKey("item_amount_${item.id}"),
-            supportingText = fieldErrors["item_amount_${item.id}"],
-        )
-        DeleteReceiptRowButton(
-            contentDescription = "Delete item",
-            onClick = { onEvent(ReceiptReviewUiEvent.RemoveItemClick(item.id)) },
-            enabled = canRemove,
-            modifier = Modifier.padding(top = EvenUpTheme.spacing.space12),
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = EvenUpTheme.shapes.input,
+            color = EvenUpTheme.colors.surfaceElevated,
+            contentColor = EvenUpTheme.colors.textPrimary,
+            border = BorderStroke(1.dp, if (error == null) EvenUpTheme.colors.border else EvenUpTheme.colors.error),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = EvenUpTheme.spacing.space8, vertical = EvenUpTheme.spacing.space4),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = onDecrease,
+                    enabled = canDecrease,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Remove,
+                        contentDescription = "Decrease quantity",
+                    )
+                }
+                Text(
+                    text = quantity.toString(),
+                    style = EvenUpTheme.typography.cardTitle,
+                    color = EvenUpTheme.colors.textPrimary,
+                    textAlign = TextAlign.Center,
+                )
+                IconButton(
+                    onClick = onIncrease,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "Increase quantity",
+                    )
+                }
+            }
+        }
+        error?.let {
+            Text(
+                text = it,
+                style = EvenUpTheme.typography.caption,
+                color = EvenUpTheme.colors.error,
+            )
+        }
     }
 }
 
@@ -666,11 +899,48 @@ private fun FeeEditContent(
             isError = fieldErrors.containsKey("fee_amount_${fee.id}"),
             supportingText = fieldErrors["fee_amount_${fee.id}"],
         )
-        DeleteReceiptRowButton(
-            contentDescription = "Delete adjustment",
-            onClick = { onEvent(ReceiptReviewUiEvent.RemoveFeeClick(fee.id)) },
-            modifier = Modifier.padding(top = EvenUpTheme.spacing.space12),
-        )
+    }
+    DestructiveActionRow(
+        text = "Delete adjustment",
+        onClick = { onEvent(ReceiptReviewUiEvent.RemoveFeeClick(fee.id)) },
+    )
+}
+
+@Composable
+private fun DestructiveActionRow(
+    text: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = text
+            },
+        shape = EvenUpTheme.shapes.input,
+        color = EvenUpTheme.colors.errorContainer,
+        contentColor = EvenUpTheme.colors.error,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.error.copy(alpha = 0.18f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(EvenUpTheme.spacing.space12),
+            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Delete,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = text,
+                style = EvenUpTheme.typography.button,
+                color = if (enabled) EvenUpTheme.colors.error else EvenUpTheme.colors.textTertiary,
+            )
+        }
     }
 }
 

@@ -80,6 +80,16 @@ class ReceiptReviewPresenter(
                     if (item.id == event.itemId) item.copy(quantity = event.value.filter(Char::isDigit).take(3)) else item
                 },
             )
+            is ReceiptReviewUiEvent.ItemQuantityStepped -> clearedState.copy(
+                items = state.items.map { item ->
+                    if (item.id == event.itemId) {
+                        val currentQuantity = item.quantity.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                        item.copy(quantity = (currentQuantity + event.delta).coerceAtLeast(1).coerceAtMost(999).toString())
+                    } else {
+                        item
+                    }
+                },
+            )
             is ReceiptReviewUiEvent.ItemAmountChanged -> clearedState.copy(
                 items = state.items.map { item ->
                     if (item.id == event.itemId) item.copy(amount = event.value) else item

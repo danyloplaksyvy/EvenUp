@@ -1,5 +1,17 @@
 package com.dps.evenup.feature.expenseflow.impl.choosepeople
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -27,6 +39,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
@@ -132,16 +148,51 @@ private fun SelectedParticipantsSection(
                 horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
             ) {
                 uiState.participants.forEach { participant ->
-                    SelectedParticipantAvatar(
-                        participant = participant,
-                        onRemove = { onEvent(ChoosePeopleUiEvent.RemoveParticipantClick(participant.id)) },
-                    )
+                    key(participant.id) {
+                        AnimatedSelectedParticipantAvatar(
+                            participant = participant,
+                            onRemove = { onEvent(ChoosePeopleUiEvent.RemoveParticipantClick(participant.id)) },
+                        )
+                    }
                 }
             }
         }
         uiState.fieldErrors["participants"]?.let { error ->
             EvenUpValidationMessage(message = error)
         }
+    }
+}
+
+@Composable
+private fun AnimatedSelectedParticipantAvatar(
+    participant: ChoosePeopleParticipantUiState,
+    onRemove: () -> Unit,
+) {
+    AnimatedRemoveContainer(
+        enter = fadeIn(participantEnterSpec()) +
+            slideInHorizontally(
+                animationSpec = participantEnterSpec(),
+                initialOffsetX = { it / 2 },
+            ) +
+            expandHorizontally(
+                animationSpec = participantEnterSpec(),
+                expandFrom = Alignment.Start,
+            ),
+        exit = fadeOut(participantExitSpec()) +
+            slideOutHorizontally(
+                animationSpec = participantExitSpec(),
+                targetOffsetX = { -it / 2 },
+            ) +
+            shrinkHorizontally(
+                animationSpec = participantExitSpec(),
+                shrinkTowards = Alignment.Start,
+            ),
+        onRemoved = onRemove,
+    ) { removeWithAnimation ->
+        SelectedParticipantAvatar(
+            participant = participant,
+            onRemove = removeWithAnimation,
+        )
     }
 }
 
@@ -236,13 +287,44 @@ private fun SavedSuggestionsSection(
             )
         } else {
             uiState.savedSuggestions.forEach { suggestion ->
-                SavedSuggestionRow(
-                    suggestion = suggestion,
-                    onAdd = { onEvent(ChoosePeopleUiEvent.AddSavedParticipantClick(suggestion.name)) },
-                    onDelete = { onEvent(ChoosePeopleUiEvent.DeleteSavedParticipantClick(suggestion.name)) },
-                )
+                key(suggestion.name.lowercase()) {
+                    AnimatedSavedSuggestionRow(
+                        suggestion = suggestion,
+                        onAdd = { onEvent(ChoosePeopleUiEvent.AddSavedParticipantClick(suggestion.name)) },
+                        onDelete = { onEvent(ChoosePeopleUiEvent.DeleteSavedParticipantClick(suggestion.name)) },
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun AnimatedSavedSuggestionRow(
+    suggestion: SavedParticipantSuggestionUiState,
+    onAdd: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    AnimatedRemoveContainer(
+        enter = fadeIn(participantEnterSpec()) +
+            slideInHorizontally(
+                animationSpec = participantEnterSpec(),
+                initialOffsetX = { it / 3 },
+            ) +
+            expandVertically(animationSpec = participantEnterSpec()),
+        exit = fadeOut(participantExitSpec()) +
+            slideOutHorizontally(
+                animationSpec = participantExitSpec(),
+                targetOffsetX = { -it / 3 },
+            ) +
+            shrinkVertically(animationSpec = participantExitSpec()),
+        onRemoved = onDelete,
+    ) { deleteWithAnimation ->
+        SavedSuggestionRow(
+            suggestion = suggestion,
+            onAdd = onAdd,
+            onDelete = deleteWithAnimation,
+        )
     }
 }
 
@@ -369,3 +451,42 @@ private fun SectionHeader(title: String) {
         color = EvenUpTheme.colors.textSecondary,
     )
 }
+
+@Composable
+private fun AnimatedRemoveContainer(
+    enter: androidx.compose.animation.EnterTransition,
+    exit: androidx.compose.animation.ExitTransition,
+    onRemoved: () -> Unit,
+    content: @Composable (removeWithAnimation: () -> Unit) -> Unit,
+) {
+    val latestOnRemoved = rememberUpdatedState(onRemoved)
+    val visibleState = remember {
+        MutableTransitionState(false).apply { targetState = true }
+    }
+
+    LaunchedEffect(visibleState.isIdle, visibleState.currentState, visibleState.targetState) {
+        if (visibleState.isIdle && !visibleState.currentState && !visibleState.targetState) {
+            latestOnRemoved.value()
+        }
+    }
+
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = enter,
+        exit = exit,
+    ) {
+        content {
+            visibleState.targetState = false
+        }
+    }
+}
+
+private fun <T> participantEnterSpec() = tween<T>(
+    durationMillis = 180,
+    easing = FastOutSlowInEasing,
+)
+
+private fun <T> participantExitSpec() = tween<T>(
+    durationMillis = 140,
+    easing = FastOutSlowInEasing,
+)

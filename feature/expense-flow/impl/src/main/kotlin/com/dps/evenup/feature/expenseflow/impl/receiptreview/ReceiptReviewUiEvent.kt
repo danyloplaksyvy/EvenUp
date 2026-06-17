@@ -15,6 +15,8 @@ sealed interface ReceiptReviewUiEvent {
 
     data class ItemQuantityChanged(val itemId: String, val value: String) : ReceiptReviewUiEvent
 
+    data class ItemQuantityStepped(val itemId: String, val delta: Int) : ReceiptReviewUiEvent
+
     data class ItemAmountChanged(val itemId: String, val value: String) : ReceiptReviewUiEvent
 
     data object AddItemClick : ReceiptReviewUiEvent
