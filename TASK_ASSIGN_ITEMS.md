@@ -16,15 +16,6 @@ The intended primary flow is:
 4. If another person is selected and the same item is tapped, the item is reassigned to the new person.
 5. Advanced split options are available through item customization, not the default path.
 
-## Relevant files:
-- feature/assign-items/**
-- feature/assign-items-api/**
-- feature/assign-items-impl/**
-- core/designsystem/**
-- domain/expense/**
-- domain/receipt/**
-- domain/split/**
-
 ## Scope:
 You may edit:
 - Assign Items screen composables

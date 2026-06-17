@@ -156,17 +156,15 @@ private fun EvenUpReceiptStatePill(
 ) {
     val colors = EvenUpTheme.colors
     val contentColor = when (state) {
-        EvenUpReceiptItemState.Unassigned,
-        EvenUpReceiptItemState.Partial,
-        -> colors.warning
+        EvenUpReceiptItemState.Partial -> colors.warning
+        EvenUpReceiptItemState.Unassigned -> colors.textSecondary
         EvenUpReceiptItemState.Assigned,
         EvenUpReceiptItemState.Shared,
         -> colors.textSecondary
     }
     val containerColor = when (state) {
-        EvenUpReceiptItemState.Unassigned,
-        EvenUpReceiptItemState.Partial,
-        -> colors.warningContainer
+        EvenUpReceiptItemState.Partial -> colors.warningContainer
+        EvenUpReceiptItemState.Unassigned -> colors.surface
         EvenUpReceiptItemState.Assigned,
         EvenUpReceiptItemState.Shared,
         -> colors.surface

@@ -12,6 +12,8 @@ data class AssignItemsUiState(
     val splitSheet: AssignItemsSplitSheetUiState? = null,
     val subtotalLabel: String = "",
     val progressLabel: String = "0 of 0 items assigned",
+    val helperText: String = "Select a person, then tap their items.",
+    val continueHelperText: String = "Assign items to continue",
     val canContinue: Boolean = false,
     val fieldErrors: Map<String, String> = emptyMap(),
     val submitError: String? = null,
@@ -35,6 +37,7 @@ data class AssignItemsReceiptItemUiState(
     val totalLabel: String,
     val assignmentState: AssignItemsItemState,
     val splitMode: AssignItemsSplitMode,
+    val directFullAssignment: Boolean = false,
     val shares: List<AssignItemsShareUiState>,
     val assignees: List<AssignItemsAssigneeUiState>,
 )
