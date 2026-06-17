@@ -1,53 +1,54 @@
 package com.dps.evenup
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.viewModels
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
+import com.dps.evenup.core.navigation.api.EvenUpEntryProviderInstaller
+import com.dps.evenup.core.navigation.api.EvenUpNavigator
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val viewModel: MainViewModel by viewModels()
+    @Inject
+    lateinit var navigator: EvenUpNavigator
+
+    @Inject
+    lateinit var entryProviderInstallers: Set<@JvmSuppressWildcards EvenUpEntryProviderInstaller>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val startupMessage = viewModel.startupMessage
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                scrim = Color.TRANSPARENT,
+                darkScrim = Color.TRANSPARENT,
+            ),
+            navigationBarStyle = SystemBarStyle.light(
+                scrim = Color.TRANSPARENT,
+                darkScrim = Color.TRANSPARENT,
+            ),
+        )
         setContent {
             EvenUpTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = startupMessage,
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                NavDisplay(
+                    backStack = navigator.backStack,
+                    modifier = Modifier.fillMaxSize(),
+                    onBack = { navigator.navigateBack() },
+                    entryProvider = entryProvider {
+                        entryProviderInstallers.forEach { installer ->
+                            installer.install(this)
+                        }
+                    },
+                )
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    EvenUpTheme {
-        Greeting("Android")
     }
 }

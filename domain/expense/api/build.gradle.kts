@@ -1,3 +1,10 @@
 plugins {
     id("evenup.kotlin.library")
 }
+
+dependencies {
+    implementation(project(":domain:participant:api"))
+    implementation(project(":domain:receipt:api"))
+
+    testImplementation(libs.junit)
+}

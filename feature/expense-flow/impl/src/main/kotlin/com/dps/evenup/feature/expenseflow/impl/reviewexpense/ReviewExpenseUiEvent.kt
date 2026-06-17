@@ -1,0 +1,11 @@
+package com.dps.evenup.feature.expenseflow.impl.reviewexpense
+
+sealed interface ReviewExpenseUiEvent {
+    data object CalculationDetailsToggled : ReviewExpenseUiEvent
+
+    data object SaveClick : ReviewExpenseUiEvent
+
+    data object SaveRetryClick : ReviewExpenseUiEvent
+
+    data object BackClick : ReviewExpenseUiEvent
+}

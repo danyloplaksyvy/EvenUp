@@ -212,7 +212,7 @@ Done when:
 
 ## T006 - Implement base design system components
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -248,7 +248,7 @@ Done when:
 
 ## T007 - Implement receipt and settlement UI components
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -280,7 +280,7 @@ Done when:
 
 ## T010 - Define domain value objects
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -312,7 +312,7 @@ Validation:
 
 ## T011 - Define receipt and participant models
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -330,7 +330,7 @@ Done when:
 
 ## T012 - Define assignment and fee allocation models
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -347,7 +347,7 @@ Done when:
 
 ## T013 - Implement deterministic split rounding utility
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -374,7 +374,7 @@ Validation:
 
 ## T014 - Implement receipt and participant validation
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -396,7 +396,7 @@ Done when:
 
 ## T015 - Implement item assignment validation
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -423,7 +423,7 @@ Done when:
 
 ## T016 - Implement fee allocation use cases
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -443,7 +443,7 @@ Done when:
 
 ## T017 - Implement settlement calculation use case
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -470,7 +470,7 @@ Done when:
 
 ## T018 - Implement final expense validation and save orchestration contracts
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -494,7 +494,7 @@ Done when:
 
 ## T050 - Create Cloudflare Worker baseline
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -513,7 +513,7 @@ Done when:
 
 ## T051 - Add D1 migration
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -532,7 +532,7 @@ Done when:
 
 ## T052 - Implement save finalized expense endpoint
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -553,7 +553,7 @@ Done when:
 
 ## T053 - Implement fetch public expense endpoint
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -573,7 +573,7 @@ Done when:
 
 ## T054 - Implement receipt parse endpoint
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -600,7 +600,7 @@ Done when:
 
 ## T061 - Implement guest web page
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -626,7 +626,7 @@ Done when:
 
 ## T062 - Implement guest web error states
 
-Status: TODO
+Status: DONE
 Priority: P1
 Scope:
 
@@ -648,7 +648,7 @@ Done when:
 
 ## T060 - Implement network core
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -667,7 +667,7 @@ Done when:
 
 ## T061A - Implement receipt repository and DTO mapper
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -687,7 +687,7 @@ Done when:
 
 ## T062A - Implement expense save repository
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -707,7 +707,7 @@ Done when:
 
 ## T063 - Implement local draft persistence
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -725,7 +725,7 @@ Done when:
 
 ## T064 - Implement saved participant persistence
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -748,7 +748,7 @@ Done when:
 
 ## T070 - Implement New Expense screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -768,7 +768,7 @@ Done when:
 
 ## T072 - Implement Manual Receipt Entry screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -787,7 +787,7 @@ Done when:
 
 ## T073 - Implement Receipt Review screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -806,7 +806,7 @@ Done when:
 
 ## T080 - Implement Choose People screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -826,7 +826,7 @@ Done when:
 
 ## T081 - Implement saved participant names UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -846,7 +846,7 @@ Done when:
 
 ## T090 - Implement Assign Items screen skeleton
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -865,7 +865,7 @@ Done when:
 
 ## T091 - Implement full item assignment UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -883,7 +883,7 @@ Done when:
 
 ## T092 - Implement quantity assignment UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -902,7 +902,7 @@ Done when:
 
 ## T093 - Implement Item Split bottom sheet
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -921,7 +921,7 @@ Done when:
 
 ## T094 - Implement shared/custom/percentage split UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -940,7 +940,7 @@ Done when:
 
 ## T100 - Implement Fees Allocation screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -959,7 +959,7 @@ Done when:
 
 ## T101 - Implement Review Expense screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -978,7 +978,7 @@ Done when:
 
 ## T102 - Implement calculation details UI
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -995,7 +995,7 @@ Done when:
 
 ## T103 - Implement Saved and Share screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1014,7 +1014,7 @@ Done when:
 
 ## T104 - Implement Android share sheet
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1034,7 +1034,7 @@ Done when:
 
 ## T110 - Add CameraX capture
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1051,7 +1051,7 @@ Done when:
 
 ## T111 - Add Android Photo Picker gallery import
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1068,7 +1068,7 @@ Done when:
 
 ## T071 - Implement Receipt Scan screen
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1088,7 +1088,7 @@ Done when:
 
 ## T112 - Integrate OpenAI receipt parsing through Worker
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1113,7 +1113,7 @@ Done when:
 
 ## T120 - Implement validation and error states
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1134,7 +1134,7 @@ Done when:
 
 ## T121 - Domain regression test suite
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1150,7 +1150,7 @@ Done when:
 
 ## T122 - End-to-end manual flow smoke test
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1167,7 +1167,7 @@ Done when:
 
 ## T123 - End-to-end receipt scan smoke test
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1186,7 +1186,7 @@ Done when:
 
 ## T124 - Final UI polish pass
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 
@@ -1210,7 +1210,7 @@ Done when:
 
 ## T900 - Architecture and scope review
 
-Status: TODO
+Status: DONE
 Priority: P0
 Scope:
 

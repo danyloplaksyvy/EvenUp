@@ -3,5 +3,6 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":domain:sharing:api"))
+    api(project(":domain:expense:api"))
+    api(project(":domain:sharing:api"))
 }
