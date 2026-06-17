@@ -1,6 +1,10 @@
 package com.dps.evenup.feature.expenseflow.impl.receiptreview
 
 sealed interface ReceiptReviewUiEvent {
+    data class EditTargetSelected(val target: ReceiptReviewEditTarget) : ReceiptReviewUiEvent
+
+    data object EditDismissed : ReceiptReviewUiEvent
+
     data class MerchantNameChanged(val value: String) : ReceiptReviewUiEvent
 
     data class DateChanged(val value: String) : ReceiptReviewUiEvent

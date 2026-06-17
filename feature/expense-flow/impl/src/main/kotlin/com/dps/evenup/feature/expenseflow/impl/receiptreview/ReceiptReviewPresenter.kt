@@ -52,6 +52,8 @@ class ReceiptReviewPresenter(
             },
             subtotalAmount = receipt.subtotal?.let(::formatMoneyMinor),
             totalAmount = formatMoneyMinor(receipt.total),
+            reviewWarningCount = receipt.parseMetadata.reviewWarnings.size,
+            uncertainItemCount = receipt.items.count { item -> item.parseMetadata.needsReview },
         )
     }
 
@@ -61,6 +63,8 @@ class ReceiptReviewPresenter(
     ): ReceiptReviewUiState {
         val clearedState = state.copy(fieldErrors = emptyMap(), submitError = null)
         return when (event) {
+            is ReceiptReviewUiEvent.EditTargetSelected -> clearedState.copy(editTarget = event.target)
+            ReceiptReviewUiEvent.EditDismissed -> clearedState.copy(editTarget = null)
             is ReceiptReviewUiEvent.MerchantNameChanged -> clearedState.copy(merchantName = event.value)
             is ReceiptReviewUiEvent.DateChanged -> clearedState.copy(dateLabel = event.value)
             is ReceiptReviewUiEvent.CurrencyChanged -> clearedState.copy(
@@ -81,12 +85,19 @@ class ReceiptReviewPresenter(
                     if (item.id == event.itemId) item.copy(amount = event.value) else item
                 },
             )
-            ReceiptReviewUiEvent.AddItemClick -> clearedState.copy(
-                items = state.items + ReceiptReviewItemUiState(id = nextItemId(state.items)),
-            )
+            ReceiptReviewUiEvent.AddItemClick -> {
+                val itemId = nextItemId(state.items)
+                clearedState.copy(
+                    items = state.items + ReceiptReviewItemUiState(id = itemId),
+                    editTarget = ReceiptReviewEditTarget.Item(itemId),
+                )
+            }
             is ReceiptReviewUiEvent.RemoveItemClick -> clearedState.copy(
                 items = state.items.filterNot { item -> item.id == event.itemId }.ifEmpty {
                     listOf(ReceiptReviewItemUiState(id = nextItemId(state.items)))
+                },
+                editTarget = state.editTarget.takeUnless { target ->
+                    target is ReceiptReviewEditTarget.Item && target.itemId == event.itemId
                 },
             )
             is ReceiptReviewUiEvent.FeeLabelChanged -> clearedState.copy(
@@ -99,11 +110,18 @@ class ReceiptReviewPresenter(
                     if (fee.id == event.feeId) fee.copy(amount = event.value) else fee
                 },
             )
-            ReceiptReviewUiEvent.AddFeeClick -> clearedState.copy(
-                fees = state.fees + ReceiptReviewFeeUiState(id = nextFeeId(state.fees), label = "Fee"),
-            )
+            ReceiptReviewUiEvent.AddFeeClick -> {
+                val feeId = nextFeeId(state.fees)
+                clearedState.copy(
+                    fees = state.fees + ReceiptReviewFeeUiState(id = feeId, label = "Adjustment"),
+                    editTarget = ReceiptReviewEditTarget.Fee(feeId),
+                )
+            }
             is ReceiptReviewUiEvent.RemoveFeeClick -> clearedState.copy(
                 fees = state.fees.filterNot { fee -> fee.id == event.feeId },
+                editTarget = state.editTarget.takeUnless { target ->
+                    target is ReceiptReviewEditTarget.Fee && target.feeId == event.feeId
+                },
             )
             is ReceiptReviewUiEvent.SubtotalChanged -> clearedState.copy(subtotalAmount = event.value)
             is ReceiptReviewUiEvent.TotalChanged -> clearedState.copy(totalAmount = event.value)
@@ -192,13 +210,8 @@ class ReceiptReviewPresenter(
         if (total == null || total.value < 0) {
             errors["total"] = "Enter the receipt total."
         }
-        val subtotal = subtotalAmount?.let { amount ->
-            val parsedSubtotal = parseMoneyMinor(amount)
-            if (parsedSubtotal == null || parsedSubtotal.value < 0) {
-                errors["subtotal"] = "Enter the receipt subtotal."
-            }
-            parsedSubtotal
-        }
+        val subtotal = receiptItems.takeIf { it.isNotEmpty() }
+            ?.let { validItems -> MoneyMinor(validItems.sumOf { item -> item.totalPrice.value }) }
 
         if (errors.isNotEmpty()) {
             return ReceiptReviewBuildResult.Invalid(errors)

@@ -23,6 +23,35 @@ class DefaultValidateReceiptUseCaseTest {
     }
 
     @Test
+    fun `items plus fees matching total passes without parsed subtotal`() {
+        val result = useCase.validate(
+            validReceipt().copy(
+                items = listOf(validItem().copy(totalPrice = MoneyMinor(1_500))),
+                fees = listOf(ReceiptFee(FeeId("tip"), FeeType.Tip, "Tip", MoneyMinor(300))),
+                total = MoneyMinor(1_800),
+                subtotal = null,
+            ),
+        )
+
+        assertTrue(result.isValid)
+    }
+
+    @Test
+    fun `items plus fees mismatch returns total mismatch without parsed subtotal`() {
+        val result = useCase.validate(
+            validReceipt().copy(
+                items = listOf(validItem().copy(totalPrice = MoneyMinor(1_500))),
+                fees = listOf(ReceiptFee(FeeId("tip"), FeeType.Tip, "Tip", MoneyMinor(300))),
+                total = MoneyMinor(1_700),
+                subtotal = null,
+            ),
+        )
+
+        assertFalse(result.isValid)
+        assertTrue(ReceiptValidationError.TotalMismatch in result.errors)
+    }
+
+    @Test
     fun `invalid receipt fields return specific errors`() {
         val result = useCase.validate(
             validReceipt().copy(
