@@ -1,19 +1,16 @@
 package com.dps.evenup.feature.expenseflow.impl.manualentry
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,11 +22,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpCard
+import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpMoneyField
 import com.dps.evenup.core.designsystem.api.EvenUpTextButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextField
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
-import com.dps.evenup.core.designsystem.api.EvenUpTopBar
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.CurrencySelector
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.DeleteReceiptRowButton
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.ReceiptDatePickerField
@@ -40,35 +37,44 @@ fun ManualReceiptEntryScreen(
     onEvent: (ManualReceiptEntryUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    EvenUpCollapsingTopBarScaffold(
+        title = "Manual entry",
+        onNavigationClick = { onEvent(ManualReceiptEntryUiEvent.BackClick) },
         modifier = modifier.fillMaxSize(),
-    ) {
-        EvenUpTopBar(
-            title = "Manual entry",
-            onNavigationClick = { onEvent(ManualReceiptEntryUiEvent.BackClick) },
-            navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        )
-        Box(modifier = Modifier.weight(1f)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .navigationBarsPadding()
-                    .padding(horizontal = EvenUpTheme.spacing.space20)
-                    .padding(top = EvenUpTheme.spacing.space16, bottom = 112.dp),
-                verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
-            ) {
-                ManualReceiptEssentialsCard(uiState = uiState, onEvent = onEvent)
-                ManualReceiptItemsSection(uiState = uiState, onEvent = onEvent)
-                ManualReceiptFeesSection(uiState = uiState, onEvent = onEvent)
-            }
+        bottomBar = {
             EvenUpBottomActionBar(
                 primaryText = if (uiState.isSaving) "Saving..." else "Continue",
                 onPrimaryClick = { onEvent(ManualReceiptEntryUiEvent.ContinueClick) },
                 primaryEnabled = !uiState.isSaving,
-                modifier = Modifier.align(Alignment.BottomCenter),
             )
-        }
+        },
+    ) { innerPadding ->
+        ManualReceiptEntryContent(
+            uiState = uiState,
+            onEvent = onEvent,
+            contentPadding = innerPadding,
+        )
+    }
+}
+
+@Composable
+private fun ManualReceiptEntryContent(
+    uiState: ManualReceiptEntryUiState,
+    onEvent: (ManualReceiptEntryUiEvent) -> Unit,
+    contentPadding: PaddingValues,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(contentPadding)
+            .padding(horizontal = EvenUpTheme.spacing.space20)
+            .padding(top = EvenUpTheme.spacing.space16, bottom = EvenUpTheme.spacing.space24),
+        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
+    ) {
+        ManualReceiptEssentialsCard(uiState = uiState, onEvent = onEvent)
+        ManualReceiptItemsSection(uiState = uiState, onEvent = onEvent)
+        ManualReceiptFeesSection(uiState = uiState, onEvent = onEvent)
     }
 }
 

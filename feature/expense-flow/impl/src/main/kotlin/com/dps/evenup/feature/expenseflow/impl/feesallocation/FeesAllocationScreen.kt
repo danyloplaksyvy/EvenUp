@@ -3,17 +3,14 @@ package com.dps.evenup.feature.expenseflow.impl.feesallocation
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,12 +20,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpCard
+import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
 import com.dps.evenup.core.designsystem.api.EvenUpMoneyField
 import com.dps.evenup.core.designsystem.api.EvenUpParticipantAvatar
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
-import com.dps.evenup.core.designsystem.api.EvenUpTopBar
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
 
 @Composable
@@ -37,28 +34,40 @@ fun FeesAllocationScreen(
     onEvent: (FeesAllocationUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        EvenUpTopBar(
-            title = "Allocate fees",
-            onNavigationClick = { onEvent(FeesAllocationUiEvent.BackClick) },
-            navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        )
+    EvenUpCollapsingTopBarScaffold(
+        title = "Allocate fees",
+        onNavigationClick = { onEvent(FeesAllocationUiEvent.BackClick) },
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            if (!uiState.isLoading && !uiState.missingDraft) {
+                EvenUpBottomActionBar(
+                    primaryText = if (uiState.isSaving) "Saving..." else "Continue",
+                    onPrimaryClick = { onEvent(FeesAllocationUiEvent.ContinueClick) },
+                    primaryEnabled = uiState.canContinue && !uiState.isSaving,
+                )
+            }
+        },
+    ) { innerPadding ->
         when {
             uiState.isLoading -> EvenUpLoadingState(
                 message = "Loading fees...",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
             )
             uiState.missingDraft -> EvenUpErrorState(
                 title = "Fees unavailable",
                 message = uiState.submitError ?: "Complete the previous steps before allocating fees.",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 retryText = "Go back",
                 onRetryClick = { onEvent(FeesAllocationUiEvent.BackClick) },
             )
             else -> FeesAllocationContent(
                 uiState = uiState,
                 onEvent = onEvent,
-                modifier = Modifier.weight(1f),
+                contentPadding = innerPadding,
             )
         }
     }
@@ -68,45 +77,37 @@ fun FeesAllocationScreen(
 private fun FeesAllocationContent(
     uiState: FeesAllocationUiState,
     onEvent: (FeesAllocationUiEvent) -> Unit,
-    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues,
 ) {
-    Box(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = EvenUpTheme.spacing.space20)
-                .padding(top = EvenUpTheme.spacing.space16, bottom = 112.dp),
-            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
-        ) {
-            Header(uiState = uiState)
-            FeeSummaryCards(uiState = uiState)
-            ModeSelector(selectedMode = uiState.mode, onEvent = onEvent)
-            Text(
-                text = uiState.helperText,
-                modifier = Modifier.fillMaxWidth(),
-                style = EvenUpTheme.typography.bodySmall,
-                color = EvenUpTheme.colors.textSecondary,
-                textAlign = TextAlign.Center,
-            )
-            ParticipantPreview(uiState = uiState)
-            if (uiState.mode == FeesAllocationModeUiState.Custom) {
-                CustomFeeCards(uiState = uiState, onEvent = onEvent)
-            }
-            uiState.fieldErrors["fees"]?.let { error ->
-                EvenUpValidationMessage(message = error)
-            }
-            uiState.submitError?.let { error ->
-                EvenUpValidationMessage(message = error)
-            }
-        }
-        EvenUpBottomActionBar(
-            primaryText = if (uiState.isSaving) "Saving..." else "Continue",
-            onPrimaryClick = { onEvent(FeesAllocationUiEvent.ContinueClick) },
-            primaryEnabled = uiState.canContinue && !uiState.isSaving,
-            modifier = Modifier.align(Alignment.BottomCenter),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(contentPadding)
+            .padding(horizontal = EvenUpTheme.spacing.space20)
+            .padding(top = EvenUpTheme.spacing.space16, bottom = EvenUpTheme.spacing.space24),
+        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
+    ) {
+        Header(uiState = uiState)
+        FeeSummaryCards(uiState = uiState)
+        ModeSelector(selectedMode = uiState.mode, onEvent = onEvent)
+        Text(
+            text = uiState.helperText,
+            modifier = Modifier.fillMaxWidth(),
+            style = EvenUpTheme.typography.bodySmall,
+            color = EvenUpTheme.colors.textSecondary,
+            textAlign = TextAlign.Center,
         )
+        ParticipantPreview(uiState = uiState)
+        if (uiState.mode == FeesAllocationModeUiState.Custom) {
+            CustomFeeCards(uiState = uiState, onEvent = onEvent)
+        }
+        uiState.fieldErrors["fees"]?.let { error ->
+            EvenUpValidationMessage(message = error)
+        }
+        uiState.submitError?.let { error ->
+            EvenUpValidationMessage(message = error)
+        }
     }
 }
 

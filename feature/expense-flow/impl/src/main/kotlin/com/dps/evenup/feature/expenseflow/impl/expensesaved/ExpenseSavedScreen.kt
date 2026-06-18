@@ -28,7 +28,6 @@ import com.dps.evenup.core.designsystem.api.EvenUpPrimaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpSecondaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextButton
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
-import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
 
 @Composable
 fun ExpenseSavedScreen(
@@ -63,9 +62,9 @@ fun ExpenseSavedScreen(
                 textAlign = TextAlign.Center,
             )
             LinkCard(uiState = uiState, onEvent = onEvent)
-            uiState.message?.let { message ->
-                EvenUpValidationMessage(message = message)
-            }
+//            uiState.message?.let { message ->
+//                EvenUpValidationMessage(message = message)
+//            }
         }
         Column(
             modifier = Modifier

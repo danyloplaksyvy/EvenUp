@@ -19,10 +19,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
+import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpIconButton
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
@@ -58,7 +58,6 @@ import com.dps.evenup.core.designsystem.api.EvenUpParticipantAvatar
 import com.dps.evenup.core.designsystem.api.EvenUpTextButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextField
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
-import com.dps.evenup.core.designsystem.api.EvenUpTopBar
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
 
 @Composable
@@ -67,28 +66,40 @@ fun ChoosePeopleScreen(
     onEvent: (ChoosePeopleUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        EvenUpTopBar(
-            title = "Who was involved?",
-            onNavigationClick = { onEvent(ChoosePeopleUiEvent.BackClick) },
-            navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        )
+    EvenUpCollapsingTopBarScaffold(
+        title = "Who was involved?",
+        onNavigationClick = { onEvent(ChoosePeopleUiEvent.BackClick) },
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            if (!uiState.isLoading && !uiState.missingDraft) {
+                EvenUpBottomActionBar(
+                    primaryText = if (uiState.isSaving) "Saving..." else "Continue",
+                    onPrimaryClick = { onEvent(ChoosePeopleUiEvent.ContinueClick) },
+                    primaryEnabled = uiState.canContinue,
+                )
+            }
+        },
+    ) { innerPadding ->
         when {
             uiState.isLoading -> EvenUpLoadingState(
                 message = "Loading people...",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
             )
             uiState.missingDraft -> EvenUpErrorState(
                 title = "Expense unavailable",
                 message = uiState.submitError ?: "Start a receipt before adding people.",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 retryText = "Go back",
                 onRetryClick = { onEvent(ChoosePeopleUiEvent.BackClick) },
             )
             else -> ChoosePeopleContent(
                 uiState = uiState,
                 onEvent = onEvent,
-                modifier = Modifier.weight(1f),
+                contentPadding = innerPadding,
             )
         }
     }
@@ -98,32 +109,24 @@ fun ChoosePeopleScreen(
 private fun ChoosePeopleContent(
     uiState: ChoosePeopleUiState,
     onEvent: (ChoosePeopleUiEvent) -> Unit,
-    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues,
 ) {
-    Box(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = EvenUpTheme.spacing.space20)
-                .padding(top = EvenUpTheme.spacing.space16, bottom = 112.dp),
-            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
-        ) {
-            SelectedParticipantsSection(uiState = uiState, onEvent = onEvent)
-            AddParticipantSection(uiState = uiState, onEvent = onEvent)
-            SavedSuggestionsSection(uiState = uiState, onEvent = onEvent)
-            PayerSection(uiState = uiState, onEvent = onEvent)
-            uiState.submitError?.let { error ->
-                EvenUpValidationMessage(message = error)
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(contentPadding)
+            .padding(horizontal = EvenUpTheme.spacing.space20)
+            .padding(top = EvenUpTheme.spacing.space16, bottom = EvenUpTheme.spacing.space24),
+        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
+    ) {
+        SelectedParticipantsSection(uiState = uiState, onEvent = onEvent)
+        AddParticipantSection(uiState = uiState, onEvent = onEvent)
+        SavedSuggestionsSection(uiState = uiState, onEvent = onEvent)
+        PayerSection(uiState = uiState, onEvent = onEvent)
+        uiState.submitError?.let { error ->
+            EvenUpValidationMessage(message = error)
         }
-        EvenUpBottomActionBar(
-            primaryText = if (uiState.isSaving) "Saving..." else "Continue",
-            onPrimaryClick = { onEvent(ChoosePeopleUiEvent.ContinueClick) },
-            primaryEnabled = uiState.canContinue,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
     }
 }
 

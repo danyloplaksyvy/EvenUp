@@ -1,18 +1,8 @@
 package com.dps.evenup.feature.expenseflow.impl.receiptreview
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,34 +10,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -59,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpBottomSheet
 import com.dps.evenup.core.designsystem.api.EvenUpCard
+import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
 import com.dps.evenup.core.designsystem.api.EvenUpMoneyField
@@ -70,127 +51,45 @@ import com.dps.evenup.core.designsystem.api.EvenUpValidationSeverity
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.CurrencySelector
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.ReceiptDatePickerField
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiptReviewScreen(
     uiState: ReceiptReviewUiState,
     onEvent: (ReceiptReviewUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    val showStickyBackButton by remember {
-        derivedStateOf {
-            scrollBehavior.state.collapsedFraction >= 1f
-        }
-    }
-    Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = EvenUpTheme.colors.background,
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = "Receipt review",
-                        style = EvenUpTheme.typography.sectionTitle,
-                        color = EvenUpTheme.colors.textPrimary,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { onEvent(ReceiptReviewUiEvent.BackClick) }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Navigate back",
-                            tint = EvenUpTheme.colors.textPrimary,
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EvenUpTheme.colors.background,
-                    scrolledContainerColor = EvenUpTheme.colors.background,
-                    navigationIconContentColor = EvenUpTheme.colors.textPrimary,
-                    titleContentColor = EvenUpTheme.colors.textPrimary,
-                ),
-            )
-        },
+    EvenUpCollapsingTopBarScaffold(
+        title = "Receipt review",
+        onNavigationClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
+        modifier = modifier.fillMaxSize(),
         bottomBar = {
             if (!uiState.isLoading && !uiState.missingDraft) {
                 ReceiptReviewBottomBar(uiState = uiState, onEvent = onEvent)
             }
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            when {
-                uiState.isLoading -> EvenUpLoadingState(
-                    message = "Loading receipt...",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                )
+        when {
+            uiState.isLoading -> EvenUpLoadingState(
+                message = "Loading receipt...",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            )
 
-                uiState.missingDraft -> EvenUpErrorState(
-                    title = "Receipt unavailable",
-                    message = uiState.submitError ?: "Start a new receipt to continue.",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    retryText = "Go back",
-                    onRetryClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
-                )
+            uiState.missingDraft -> EvenUpErrorState(
+                title = "Receipt unavailable",
+                message = uiState.submitError ?: "Start a new receipt to continue.",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                retryText = "Go back",
+                onRetryClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
+            )
 
-                else -> ReceiptReviewContent(
-                    uiState = uiState,
-                    onEvent = onEvent,
-                    contentPadding = innerPadding,
-                )
-            }
-
-            AnimatedVisibility(
-                visible = showStickyBackButton,
-                modifier = Modifier.align(Alignment.TopStart),
-                enter = fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 180,
-                        easing = FastOutSlowInEasing,
-                    ),
-                ) + scaleIn(
-                    initialScale = 0.88f,
-                    animationSpec = tween(
-                        durationMillis = 180,
-                        easing = FastOutSlowInEasing,
-                    ),
-                ) + slideInVertically(
-                    initialOffsetY = { -it / 3 },
-                    animationSpec = tween(
-                        durationMillis = 180,
-                        easing = FastOutSlowInEasing,
-                    ),
-                ),
-                exit = fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 120,
-                        easing = FastOutSlowInEasing,
-                    ),
-                ) + scaleOut(
-                    targetScale = 0.88f,
-                    animationSpec = tween(
-                        durationMillis = 120,
-                        easing = FastOutSlowInEasing,
-                    ),
-                ) + slideOutVertically(
-                    targetOffsetY = { -it / 3 },
-                    animationSpec = tween(
-                        durationMillis = 120,
-                        easing = FastOutSlowInEasing,
-                    ),
-                ),
-            ) {
-                StickyBackButton(
-                    onClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
-                )
-            }
+            else -> ReceiptReviewContent(
+                uiState = uiState,
+                onEvent = onEvent,
+                contentPadding = innerPadding,
+            )
         }
     }
 }
@@ -235,35 +134,6 @@ private fun ReceiptReviewBottomBar(
 }
 
 @Composable
-private fun StickyBackButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier
-            .statusBarsPadding()
-            .padding(start = EvenUpTheme.spacing.space8, top = EvenUpTheme.spacing.space8)
-            .size(48.dp)
-            .clickable(onClick = onClick)
-            .semantics {
-                role = Role.Button
-                contentDescription = "Navigate back"
-            },
-        shape = EvenUpTheme.shapes.avatar,
-        color = EvenUpTheme.colors.background,
-        contentColor = EvenUpTheme.colors.textPrimary,
-        border = BorderStroke(1.dp, EvenUpTheme.colors.border),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = null,
-            )
-        }
-    }
-}
-
-@Composable
 private fun ReceiptReviewHeader(uiState: ReceiptReviewUiState) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -279,7 +149,7 @@ private fun ReceiptReviewHeader(uiState: ReceiptReviewUiState) {
             style = EvenUpTheme.typography.body,
             color = EvenUpTheme.colors.textSecondary,
         )
-        ReceiptReviewStatusMessage(uiState = uiState)
+//        ReceiptReviewStatusMessage(uiState = uiState)
     }
 }
 
