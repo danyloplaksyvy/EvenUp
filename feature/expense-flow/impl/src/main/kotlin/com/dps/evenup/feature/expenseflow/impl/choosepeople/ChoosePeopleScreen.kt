@@ -1,5 +1,17 @@
 package com.dps.evenup.feature.expenseflow.impl.choosepeople
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -7,10 +19,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -27,6 +38,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
@@ -35,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
+import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpIconButton
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
@@ -42,7 +58,6 @@ import com.dps.evenup.core.designsystem.api.EvenUpParticipantAvatar
 import com.dps.evenup.core.designsystem.api.EvenUpTextButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextField
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
-import com.dps.evenup.core.designsystem.api.EvenUpTopBar
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
 
 @Composable
@@ -51,28 +66,40 @@ fun ChoosePeopleScreen(
     onEvent: (ChoosePeopleUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        EvenUpTopBar(
-            title = "Who was involved?",
-            onNavigationClick = { onEvent(ChoosePeopleUiEvent.BackClick) },
-            navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        )
+    EvenUpCollapsingTopBarScaffold(
+        title = "Who was involved?",
+        onNavigationClick = { onEvent(ChoosePeopleUiEvent.BackClick) },
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            if (!uiState.isLoading && !uiState.missingDraft) {
+                EvenUpBottomActionBar(
+                    primaryText = if (uiState.isSaving) "Saving..." else "Continue",
+                    onPrimaryClick = { onEvent(ChoosePeopleUiEvent.ContinueClick) },
+                    primaryEnabled = uiState.canContinue,
+                )
+            }
+        },
+    ) { innerPadding ->
         when {
             uiState.isLoading -> EvenUpLoadingState(
                 message = "Loading people...",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
             )
             uiState.missingDraft -> EvenUpErrorState(
                 title = "Expense unavailable",
                 message = uiState.submitError ?: "Start a receipt before adding people.",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 retryText = "Go back",
                 onRetryClick = { onEvent(ChoosePeopleUiEvent.BackClick) },
             )
             else -> ChoosePeopleContent(
                 uiState = uiState,
                 onEvent = onEvent,
-                modifier = Modifier.weight(1f),
+                contentPadding = innerPadding,
             )
         }
     }
@@ -82,32 +109,24 @@ fun ChoosePeopleScreen(
 private fun ChoosePeopleContent(
     uiState: ChoosePeopleUiState,
     onEvent: (ChoosePeopleUiEvent) -> Unit,
-    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues,
 ) {
-    Box(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = EvenUpTheme.spacing.space20)
-                .padding(top = EvenUpTheme.spacing.space16, bottom = 112.dp),
-            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
-        ) {
-            SelectedParticipantsSection(uiState = uiState, onEvent = onEvent)
-            AddParticipantSection(uiState = uiState, onEvent = onEvent)
-            SavedSuggestionsSection(uiState = uiState, onEvent = onEvent)
-            PayerSection(uiState = uiState, onEvent = onEvent)
-            uiState.submitError?.let { error ->
-                EvenUpValidationMessage(message = error)
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(contentPadding)
+            .padding(horizontal = EvenUpTheme.spacing.space20)
+            .padding(top = EvenUpTheme.spacing.space16, bottom = EvenUpTheme.spacing.space24),
+        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
+    ) {
+        SelectedParticipantsSection(uiState = uiState, onEvent = onEvent)
+        AddParticipantSection(uiState = uiState, onEvent = onEvent)
+        SavedSuggestionsSection(uiState = uiState, onEvent = onEvent)
+        PayerSection(uiState = uiState, onEvent = onEvent)
+        uiState.submitError?.let { error ->
+            EvenUpValidationMessage(message = error)
         }
-        EvenUpBottomActionBar(
-            primaryText = if (uiState.isSaving) "Saving..." else "Continue",
-            onPrimaryClick = { onEvent(ChoosePeopleUiEvent.ContinueClick) },
-            primaryEnabled = uiState.canContinue,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
     }
 }
 
@@ -132,16 +151,51 @@ private fun SelectedParticipantsSection(
                 horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
             ) {
                 uiState.participants.forEach { participant ->
-                    SelectedParticipantAvatar(
-                        participant = participant,
-                        onRemove = { onEvent(ChoosePeopleUiEvent.RemoveParticipantClick(participant.id)) },
-                    )
+                    key(participant.id) {
+                        AnimatedSelectedParticipantAvatar(
+                            participant = participant,
+                            onRemove = { onEvent(ChoosePeopleUiEvent.RemoveParticipantClick(participant.id)) },
+                        )
+                    }
                 }
             }
         }
         uiState.fieldErrors["participants"]?.let { error ->
             EvenUpValidationMessage(message = error)
         }
+    }
+}
+
+@Composable
+private fun AnimatedSelectedParticipantAvatar(
+    participant: ChoosePeopleParticipantUiState,
+    onRemove: () -> Unit,
+) {
+    AnimatedRemoveContainer(
+        enter = fadeIn(participantEnterSpec()) +
+            slideInHorizontally(
+                animationSpec = participantEnterSpec(),
+                initialOffsetX = { it / 2 },
+            ) +
+            expandHorizontally(
+                animationSpec = participantEnterSpec(),
+                expandFrom = Alignment.Start,
+            ),
+        exit = fadeOut(participantExitSpec()) +
+            slideOutHorizontally(
+                animationSpec = participantExitSpec(),
+                targetOffsetX = { -it / 2 },
+            ) +
+            shrinkHorizontally(
+                animationSpec = participantExitSpec(),
+                shrinkTowards = Alignment.Start,
+            ),
+        onRemoved = onRemove,
+    ) { removeWithAnimation ->
+        SelectedParticipantAvatar(
+            participant = participant,
+            onRemove = removeWithAnimation,
+        )
     }
 }
 
@@ -236,13 +290,44 @@ private fun SavedSuggestionsSection(
             )
         } else {
             uiState.savedSuggestions.forEach { suggestion ->
-                SavedSuggestionRow(
-                    suggestion = suggestion,
-                    onAdd = { onEvent(ChoosePeopleUiEvent.AddSavedParticipantClick(suggestion.name)) },
-                    onDelete = { onEvent(ChoosePeopleUiEvent.DeleteSavedParticipantClick(suggestion.name)) },
-                )
+                key(suggestion.name.lowercase()) {
+                    AnimatedSavedSuggestionRow(
+                        suggestion = suggestion,
+                        onAdd = { onEvent(ChoosePeopleUiEvent.AddSavedParticipantClick(suggestion.name)) },
+                        onDelete = { onEvent(ChoosePeopleUiEvent.DeleteSavedParticipantClick(suggestion.name)) },
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun AnimatedSavedSuggestionRow(
+    suggestion: SavedParticipantSuggestionUiState,
+    onAdd: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    AnimatedRemoveContainer(
+        enter = fadeIn(participantEnterSpec()) +
+            slideInHorizontally(
+                animationSpec = participantEnterSpec(),
+                initialOffsetX = { it / 3 },
+            ) +
+            expandVertically(animationSpec = participantEnterSpec()),
+        exit = fadeOut(participantExitSpec()) +
+            slideOutHorizontally(
+                animationSpec = participantExitSpec(),
+                targetOffsetX = { -it / 3 },
+            ) +
+            shrinkVertically(animationSpec = participantExitSpec()),
+        onRemoved = onDelete,
+    ) { deleteWithAnimation ->
+        SavedSuggestionRow(
+            suggestion = suggestion,
+            onAdd = onAdd,
+            onDelete = deleteWithAnimation,
+        )
     }
 }
 
@@ -369,3 +454,42 @@ private fun SectionHeader(title: String) {
         color = EvenUpTheme.colors.textSecondary,
     )
 }
+
+@Composable
+private fun AnimatedRemoveContainer(
+    enter: androidx.compose.animation.EnterTransition,
+    exit: androidx.compose.animation.ExitTransition,
+    onRemoved: () -> Unit,
+    content: @Composable (removeWithAnimation: () -> Unit) -> Unit,
+) {
+    val latestOnRemoved = rememberUpdatedState(onRemoved)
+    val visibleState = remember {
+        MutableTransitionState(false).apply { targetState = true }
+    }
+
+    LaunchedEffect(visibleState.isIdle, visibleState.currentState, visibleState.targetState) {
+        if (visibleState.isIdle && !visibleState.currentState && !visibleState.targetState) {
+            latestOnRemoved.value()
+        }
+    }
+
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = enter,
+        exit = exit,
+    ) {
+        content {
+            visibleState.targetState = false
+        }
+    }
+}
+
+private fun <T> participantEnterSpec() = tween<T>(
+    durationMillis = 180,
+    easing = FastOutSlowInEasing,
+)
+
+private fun <T> participantExitSpec() = tween<T>(
+    durationMillis = 140,
+    easing = FastOutSlowInEasing,
+)

@@ -34,14 +34,13 @@ class AssignItemsPresenter(
             )
         }
 
-        val selectedParticipantId = draft.participants.first().id.value
         return buildState(
             merchantName = draft.receipt.merchantName,
             dateLabel = draft.receipt.transactionDateLabel,
             participants = draft.participants,
             items = draft.receipt.items,
             assignments = draft.itemAssignments,
-            selectedParticipantId = selectedParticipantId,
+            selectedParticipantId = null,
             isLoading = false,
         )
     }
@@ -102,12 +101,12 @@ class AssignItemsPresenter(
         val currentAssignments = state.toAssignments(draft.receipt.items)
         val item = draft.receipt.items.firstOrNull { receiptItem -> receiptItem.id.value == itemId }
             ?: return state
-
-        val nextAssignments = if (item.quantity.value == 1) {
-            currentAssignments.replaceAssignment(item.fullAssignment(selectedParticipantId))
-        } else {
-            val existing = currentAssignments.firstOrNull { assignment -> assignment.receiptItemId == item.id }
-            currentAssignments.replaceAssignment(item.nextUnitAssignment(existing, selectedParticipantId))
+        val existingAssignment = currentAssignments.firstOrNull { assignment -> assignment.receiptItemId == item.id }
+        val nextAssignments = when (val tapResult = item.assignmentToggledForParticipant(existingAssignment, selectedParticipantId)) {
+            DirectTapAssignmentResult.OpenSplitSheet -> {
+                return openSplitSheet(state.copy(fieldErrors = emptyMap(), submitError = null), itemId)
+            }
+            is DirectTapAssignmentResult.Update -> currentAssignments.replaceAssignment(item.id, tapResult.assignment)
         }
 
         return buildState(
@@ -127,7 +126,7 @@ class AssignItemsPresenter(
         participants: List<Participant>,
         items: List<ReceiptItem>,
         assignments: List<ItemAssignment>,
-        selectedParticipantId: String,
+        selectedParticipantId: String?,
         isLoading: Boolean,
     ): AssignItemsUiState {
         val participantsById = participants.associateBy { participant -> participant.id }
@@ -154,6 +153,17 @@ class AssignItemsPresenter(
             },
             subtotalLabel = formatMoney(MoneyMinor(items.sumOf { item -> item.totalPrice.value })),
             progressLabel = "$assignedItemCount of ${items.size} items assigned",
+            helperText = selectedParticipantId
+                ?.let { participantId ->
+                    participants.firstOrNull { participant -> participant.id.value == participantId }?.name
+                }
+                ?.let { selectedName -> "Assigning to $selectedName" }
+                ?: "Select a person, then tap their items.",
+            continueHelperText = when (val remaining = items.size - assignedItemCount) {
+                0 -> "All items assigned"
+                1 -> "Assign 1 item to continue"
+                else -> "Assign $remaining items to continue"
+            },
             canContinue = items.isNotEmpty() && assignedItemCount == items.size,
         )
     }
@@ -194,13 +204,13 @@ class AssignItemsPresenter(
                         .filter { share -> share.quantity > 0 }
                         .associate { share -> share.participantId to share.quantity }
                     val amounts = receiptItem.allocateAmountsByQuantity(quantities)
-                    if (receiptItem.quantity.value == 1 && quantities.size == 1) {
+                    if (item.directFullAssignment && item.assignees.size == 1) {
                         ItemAssignment(
                             receiptItemId = receiptItem.id,
                             mode = ItemAssignmentMode.Full,
                             shares = listOf(
                                 ItemParticipantShare(
-                                    participantId = ParticipantId(quantities.keys.first()),
+                                    participantId = ParticipantId(item.assignees.single().participantId),
                                     amount = receiptItem.totalPrice,
                                 ),
                             ),
@@ -265,7 +275,7 @@ class AssignItemsPresenter(
         assignment: ItemAssignment?,
         participantsById: Map<ParticipantId, Participant>,
     ): AssignItemsReceiptItemUiState {
-        val shares = assignment.toShares(participantsById)
+        val shares = assignment.toShares(participantsById, quantity.value)
         val assignees = shares.map { share ->
             AssignItemsAssigneeUiState(
                 participantId = share.participantId,
@@ -293,6 +303,7 @@ class AssignItemsPresenter(
             totalLabel = formatMoney(totalPrice),
             assignmentState = assignmentState,
             splitMode = assignment.toSplitMode(),
+            directFullAssignment = assignment?.mode == ItemAssignmentMode.Full,
             shares = shares,
             assignees = assignees,
         )
@@ -300,6 +311,7 @@ class AssignItemsPresenter(
 
     private fun ItemAssignment?.toShares(
         participantsById: Map<ParticipantId, Participant>,
+        itemQuantity: Int,
     ): List<AssignItemsShareUiState> {
         if (this == null) return emptyList()
         return shares.mapNotNull { share ->
@@ -309,7 +321,7 @@ class AssignItemsPresenter(
                 name = participant.name,
                 colorIndex = participant.creationOrder,
                 amountMinor = share.amount.value,
-                quantity = share.quantity?.value ?: 1,
+                quantity = share.quantity?.value ?: if (mode == ItemAssignmentMode.Full) itemQuantity else 1,
                 percentageBasisPoints = share.percentage?.value ?: 0,
             )
         }
@@ -354,40 +366,53 @@ class AssignItemsPresenter(
         )
     }
 
-    private fun ReceiptItem.nextUnitAssignment(
-        existing: ItemAssignment?,
+    private fun ReceiptItem.assignmentToggledForParticipant(
+        existingAssignment: ItemAssignment?,
         selectedParticipantId: String,
-    ): ItemAssignment {
-        val units = buildList {
-            existing?.shares.orEmpty().forEach { share ->
-                repeat(share.quantity?.value ?: 0) {
-                    add(share.participantId.value)
-                }
-            }
-        }.toMutableList()
-        if (units.size < quantity.value) {
-            units += selectedParticipantId
-        } else {
-            units.removeAt(0)
-            units += selectedParticipantId
+    ): DirectTapAssignmentResult {
+        if (existingAssignment == null) {
+            return DirectTapAssignmentResult.Update(fullAssignment(selectedParticipantId))
+        }
+        val canDirectlyToggle = existingAssignment.mode == ItemAssignmentMode.Full ||
+            existingAssignment.mode == ItemAssignmentMode.SharedEqual ||
+            (existingAssignment.mode == ItemAssignmentMode.ByUnits && existingAssignment.shares.size == 1)
+        if (!canDirectlyToggle) {
+            return DirectTapAssignmentResult.OpenSplitSheet
         }
 
-        val quantities = units.groupingBy { participantId -> participantId }
-            .eachCount()
-        val amounts = allocateAmountsByQuantity(quantities)
-        val shares = quantities
-            .map { (participantId, assignedUnits) ->
-                ItemParticipantShare(
-                    participantId = ParticipantId(participantId),
-                    amount = MoneyMinor(amounts.getValue(participantId)),
-                    quantity = Quantity(assignedUnits),
-                )
-            }
-        return ItemAssignment(
-            receiptItemId = id,
-            mode = ItemAssignmentMode.ByUnits,
-            shares = shares,
+        val participantIds = existingAssignment.shares.map { share -> share.participantId.value }.distinct()
+        val nextParticipantIds = if (selectedParticipantId in participantIds) {
+            participantIds - selectedParticipantId
+        } else {
+            participantIds + selectedParticipantId
+        }
+
+        return DirectTapAssignmentResult.Update(
+            when (nextParticipantIds.size) {
+                0 -> null
+                1 -> fullAssignment(nextParticipantIds.single())
+                else -> sharedEqualAssignment(nextParticipantIds)
+            },
         )
+    }
+
+    private sealed interface DirectTapAssignmentResult {
+        data object OpenSplitSheet : DirectTapAssignmentResult
+
+        data class Update(val assignment: ItemAssignment?) : DirectTapAssignmentResult
+    }
+
+    private fun List<ItemAssignment>.replaceAssignment(
+        receiptItemId: ReceiptItemId,
+        nextAssignment: ItemAssignment?,
+    ): List<ItemAssignment> {
+        return filterNot { assignment -> assignment.receiptItemId == receiptItemId }.let { remainingAssignments ->
+            if (nextAssignment == null) {
+                remainingAssignments
+            } else {
+                remainingAssignments + nextAssignment
+            }
+        }
     }
 
     private fun List<ItemAssignment>.replaceAssignment(nextAssignment: ItemAssignment): List<ItemAssignment> {
@@ -431,9 +456,15 @@ class AssignItemsPresenter(
         delta: Int,
     ): AssignItemsUiState {
         val sheet = state.splitSheet ?: return state
+        val currentTotal = sheet.rows.sumOf { row -> row.quantity }
+        val currentRowQuantity = sheet.rows.firstOrNull { row -> row.participantId == participantId }?.quantity ?: return state
+        val nextQuantity = currentRowQuantity + delta
+        if (nextQuantity < 0 || (delta > 0 && currentTotal >= sheet.quantity)) {
+            return state
+        }
         val rows = sheet.rows.map { row ->
             if (row.participantId == participantId) {
-                row.copy(quantity = (row.quantity + delta).coerceAtLeast(0))
+                row.copy(quantity = nextQuantity)
             } else {
                 row
             }
@@ -500,6 +531,7 @@ class AssignItemsPresenter(
                 item.copy(
                     assignmentState = AssignItemsItemState.Assigned,
                     splitMode = sheet.mode,
+                    directFullAssignment = false,
                     shares = shares,
                     assignees = assignees,
                 )
@@ -514,6 +546,11 @@ class AssignItemsPresenter(
             fieldErrors = emptyMap(),
             submitError = null,
             progressLabel = "$assignedItemCount of ${items.size} items assigned",
+            continueHelperText = when (val remaining = items.size - assignedItemCount) {
+                0 -> "All items assigned"
+                1 -> "Assign 1 item to continue"
+                else -> "Assign $remaining items to continue"
+            },
             canContinue = items.isNotEmpty() && assignedItemCount == items.size,
         )
     }
@@ -572,7 +609,11 @@ class AssignItemsPresenter(
                 }
                 copy(
                     error = error,
-                    statusLabel = "Assigned: $assignedUnits of $quantity units",
+                    statusLabel = when (val remaining = quantity - assignedUnits) {
+                        0 -> "All units assigned"
+                        1 -> "Assign 1 unit to save"
+                        else -> "Assign $remaining more units to save"
+                    },
                 )
             }
             AssignItemsSplitMode.SharedEqual -> {
@@ -581,9 +622,14 @@ class AssignItemsPresenter(
                     includedCount < 2 -> "Choose at least two people for a shared split."
                     else -> null
                 }
+                val perPerson = if (includedCount >= 2) {
+                    " · ${formatMoney(MoneyMinor(totalMinor / includedCount))} each"
+                } else {
+                    ""
+                }
                 copy(
                     error = error,
-                    statusLabel = "$includedCount people selected",
+                    statusLabel = if (includedCount < 2) "Select at least 2 people" else "$includedCount people selected$perPerson",
                 )
             }
             AssignItemsSplitMode.CustomAmount -> {
@@ -592,12 +638,13 @@ class AssignItemsPresenter(
                 val assignedMinor = amounts.filterNotNull().sum()
                 val error = when {
                     hasInvalid -> "Enter valid custom amounts."
-                    assignedMinor != totalMinor -> "Custom amounts must equal $totalLabel."
+                    assignedMinor < totalMinor -> "Assign the remaining ${formatMoney(MoneyMinor(totalMinor - assignedMinor))}."
+                    assignedMinor > totalMinor -> "Reduce assigned amount by ${formatMoney(MoneyMinor(assignedMinor - totalMinor))}."
                     else -> null
                 }
                 copy(
                     error = error,
-                    statusLabel = "Assigned: ${formatMoney(MoneyMinor(assignedMinor))} of $totalLabel",
+                    statusLabel = "${formatMoney(MoneyMinor(totalMinor - assignedMinor))} remaining",
                 )
             }
             AssignItemsSplitMode.Percentage -> {
@@ -606,12 +653,15 @@ class AssignItemsPresenter(
                 val assignedBasisPoints = percentages.filterNotNull().sum()
                 val error = when {
                     hasInvalid -> "Enter valid percentages."
-                    assignedBasisPoints != PercentageBasisPoints.MAX_BASIS_POINTS -> "Percentages must add to 100%."
+                    assignedBasisPoints < PercentageBasisPoints.MAX_BASIS_POINTS ->
+                        "Assign the remaining ${(PercentageBasisPoints.MAX_BASIS_POINTS - assignedBasisPoints) / 100}%."
+                    assignedBasisPoints > PercentageBasisPoints.MAX_BASIS_POINTS ->
+                        "Reduce assigned percentage by ${(assignedBasisPoints - PercentageBasisPoints.MAX_BASIS_POINTS) / 100}%."
                     else -> null
                 }
                 copy(
                     error = error,
-                    statusLabel = "Assigned: ${assignedBasisPoints / 100}% of 100%",
+                    statusLabel = "${(PercentageBasisPoints.MAX_BASIS_POINTS - assignedBasisPoints) / 100}% remaining",
                 )
             }
         }

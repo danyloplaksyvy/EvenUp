@@ -2,17 +2,15 @@ package com.dps.evenup.feature.expenseflow.impl.reviewexpense
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -23,15 +21,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpCard
+import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
-import com.dps.evenup.core.designsystem.api.EvenUpPrimaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpParticipantAvatar
+import com.dps.evenup.core.designsystem.api.EvenUpPrimaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
-import com.dps.evenup.core.designsystem.api.EvenUpTopBar
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
 
 @Composable
@@ -40,28 +37,40 @@ fun ReviewExpenseScreen(
     onEvent: (ReviewExpenseUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        EvenUpTopBar(
-            title = "Review expense",
-            onNavigationClick = { onEvent(ReviewExpenseUiEvent.BackClick) },
-            navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        )
+    EvenUpCollapsingTopBarScaffold(
+        title = "Review expense",
+        onNavigationClick = { onEvent(ReviewExpenseUiEvent.BackClick) },
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            if (!uiState.isLoading && !uiState.missingDraft) {
+                EvenUpBottomActionBar(
+                    primaryText = if (uiState.isSaving) "Saving..." else "Save expense",
+                    onPrimaryClick = { onEvent(ReviewExpenseUiEvent.SaveClick) },
+                    primaryEnabled = uiState.canSave && !uiState.isSaving,
+                )
+            }
+        },
+    ) { innerPadding ->
         when {
             uiState.isLoading -> EvenUpLoadingState(
                 message = "Calculating settlement...",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
             )
             uiState.missingDraft -> EvenUpErrorState(
                 title = "Review unavailable",
                 message = uiState.submitError ?: "Complete the previous steps before reviewing.",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 retryText = "Go back",
                 onRetryClick = { onEvent(ReviewExpenseUiEvent.BackClick) },
             )
             else -> ReviewExpenseContent(
                 uiState = uiState,
                 onEvent = onEvent,
-                modifier = Modifier.weight(1f),
+                contentPadding = innerPadding,
             )
         }
     }
@@ -71,39 +80,31 @@ fun ReviewExpenseScreen(
 private fun ReviewExpenseContent(
     uiState: ReviewExpenseUiState,
     onEvent: (ReviewExpenseUiEvent) -> Unit,
-    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues,
 ) {
-    Box(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = EvenUpTheme.spacing.space20)
-                .padding(top = EvenUpTheme.spacing.space16, bottom = 112.dp),
-            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            ReviewHeader(uiState = uiState)
-            SettlementSummary(uiState = uiState)
-            CalculationDetails(uiState = uiState, onEvent = onEvent)
-            uiState.validationError?.let { error ->
-                EvenUpValidationMessage(message = error)
-            }
-            uiState.submitError?.let { error ->
-                SaveErrorCard(
-                    message = error,
-                    onRetry = { onEvent(ReviewExpenseUiEvent.SaveRetryClick) },
-                    retryEnabled = uiState.canSave && !uiState.isSaving,
-                )
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(contentPadding)
+            .padding(horizontal = EvenUpTheme.spacing.space20)
+            .padding(top = EvenUpTheme.spacing.space16, bottom = EvenUpTheme.spacing.space24),
+        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        ReviewHeader(uiState = uiState)
+        SettlementSummary(uiState = uiState)
+        CalculationDetails(uiState = uiState, onEvent = onEvent)
+        uiState.validationError?.let { error ->
+            EvenUpValidationMessage(message = error)
         }
-        EvenUpBottomActionBar(
-            primaryText = if (uiState.isSaving) "Saving..." else "Save expense",
-            onPrimaryClick = { onEvent(ReviewExpenseUiEvent.SaveClick) },
-            primaryEnabled = uiState.canSave && !uiState.isSaving,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        uiState.submitError?.let { error ->
+            SaveErrorCard(
+                message = error,
+                onRetry = { onEvent(ReviewExpenseUiEvent.SaveRetryClick) },
+                retryEnabled = uiState.canSave && !uiState.isSaving,
+            )
+        }
     }
 }
 
