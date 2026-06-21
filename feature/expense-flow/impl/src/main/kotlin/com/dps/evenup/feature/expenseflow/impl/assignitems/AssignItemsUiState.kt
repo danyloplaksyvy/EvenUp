@@ -6,8 +6,9 @@ data class AssignItemsUiState(
     val missingDraft: Boolean = false,
     val merchantName: String = "",
     val dateLabel: String? = null,
+    val currencyCode: String = "USD",
     val participants: List<AssignItemsParticipantUiState> = emptyList(),
-    val selectedParticipantId: String? = null,
+    val selectedParticipantIds: List<String> = emptyList(),
     val items: List<AssignItemsReceiptItemUiState> = emptyList(),
     val splitSheet: AssignItemsSplitSheetUiState? = null,
     val subtotalLabel: String = "",
@@ -17,9 +18,21 @@ data class AssignItemsUiState(
     val canContinue: Boolean = false,
     val fieldErrors: Map<String, String> = emptyMap(),
     val submitError: String? = null,
+    val showClearAssignmentsConfirmation: Boolean = false,
+    val showEqualSplitConfirmation: Boolean = false,
+    val clearUndoItems: List<AssignItemsReceiptItemUiState>? = null,
+    val clearUndoSnackbarId: Long = 0L,
+    val feedback: AssignItemsFeedbackUiState? = null,
+    val scrollToItemId: String? = null,
 ) {
     val canApplyEqualSplit: Boolean = participants.size >= 2 && items.isNotEmpty() && !isSaving
+    val canClearAssignments: Boolean = items.any { item -> item.assignmentState != AssignItemsItemState.Unassigned }
 }
+
+data class AssignItemsFeedbackUiState(
+    val id: Long,
+    val message: String,
+)
 
 data class AssignItemsParticipantUiState(
     val id: String,
@@ -32,9 +45,11 @@ data class AssignItemsReceiptItemUiState(
     val id: String,
     val name: String,
     val quantity: Int,
+    val totalMinor: Long,
     val quantityLabel: String,
     val unitPriceLabel: String,
     val totalLabel: String,
+    val assignmentActionLabel: String,
     val assignmentState: AssignItemsItemState,
     val splitMode: AssignItemsSplitMode,
     val directFullAssignment: Boolean = false,
@@ -78,6 +93,8 @@ data class AssignItemsSplitSheetUiState(
     val quantity: Int,
     val unitPriceLabel: String,
     val totalLabel: String,
+    val currencyCode: String,
+    val currencySymbol: String,
     val totalMinor: Long,
     val mode: AssignItemsSplitMode,
     val rows: List<AssignItemsSplitRowUiState>,
@@ -94,5 +111,6 @@ data class AssignItemsSplitRowUiState(
     val quantity: Int = 0,
     val amount: String = "",
     val percentage: String = "",
+    val amountLabel: String = "",
     val included: Boolean = false,
 )

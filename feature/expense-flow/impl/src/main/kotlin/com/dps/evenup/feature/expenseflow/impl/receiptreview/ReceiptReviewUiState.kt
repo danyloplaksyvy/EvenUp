@@ -25,6 +25,7 @@ data class ReceiptReviewUiState(
     val editDraft: ReceiptReviewEditDraft? = null,
     val fieldErrors: Map<String, String> = emptyMap(),
     val firstBlockingSection: ReceiptReviewSection? = null,
+    val firstBlockingItemId: String? = null,
     val validationRequestId: Int = 0,
     val submitError: String? = null,
 ) {
@@ -43,6 +44,11 @@ data class ReceiptReviewUiState(
     val scannedReceiptTotalLabel: String? = scannedReceiptTotalAmount.takeIf { it.isNotBlank() }
         ?.let { amount -> formatCurrency(amount, currencyCode) }
     val summaryTotalLabel: String = calculatedTotalLabel
+    val mismatchDiagnosis: ReceiptMismatchDiagnosis? = buildMismatchDiagnosis()
+    val suspectedCorrectionCount: Int = mismatchDiagnosis?.suspectedCorrections?.size ?: 0
+    val suggestedCorrectionActionLabel: String? = suspectedCorrectionCount.takeIf { count -> count > 0 }?.let { count ->
+        "Review $count suggested ${if (count == 1) "correction" else "corrections"}"
+    }
     val reconciliation: ReceiptReviewReconciliationUiState = buildReconciliation()
     val summaryStatusLabel: String = if (reconciliation.isIssue || hasInvalidRequiredFields) {
         "Needs review"
@@ -50,8 +56,11 @@ data class ReceiptReviewUiState(
         "Matches receipt"
     }
     val statusLabel: String = when {
+        reconciliation.type == ReceiptReviewReconciliationType.Mismatch && suspectedCorrectionCount > 0 -> {
+            "$suspectedCorrectionCount likely item ${if (suspectedCorrectionCount == 1) "error" else "errors"} found"
+        }
+        reconciliation.type == ReceiptReviewReconciliationType.Mismatch -> "Total differs · Review item amounts"
         unresolvedReviewItemCount > 0 -> "$unresolvedReviewItemCount ${if (unresolvedReviewItemCount == 1) "item needs" else "items need"} review"
-        reconciliation.type == ReceiptReviewReconciliationType.Mismatch -> "Scanned total differs"
         reconciliation.type == ReceiptReviewReconciliationType.MissingScannedTotal -> "Receipt total not detected"
         reviewWarningCount > 0 -> "Review needed"
         hasInvalidRequiredFields -> "Missing or uncertain fields"
@@ -97,6 +106,22 @@ data class ReceiptReviewUiState(
     private val hasFutureDate: Boolean
         get() = dateLabel.toLocalDateOrNull()?.isAfter(LocalDate.now()) == true
 
+    private fun buildMismatchDiagnosis(): ReceiptMismatchDiagnosis? {
+        return ReceiptMismatchDiagnoser.diagnose(
+            items = items.mapNotNull { item ->
+                ReceiptMismatchItem(
+                    id = item.id,
+                    name = item.name,
+                    currentAmountMinor = parseMoneyMinorValue(item.amount) ?: return@mapNotNull null,
+                    parseMetadata = item.parseMetadata,
+                )
+            },
+            parseCorrections = parseCorrections,
+            scannedTotalMinor = scannedReceiptTotalMinor,
+            calculatedTotalMinor = calculatedTotalMinor,
+        )
+    }
+
     private fun buildReconciliation(): ReceiptReviewReconciliationUiState {
         val total = scannedReceiptTotalMinor
         return when {
@@ -108,11 +133,12 @@ data class ReceiptReviewUiState(
             total != calculatedTotalMinor -> {
                 val delta = total - calculatedTotalMinor
                 ReceiptReviewReconciliationUiState(
-                    message = "Scanned receipt says ${formatCurrency(formatMoneyInput(total), currencyCode)} · Difference ${formatCurrency(formatMoneyInput(kotlin.math.abs(delta)), currencyCode)}",
+                    message = "Receipt says ${formatCurrency(formatMoneyInput(total), currencyCode)} · Difference ${formatCurrency(formatMoneyInput(kotlin.math.abs(delta)), currencyCode)}",
                     isIssue = true,
                     type = ReceiptReviewReconciliationType.Mismatch,
                     scannedReceiptTotalLabel = formatCurrency(formatMoneyInput(total), currencyCode),
                     differenceLabel = formatCurrency(formatMoneyInput(kotlin.math.abs(delta)), currencyCode),
+                    suggestedCorrectionActionLabel = suggestedCorrectionActionLabel,
                 )
             }
             unresolvedReviewItemCount > 0 -> ReceiptReviewReconciliationUiState(
@@ -142,8 +168,14 @@ data class ReceiptReviewItemUiState(
     val parseMetadata: ReceiptItemParseMetadata = ReceiptItemParseMetadata(),
     val originalName: String = name,
     val correctionFields: List<String> = emptyList(),
+    val suggestedCorrection: SuspectedItemCorrection? = null,
 ) {
     fun totalLabel(currencyCode: String): String = formatCurrency(amount, currencyCode)
+
+    fun suggestedCorrectionNote(currencyCode: String): String? {
+        val correction = suggestedCorrection ?: return reviewNote
+        return "Receipt likely says ${formatCurrency(formatMoneyInput(correction.suggestedAmountMinor), currencyCode)} · Difference ${formatCurrency(formatMoneyInput(correction.differenceMinor), currencyCode)}"
+    }
 
     fun quantityDetail(currencyCode: String): String {
         val quantityValue = quantity.toIntOrNull()?.coerceAtLeast(1) ?: 1
@@ -172,6 +204,7 @@ data class ReceiptReviewReconciliationUiState(
     val type: ReceiptReviewReconciliationType,
     val scannedReceiptTotalLabel: String? = null,
     val differenceLabel: String? = null,
+    val suggestedCorrectionActionLabel: String? = null,
 )
 
 enum class ReceiptReviewReconciliationType {
@@ -224,6 +257,7 @@ sealed interface ReceiptReviewEditDraft {
         val lastEditedMoneyField: ReceiptReviewMoneyField,
         val isNew: Boolean,
         val reviewNote: String? = null,
+        val suggestedCorrection: SuspectedItemCorrection? = null,
     ) : ReceiptReviewEditDraft {
         val showsPriceEach: Boolean
             get() = quantity.toIntOrNull()?.let { it > 1 } == true

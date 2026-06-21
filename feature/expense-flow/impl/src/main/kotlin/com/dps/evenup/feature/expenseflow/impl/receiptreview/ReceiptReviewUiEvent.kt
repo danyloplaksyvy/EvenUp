@@ -31,6 +31,8 @@ sealed interface ReceiptReviewUiEvent {
 
     data class ItemLineTotalChanged(val value: String) : ReceiptReviewUiEvent
 
+    data object UseSuggestedItemCorrectionClick : ReceiptReviewUiEvent
+
     data object AddItemClick : ReceiptReviewUiEvent
 
     data class RemoveItemClick(val itemId: String) : ReceiptReviewUiEvent

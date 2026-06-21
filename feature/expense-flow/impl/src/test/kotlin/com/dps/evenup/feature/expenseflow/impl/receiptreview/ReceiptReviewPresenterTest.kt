@@ -281,9 +281,9 @@ class ReceiptReviewPresenterTest {
         assertEquals("10.00", state.scannedReceiptTotalAmount)
         assertEquals("€11.00", state.summaryTotalLabel)
         assertEquals("Needs review", state.summaryStatusLabel)
-        assertEquals("Scanned total differs", state.statusLabel)
+        assertEquals("Total differs · Review item amounts", state.statusLabel)
         assertEquals(ReceiptReviewReconciliationType.Mismatch, state.reconciliation.type)
-        assertEquals("Scanned receipt says €10.00 · Difference €1.00", state.reconciliation.message)
+        assertEquals("Receipt says €10.00 · Difference €1.00", state.reconciliation.message)
     }
 
     @Test
@@ -335,7 +335,78 @@ class ReceiptReviewPresenterTest {
         val result = presenter.saveDraft(validated)
 
         assertEquals(ReceiptReviewSection.Summary, validated.firstBlockingSection)
-        assertTrue(validated.fieldErrors["summary"].orEmpty().contains("Scanned receipt says"))
+        assertTrue(validated.fieldErrors["summary"].orEmpty().contains("Receipt says"))
+        assertTrue(result is SaveReceiptReviewResult.Invalid)
+        assertEquals(0, repository.saveCount)
+    }
+
+    @Test
+    fun `Rissol and Octopus mismatch highlights two suggested item corrections`() = runBlocking {
+        val presenter = presenter(draft = rissolOctopusDraft())
+
+        val state = presenter.load()
+
+        assertEquals("2 likely item errors found", state.statusLabel)
+        assertEquals("Review 2 suggested corrections", state.suggestedCorrectionActionLabel)
+        assertEquals("Receipt says €65.25 · Difference €1.10", state.reconciliation.message)
+        assertEquals(
+            listOf(
+                "Receipt likely says €5.60 · Difference €0.20",
+                "Receipt likely says €9.00 · Difference €0.90",
+                null,
+            ),
+            state.items.map { item -> item.suggestedCorrectionNote(state.currencyCode) },
+        )
+    }
+
+    @Test
+    fun `applying one suggested correction reduces mismatch and leaves remaining item highlighted`() = runBlocking {
+        val presenter = presenter(draft = rissolOctopusDraft())
+        var state = presenter.load()
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-1")))
+        val draft = state.editDraft as ReceiptReviewEditDraft.Item
+        assertEquals(560L, draft.suggestedCorrection?.suggestedAmountMinor)
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.UseSuggestedItemCorrectionClick)
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+
+        assertEquals("66.15", state.calculatedTotalAmount)
+        assertEquals("1 likely item error found", state.statusLabel)
+        assertEquals(listOf(null, 900L, null), state.items.map { item -> item.suggestedCorrection?.suggestedAmountMinor })
+    }
+
+    @Test
+    fun `applying all suggested corrections clears mismatch and highlights`() = runBlocking {
+        val presenter = presenter(draft = rissolOctopusDraft())
+        var state = presenter.load()
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-1")))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.UseSuggestedItemCorrectionClick)
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-2")))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.UseSuggestedItemCorrectionClick)
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+
+        assertEquals("65.25", state.calculatedTotalAmount)
+        assertEquals("65.25", state.scannedReceiptTotalAmount)
+        assertEquals("Matches receipt", state.summaryStatusLabel)
+        assertFalse(state.hasWarningStatus)
+        assertEquals(listOf(null, null, null), state.items.map { item -> item.suggestedCorrection })
+    }
+
+    @Test
+    fun `suggested mismatch blocks save and requests first suspected item`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(rissolOctopusDraft())
+        val presenter = presenter(repository = repository)
+        val state = presenter.load()
+
+        val validated = presenter.validateVisibleState(state)
+        val result = presenter.saveDraft(validated)
+
+        assertEquals(ReceiptReviewSection.Items, validated.firstBlockingSection)
+        assertEquals("item-1", validated.firstBlockingItemId)
+        assertTrue(validated.fieldErrors["summary"].orEmpty().contains("Receipt says"))
         assertTrue(result is SaveReceiptReviewResult.Invalid)
         assertEquals(0, repository.saveCount)
     }
@@ -402,7 +473,11 @@ class ReceiptReviewPresenterTest {
     @Test
     fun `review highlighted items action scrolls to items and closes sheet`() = runBlocking {
         val presenter = presenter()
-        val state = presenter.load().copy(editDraft = ReceiptReviewEditDraft.TotalCheck)
+        val loaded = presenter.load()
+        val state = loaded.copy(
+            editDraft = ReceiptReviewEditDraft.TotalCheck,
+            items = loaded.items.map { item -> item.copy(needsReview = true) },
+        )
 
         val nextState = presenter.reduce(state, ReceiptReviewUiEvent.ReviewHighlightedItemsClick)
 
@@ -548,6 +623,19 @@ class ReceiptReviewPresenterTest {
         itemAssignments = emptyList(),
         feeAllocations = emptyList(),
     )
+
+    private fun rissolOctopusDraft(): ExpenseDraft {
+        return draft().copy(
+            receipt = draft().receipt.copy(
+                items = listOf(
+                    validItem("item-1", "Rissol", 580),
+                    validItem("item-2", "Octopus Peppers", 990),
+                    validItem("item-3", "Coffee", 5_065),
+                ),
+                total = MoneyMinor(6_525),
+            ),
+        )
+    }
 
     private fun validItem(
         id: String,

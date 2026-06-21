@@ -78,7 +78,7 @@ class ReceiptReviewPresenter(
             reviewWarnings = receipt.parseMetadata.reviewWarnings,
             reviewWarningCount = receipt.parseMetadata.reviewWarnings.size,
             uncertainItemCount = receipt.items.count { item -> item.parseMetadata.needsReview },
-        )
+        ).withMismatchDiagnosis()
     }
 
     fun reduce(
@@ -88,15 +88,25 @@ class ReceiptReviewPresenter(
         val clearedState = state.copy(fieldErrors = emptyMap(), submitError = null)
         return when (event) {
             is ReceiptReviewUiEvent.EditTargetSelected -> clearedState.copy(
-                editDraft = state.draftFor(event.target),
+                editDraft = clearedState.draftFor(event.target),
                 firstBlockingSection = null,
+                firstBlockingItemId = null,
             )
-            ReceiptReviewUiEvent.EditDismissed -> clearedState.copy(editDraft = null, firstBlockingSection = null)
+            ReceiptReviewUiEvent.EditDismissed -> clearedState.copy(
+                editDraft = null,
+                firstBlockingSection = null,
+                firstBlockingItemId = null,
+            )
             ReceiptReviewUiEvent.EditCommitClick -> commitEditDraft(clearedState)
             ReceiptReviewUiEvent.StatusClick -> validateVisibleState(clearedState)
             ReceiptReviewUiEvent.ReviewHighlightedItemsClick -> clearedState.copy(
                 editDraft = null,
-                firstBlockingSection = ReceiptReviewSection.Items,
+                firstBlockingSection = if (state.firstSuggestedCorrectionItemId() != null || state.unresolvedReviewItemCount > 0) {
+                    ReceiptReviewSection.Items
+                } else {
+                    ReceiptReviewSection.Summary
+                },
+                firstBlockingItemId = state.firstSuggestedCorrectionItemId(),
                 validationRequestId = state.validationRequestId + 1,
             )
             is ReceiptReviewUiEvent.MerchantNameChanged -> clearedState.updateDraft {
@@ -162,6 +172,18 @@ class ReceiptReviewPresenter(
                     else -> this
                 }.deriveUnitPriceFromLineTotal()
             }
+            ReceiptReviewUiEvent.UseSuggestedItemCorrectionClick -> clearedState.updateDraft {
+                when (this) {
+                    is ReceiptReviewEditDraft.Item -> suggestedCorrection?.let { correction ->
+                        copy(
+                            lineTotal = formatMoneyInput(correction.suggestedAmountMinor),
+                            lastEditedMoneyField = ReceiptReviewMoneyField.ItemTotal,
+                            suggestedCorrection = null,
+                        ).deriveUnitPriceFromLineTotal()
+                    } ?: this
+                    else -> this
+                }
+            }
             ReceiptReviewUiEvent.AddItemClick -> clearedState.copy(
                 editDraft = ReceiptReviewEditDraft.Item(
                     itemId = null,
@@ -181,6 +203,7 @@ class ReceiptReviewPresenter(
                     draft is ReceiptReviewEditDraft.Item && draft.itemId == event.itemId
                 },
                 firstBlockingSection = null,
+                firstBlockingItemId = null,
             )
             is ReceiptReviewUiEvent.FeeTypeChanged -> clearedState.updateDraft {
                 when (this) {
@@ -222,11 +245,12 @@ class ReceiptReviewPresenter(
                     draft is ReceiptReviewEditDraft.Fee && draft.feeId == event.feeId
                 },
                 firstBlockingSection = null,
+                firstBlockingItemId = null,
             )
             ReceiptReviewUiEvent.BackClick,
             ReceiptReviewUiEvent.ContinueClick,
             -> state
-        }
+        }.withMismatchDiagnosis()
     }
 
     private fun ReceiptReviewUiState.draftFor(target: ReceiptReviewEditTarget): ReceiptReviewEditDraft? {
@@ -253,6 +277,7 @@ class ReceiptReviewPresenter(
                     lastEditedMoneyField = lastEditedMoneyField,
                     isNew = false,
                     reviewNote = item.reviewNote,
+                    suggestedCorrection = item.suggestedCorrection,
                 )
             }
             is ReceiptReviewEditTarget.Fee -> fees.firstOrNull { fee -> fee.id == target.feeId }?.let { fee ->
@@ -419,6 +444,7 @@ class ReceiptReviewPresenter(
         return state.copy(
             fieldErrors = validation.errors,
             firstBlockingSection = validation.firstBlockingSection,
+            firstBlockingItemId = validation.firstBlockingItemId,
             validationRequestId = state.validationRequestId + 1,
             submitError = null,
         )
@@ -430,6 +456,7 @@ class ReceiptReviewPresenter(
             return SaveReceiptReviewResult.Invalid(
                 fieldErrors = visibleValidation.errors,
                 firstBlockingSection = visibleValidation.firstBlockingSection,
+                firstBlockingItemId = visibleValidation.firstBlockingItemId,
             )
         }
         val existingDraft = draftRepository.getDraft() ?: return SaveReceiptReviewResult.MissingDraft
@@ -457,14 +484,19 @@ class ReceiptReviewPresenter(
     private fun ReceiptReviewUiState.visibleValidation(): ReceiptReviewValidationResult {
         val errors = mutableMapOf<String, String>()
         var firstBlockingSection: ReceiptReviewSection? = null
+        var firstBlockingItemId: String? = null
 
         fun addError(
             key: String,
             message: String,
             section: ReceiptReviewSection,
+            itemId: String? = null,
         ) {
             if (!errors.containsKey(key)) errors[key] = message
-            if (firstBlockingSection == null) firstBlockingSection = section
+            if (firstBlockingSection == null) {
+                firstBlockingSection = section
+                firstBlockingItemId = itemId
+            }
         }
 
         val merchant = merchantName.trim()
@@ -489,10 +521,21 @@ class ReceiptReviewPresenter(
         if (scannedReceiptTotal == null || scannedReceiptTotal.value <= 0) {
             addError("summary", reconciliation.message, ReceiptReviewSection.Summary)
         } else if (scannedReceiptTotal.value != calculatedTotalMinor) {
-            addError("summary", reconciliation.message, ReceiptReviewSection.Summary)
+            val firstSuggestedItemId = firstSuggestedCorrectionItemId()
+            addError(
+                key = "summary",
+                message = reconciliation.message,
+                section = if (firstSuggestedItemId == null) ReceiptReviewSection.Summary else ReceiptReviewSection.Items,
+                itemId = firstSuggestedItemId,
+            )
         }
         if (unresolvedReviewItemCount > 0) {
-            addError("items", reconciliation.message, ReceiptReviewSection.Items)
+            addError(
+                key = "items",
+                message = reconciliation.message,
+                section = ReceiptReviewSection.Items,
+                itemId = firstReviewItemId(),
+            )
         }
 
         if (items.isEmpty()) addError("items", "Add at least one valid item.", ReceiptReviewSection.Items)
@@ -524,7 +567,11 @@ class ReceiptReviewPresenter(
             }
         }
 
-        return ReceiptReviewValidationResult(errors = errors, firstBlockingSection = firstBlockingSection)
+        return ReceiptReviewValidationResult(
+            errors = errors,
+            firstBlockingSection = firstBlockingSection,
+            firstBlockingItemId = firstBlockingItemId,
+        )
     }
 
     private fun ReceiptReviewUiState.toReceipt(): ReceiptReviewBuildResult {
@@ -674,6 +721,27 @@ class ReceiptReviewPresenter(
         keys.any { key -> key == "fees" || key.startsWith("fee_") } -> ReceiptReviewSection.Adjustments
         keys.any { key -> key == "summary" } -> ReceiptReviewSection.Summary
         else -> null
+    }
+
+    private fun ReceiptReviewUiState.withMismatchDiagnosis(): ReceiptReviewUiState {
+        val correctionsByItemId = mismatchDiagnosis
+            ?.takeIf { diagnosis -> diagnosis.confidence == DiagnosisConfidence.High }
+            ?.suspectedCorrections
+            .orEmpty()
+            .associateBy { correction -> correction.itemId }
+        return copy(
+            items = items.map { item ->
+                item.copy(suggestedCorrection = correctionsByItemId[item.id])
+            },
+        )
+    }
+
+    private fun ReceiptReviewUiState.firstSuggestedCorrectionItemId(): String? {
+        return items.firstOrNull { item -> item.suggestedCorrection != null }?.id
+    }
+
+    private fun ReceiptReviewUiState.firstReviewItemId(): String? {
+        return items.firstOrNull { item -> item.needsReview }?.id
     }
 
     private fun Receipt.logParseNotes() {
@@ -836,6 +904,7 @@ sealed interface SaveReceiptReviewResult {
     data class Invalid(
         val fieldErrors: Map<String, String>,
         val firstBlockingSection: ReceiptReviewSection? = null,
+        val firstBlockingItemId: String? = null,
     ) : SaveReceiptReviewResult
 }
 
@@ -851,4 +920,5 @@ private sealed interface ReceiptReviewBuildResult {
 data class ReceiptReviewValidationResult(
     val errors: Map<String, String>,
     val firstBlockingSection: ReceiptReviewSection?,
+    val firstBlockingItemId: String? = null,
 )
