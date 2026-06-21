@@ -11,6 +11,7 @@ data class ReceiptImageParseRequest(
     val mimeType: String,
     val localeHint: String? = null,
     val currencyHint: String? = null,
+    val requestId: String? = null,
 )
 
 class ReceiptDataException(

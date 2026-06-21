@@ -2,8 +2,13 @@ name = "evenup-worker"
 main = "src/index.js"
 compatibility_date = "2026-06-15"
 
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [vars]
 PUBLIC_BASE_URL = "https://evenup-worker.danyaplaksyvy.workers.dev"
+RECEIPT_PARSE_AUDIT = "false"
 
 [[d1_databases]]
 binding = "EXPENSES_DB"

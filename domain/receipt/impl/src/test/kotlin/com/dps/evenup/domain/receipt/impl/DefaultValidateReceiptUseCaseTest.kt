@@ -10,6 +10,7 @@ import com.dps.evenup.domain.receipt.api.ReceiptFee
 import com.dps.evenup.domain.receipt.api.ReceiptItem
 import com.dps.evenup.domain.receipt.api.ReceiptItemId
 import com.dps.evenup.domain.receipt.api.ReceiptValidationError
+import java.time.LocalDate
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -105,6 +106,18 @@ class DefaultValidateReceiptUseCaseTest {
 
         assertFalse(result.isValid)
         assertTrue(ReceiptValidationError.TotalMismatch in result.errors)
+    }
+
+    @Test
+    fun `future receipt date is invalid`() {
+        val result = useCase.validate(
+            validReceipt().copy(
+                transactionDateLabel = LocalDate.now().plusDays(1).toString(),
+            ),
+        )
+
+        assertFalse(result.isValid)
+        assertTrue(ReceiptValidationError.FutureDate in result.errors)
     }
 
     private fun validReceipt(): Receipt = Receipt(

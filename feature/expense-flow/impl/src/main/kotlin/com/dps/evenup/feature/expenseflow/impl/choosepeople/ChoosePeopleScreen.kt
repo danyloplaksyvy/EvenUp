@@ -14,25 +14,23 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -44,6 +42,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -120,10 +122,9 @@ private fun ChoosePeopleContent(
             .padding(top = EvenUpTheme.spacing.space16, bottom = EvenUpTheme.spacing.space24),
         verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
     ) {
-        SelectedParticipantsSection(uiState = uiState, onEvent = onEvent)
+        PeopleInvolvedSection(uiState = uiState, onEvent = onEvent)
         AddParticipantSection(uiState = uiState, onEvent = onEvent)
         SavedSuggestionsSection(uiState = uiState, onEvent = onEvent)
-        PayerSection(uiState = uiState, onEvent = onEvent)
         uiState.submitError?.let { error ->
             EvenUpValidationMessage(message = error)
         }
@@ -131,44 +132,52 @@ private fun ChoosePeopleContent(
 }
 
 @Composable
-private fun SelectedParticipantsSection(
+private fun PeopleInvolvedSection(
     uiState: ChoosePeopleUiState,
     onEvent: (ChoosePeopleUiEvent) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12)) {
-        SectionHeader(title = "Selected")
-        if (uiState.participants.isEmpty()) {
-            Text(
-                text = "Add at least two people for this expense.",
-                style = EvenUpTheme.typography.body,
-                color = EvenUpTheme.colors.textSecondary,
-            )
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+        SectionHeader(title = "People involved", detail = uiState.selectedCountLabel)
+        AnimatedVisibility(visible = uiState.selectedParticipants.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+                contentPadding = PaddingValues(end = EvenUpTheme.spacing.space20),
             ) {
-                uiState.participants.forEach { participant ->
-                    key(participant.id) {
-                        AnimatedSelectedParticipantAvatar(
-                            participant = participant,
-                            onRemove = { onEvent(ChoosePeopleUiEvent.RemoveParticipantClick(participant.id)) },
-                        )
-                    }
+                items(
+                    items = uiState.selectedParticipants,
+                    key = { participant -> participant.id },
+                ) { participant ->
+                    AnimatedSelectedParticipantItem(
+                        participant = participant,
+                        onSetPayer = { onEvent(ChoosePeopleUiEvent.PayerSelected(participant.id)) },
+                        onRemove = { onEvent(ChoosePeopleUiEvent.RemoveParticipantClick(participant.id)) },
+                    )
                 }
             }
         }
+        Text(
+            text = uiState.helperText,
+            style = EvenUpTheme.typography.bodySmall,
+            color = if (uiState.canContinue) {
+                EvenUpTheme.colors.textSecondary
+            } else {
+                EvenUpTheme.colors.warning
+            },
+        )
         uiState.fieldErrors["participants"]?.let { error ->
+            EvenUpValidationMessage(message = error)
+        }
+        uiState.fieldErrors["payer"]?.let { error ->
             EvenUpValidationMessage(message = error)
         }
     }
 }
 
 @Composable
-private fun AnimatedSelectedParticipantAvatar(
-    participant: ChoosePeopleParticipantUiState,
+private fun AnimatedSelectedParticipantItem(
+    participant: SelectedParticipantUiState,
+    onSetPayer: () -> Unit,
     onRemove: () -> Unit,
 ) {
     AnimatedRemoveContainer(
@@ -192,54 +201,84 @@ private fun AnimatedSelectedParticipantAvatar(
             ),
         onRemoved = onRemove,
     ) { removeWithAnimation ->
-        SelectedParticipantAvatar(
+        SelectedParticipantItem(
             participant = participant,
+            onSetPayer = onSetPayer,
             onRemove = removeWithAnimation,
         )
     }
 }
 
 @Composable
-private fun SelectedParticipantAvatar(
-    participant: ChoosePeopleParticipantUiState,
+private fun SelectedParticipantItem(
+    participant: SelectedParticipantUiState,
+    onSetPayer: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.width(72.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
+    Surface(
+        modifier = Modifier
+            .clickable(enabled = !participant.isPayer, onClick = onSetPayer)
+            .semantics {
+                if (!participant.isPayer) role = Role.Button
+                contentDescription = participant.setPayerContentDescription
+            },
+        shape = EvenUpTheme.shapes.input,
+        color = EvenUpTheme.colors.surfaceElevated,
+        contentColor = EvenUpTheme.colors.textPrimary,
+        border = BorderStroke(
+            width = if (participant.isPayer) 2.dp else 1.dp,
+            color = if (participant.isPayer) EvenUpTheme.colors.primary else EvenUpTheme.colors.border,
+        ),
     ) {
-        Box {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = EvenUpTheme.spacing.space12,
+                vertical = EvenUpTheme.spacing.space8,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             EvenUpParticipantAvatar(
                 name = participant.name,
                 colorIndex = participant.colorIndex,
-                modifier = Modifier.size(56.dp),
+                selected = participant.isPayer,
+                modifier = Modifier.size(32.dp),
             )
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(24.dp)
-                    .clickable(onClick = onRemove),
-                shape = EvenUpTheme.shapes.avatar,
-                color = EvenUpTheme.colors.surfaceElevated,
-                border = BorderStroke(1.dp, EvenUpTheme.colors.border),
+            Column(
+                verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
+            ) {
+                Text(
+                    text = participant.name,
+                    style = EvenUpTheme.typography.bodySmall,
+                    color = EvenUpTheme.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = participant.payerActionLabel,
+                    style = EvenUpTheme.typography.caption,
+                    color = if (participant.isPayer) {
+                        EvenUpTheme.colors.primary
+                    } else {
+                        EvenUpTheme.colors.textSecondary
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            EvenUpIconButton(
+                contentDescription = participant.removeContentDescription,
+                onClick = onRemove,
+                modifier = Modifier.size(32.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
-                    contentDescription = "Remove ${participant.name}",
-                    modifier = Modifier.padding(EvenUpTheme.spacing.space4),
+                    contentDescription = null,
                     tint = EvenUpTheme.colors.textSecondary,
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
-        Text(
-            text = participant.name,
-            style = EvenUpTheme.typography.caption,
-            color = EvenUpTheme.colors.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
@@ -259,6 +298,13 @@ private fun AddParticipantSection(
                 capitalization = KeyboardCapitalization.Words,
                 imeAction = ImeAction.Done,
             ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (uiState.typedAddLabel != null) {
+                        onEvent(ChoosePeopleUiEvent.AddParticipantClick)
+                    }
+                },
+            ),
             leadingContent = {
                 Icon(
                     imageVector = Icons.Filled.Search,
@@ -267,11 +313,12 @@ private fun AddParticipantSection(
                 )
             },
         )
-        EvenUpTextButton(
-            text = "Add person",
-            onClick = { onEvent(ChoosePeopleUiEvent.AddParticipantClick) },
-            enabled = uiState.participantNameInput.isNotBlank(),
-        )
+        uiState.typedAddLabel?.let { label ->
+            EvenUpTextButton(
+                text = label,
+                onClick = { onEvent(ChoosePeopleUiEvent.AddParticipantClick) },
+            )
+        }
     }
 }
 
@@ -284,7 +331,11 @@ private fun SavedSuggestionsSection(
         SectionHeader(title = "Suggested")
         if (uiState.savedSuggestions.isEmpty()) {
             Text(
-                text = "Saved names will appear here after you add people.",
+                text = if (uiState.participantNameInput.isBlank()) {
+                    "Saved names will appear here after you add people."
+                } else {
+                    "No saved people match this search."
+                },
                 style = EvenUpTheme.typography.bodySmall,
                 color = EvenUpTheme.colors.textSecondary,
             )
@@ -294,7 +345,6 @@ private fun SavedSuggestionsSection(
                     AnimatedSavedSuggestionRow(
                         suggestion = suggestion,
                         onAdd = { onEvent(ChoosePeopleUiEvent.AddSavedParticipantClick(suggestion.name)) },
-                        onDelete = { onEvent(ChoosePeopleUiEvent.DeleteSavedParticipantClick(suggestion.name)) },
                     )
                 }
             }
@@ -306,7 +356,6 @@ private fun SavedSuggestionsSection(
 private fun AnimatedSavedSuggestionRow(
     suggestion: SavedParticipantSuggestionUiState,
     onAdd: () -> Unit,
-    onDelete: () -> Unit,
 ) {
     AnimatedRemoveContainer(
         enter = fadeIn(participantEnterSpec()) +
@@ -321,12 +370,11 @@ private fun AnimatedSavedSuggestionRow(
                 targetOffsetX = { -it / 3 },
             ) +
             shrinkVertically(animationSpec = participantExitSpec()),
-        onRemoved = onDelete,
-    ) { deleteWithAnimation ->
+        onRemoved = onAdd,
+    ) { addWithAnimation ->
         SavedSuggestionRow(
             suggestion = suggestion,
-            onAdd = onAdd,
-            onDelete = deleteWithAnimation,
+            onAdd = addWithAnimation,
         )
     }
 }
@@ -335,11 +383,15 @@ private fun AnimatedSavedSuggestionRow(
 private fun SavedSuggestionRow(
     suggestion: SavedParticipantSuggestionUiState,
     onAdd: () -> Unit,
-    onDelete: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onAdd)
+            .semantics {
+                role = Role.Button
+                contentDescription = "Add ${suggestion.name}"
+            }
             .padding(vertical = EvenUpTheme.spacing.space4),
         horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
         verticalAlignment = Alignment.CenterVertically,
@@ -356,16 +408,6 @@ private fun SavedSuggestionRow(
             color = EvenUpTheme.colors.textPrimary,
         )
         EvenUpIconButton(
-            contentDescription = "Delete saved ${suggestion.name}",
-            onClick = onDelete,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.DeleteOutline,
-                contentDescription = null,
-                tint = EvenUpTheme.colors.textSecondary,
-            )
-        }
-        EvenUpIconButton(
             contentDescription = "Add ${suggestion.name}",
             onClick = onAdd,
         ) {
@@ -379,80 +421,29 @@ private fun SavedSuggestionRow(
 }
 
 @Composable
-private fun PayerSection(
-    uiState: ChoosePeopleUiState,
-    onEvent: (ChoosePeopleUiEvent) -> Unit,
+private fun SectionHeader(
+    title: String,
+    detail: String = "",
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12)) {
-        SectionHeader(title = "Who paid?")
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
-            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
-            maxItemsInEachRow = 2,
-        ) {
-            uiState.participants.forEach { participant ->
-                PayerCard(
-                    participant = participant,
-                    selected = participant.id == uiState.payerId,
-                    onClick = { onEvent(ChoosePeopleUiEvent.PayerSelected(participant.id)) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        uiState.fieldErrors["payer"]?.let { error ->
-            EvenUpValidationMessage(message = error)
-        }
-    }
-}
-
-@Composable
-private fun PayerCard(
-    participant: ChoosePeopleParticipantUiState,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = EvenUpTheme.shapes.input,
-        color = EvenUpTheme.colors.surfaceElevated,
-        contentColor = EvenUpTheme.colors.textPrimary,
-        border = BorderStroke(
-            width = if (selected) 2.dp else 1.dp,
-            color = if (selected) EvenUpTheme.colors.primary else EvenUpTheme.colors.border,
-        ),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(EvenUpTheme.spacing.space16),
-            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            EvenUpParticipantAvatar(
-                name = participant.name,
-                colorIndex = participant.colorIndex,
-                modifier = Modifier.size(36.dp),
-            )
+        Text(
+            text = title,
+            style = EvenUpTheme.typography.sectionTitle,
+            color = EvenUpTheme.colors.textSecondary,
+        )
+        if (detail.isNotBlank()) {
             Text(
-                text = participant.name,
-                style = if (selected) EvenUpTheme.typography.bodyStrong else EvenUpTheme.typography.body,
-                color = EvenUpTheme.colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                text = detail,
+                style = EvenUpTheme.typography.caption,
+                color = EvenUpTheme.colors.textSecondary,
+                textAlign = TextAlign.End,
             )
         }
     }
-}
-
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = EvenUpTheme.typography.sectionTitle,
-        color = EvenUpTheme.colors.textSecondary,
-    )
 }
 
 @Composable

@@ -8,6 +8,7 @@ import com.dps.evenup.data.receipt.api.ReceiptImageParseRequest
 import com.dps.evenup.domain.receipt.api.FeeType
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -48,6 +49,24 @@ class WorkerReceiptRepositoryTest {
         val receipt = repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
 
         assertEquals(FeeType.Other, receipt.fees.single().type)
+    }
+
+    @Test
+    fun `request id is kept out of worker request body`() = runBlocking {
+        val apiClient = FakeWorkerApiClient(receiptJson())
+        val repository = WorkerReceiptRepository(apiClient)
+
+        repository.parseReceiptImage(
+            ReceiptImageParseRequest(
+                imageBase64 = "abc",
+                mimeType = "image/jpeg",
+                requestId = "local-request-id",
+            ),
+        )
+
+        assertFalse(apiClient.lastPostBody.orEmpty().contains("local-request-id"))
+        assertFalse(apiClient.lastPostBody.orEmpty().contains("requestId"))
+        assertEquals("local-request-id", apiClient.lastPostHeaders["X-EvenUp-Request-Id"])
     }
 
     @Test
@@ -151,11 +170,21 @@ class WorkerReceiptRepositoryTest {
     private class FakeWorkerApiClient(
         private val responseBody: String,
     ) : WorkerApiClient {
+        var lastPostBody: String? = null
+            private set
+        var lastPostHeaders: Map<String, String> = emptyMap()
+            private set
+
         override suspend fun get(path: String): WorkerApiResult = error("Not used.")
 
         override suspend fun postJson(
             path: String,
             body: String,
-        ): WorkerApiResult = WorkerApiResult.Success(WorkerApiResponse(200, responseBody))
+            headers: Map<String, String>,
+        ): WorkerApiResult {
+            lastPostBody = body
+            lastPostHeaders = headers
+            return WorkerApiResult.Success(WorkerApiResponse(200, responseBody))
+        }
     }
 }

@@ -22,4 +22,5 @@ enum class ReceiptValidationError {
     NonPositiveFeeAmount,
     TotalMismatch,
     NegativeTotal,
+    FutureDate,
 }

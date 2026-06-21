@@ -6,6 +6,7 @@ interface WorkerApiClient {
     suspend fun postJson(
         path: String,
         body: String,
+        headers: Map<String, String> = emptyMap(),
     ): WorkerApiResult
 }
 

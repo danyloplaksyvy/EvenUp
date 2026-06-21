@@ -1,6 +1,7 @@
 package com.dps.evenup.core.designsystem.api
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -21,6 +22,7 @@ fun EvenUpTextField(
     placeholder: String? = null,
     singleLine: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     leadingContent: @Composable (() -> Unit)? = null,
 ) {
     OutlinedTextField(
@@ -35,6 +37,7 @@ fun EvenUpTextField(
         supportingText = supportingText?.let { { Text(text = it) } },
         leadingIcon = leadingContent,
         keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         shape = EvenUpTheme.shapes.input,
         textStyle = EvenUpTheme.typography.body,
         colors = OutlinedTextFieldDefaults.colors(

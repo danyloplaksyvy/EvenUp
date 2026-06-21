@@ -19,7 +19,11 @@ class DefaultWorkerApiClientTest {
         val connection = FakeHttpURLConnection(URL("https://example.test/v1/receipts/parse"), 200, """{"ok":true}""")
         val client = DefaultWorkerApiClient(WorkerApiConfig("https://example.test")) { connection }
 
-        val result = client.postJson("/v1/receipts/parse", """{"imageBase64":"abc"}""")
+        val result = client.postJson(
+            path = "/v1/receipts/parse",
+            body = """{"imageBase64":"abc"}""",
+            headers = mapOf("X-EvenUp-Request-Id" to "request_123"),
+        )
 
         assertTrue(result is WorkerApiResult.Success)
         result as WorkerApiResult.Success
@@ -27,6 +31,7 @@ class DefaultWorkerApiClientTest {
         assertEquals("""{"ok":true}""", result.response.body)
         assertEquals("POST", connection.requestMethod)
         assertEquals("""{"imageBase64":"abc"}""", connection.output.toString(Charsets.UTF_8.name()))
+        assertEquals("request_123", connection.capturedRequestProperties["X-EvenUp-Request-Id"])
     }
 
     @Test
@@ -62,6 +67,7 @@ class DefaultWorkerApiClientTest {
         },
     ) : HttpURLConnection(url) {
         val output = ByteArrayOutputStream()
+        val capturedRequestProperties = mutableMapOf<String, String>()
 
         override fun disconnect() = Unit
 
@@ -76,5 +82,12 @@ class DefaultWorkerApiClientTest {
         override fun getErrorStream(): ByteArrayInputStream = ByteArrayInputStream(responseBody.toByteArray())
 
         override fun getOutputStream(): ByteArrayOutputStream = output
+
+        override fun setRequestProperty(
+            key: String,
+            value: String,
+        ) {
+            capturedRequestProperties[key] = value
+        }
     }
 }

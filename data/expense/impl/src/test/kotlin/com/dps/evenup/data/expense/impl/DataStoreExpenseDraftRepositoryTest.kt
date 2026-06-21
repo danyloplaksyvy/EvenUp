@@ -284,6 +284,7 @@ class DataStoreExpenseDraftRepositoryTest {
         override suspend fun postJson(
             path: String,
             body: String,
+            headers: Map<String, String>,
         ): WorkerApiResult {
             if (!success) {
                 return WorkerApiResult.Failure(com.dps.evenup.core.network.api.WorkerNetworkError.ConnectionFailed)

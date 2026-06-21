@@ -12,6 +12,7 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,8 +42,19 @@ internal fun ReceiptDatePickerField(
     modifier: Modifier = Modifier,
 ) {
     var pickerVisible by remember { mutableStateOf(false) }
+    val todayMillis = remember {
+        LocalDate.now()
+            .atStartOfDay()
+            .toInstant(ZoneOffset.UTC)
+            .toEpochMilli()
+    }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = value.toEpochMillisOrNull(),
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= todayMillis
+
+            override fun isSelectableYear(year: Int): Boolean = year <= LocalDate.now().year
+        },
     )
 
     Surface(

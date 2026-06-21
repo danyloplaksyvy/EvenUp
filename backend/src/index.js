@@ -353,31 +353,59 @@ function isUniqueConstraintError(error) {
 }
 
 async function parseReceipt(request, env) {
+  const requestId = receiptParseRequestId(request);
+  const totalStart = Date.now();
+
   if (!env.OPENAI_API_KEY) {
-    return jsonResponse(
+    return receiptParseJsonResponse(
+      env,
+      requestId,
       {
         error: {
           code: "SERVER_MISCONFIGURED",
           message: "Receipt parsing is not configured."
         }
       },
-      500
+      500,
+      totalStart,
+      { result: "server_misconfigured" }
     );
   }
 
   let payload;
+  const requestJsonStart = Date.now();
   try {
     payload = await request.json();
   } catch {
-    return jsonResponse(RECEIPT_PARSE_ERROR, 400);
+    logReceiptParseTiming(env, requestId, "request_json", requestJsonStart, {
+      result: "invalid_json"
+    }, true);
+    return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 400, totalStart, {
+      result: "invalid_json"
+    });
   }
+  logReceiptParseTiming(env, requestId, "request_json", requestJsonStart, {
+    result: "parsed"
+  });
 
+  const validationStart = Date.now();
   if (!isValidReceiptParseRequest(payload)) {
-    return jsonResponse(RECEIPT_PARSE_ERROR, 400);
+    logReceiptParseTiming(env, requestId, "request_validation", validationStart, {
+      ...receiptParseRequestMetadata(payload),
+      valid: false
+    }, true);
+    return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 400, totalStart, {
+      result: "invalid_request"
+    });
   }
+  logReceiptParseTiming(env, requestId, "request_validation", validationStart, {
+    ...receiptParseRequestMetadata(payload),
+    valid: true
+  });
 
   try {
     const fetcher = env.OPENAI_FETCH || fetch;
+    const firstOpenAiStart = Date.now();
     const response = await fetcher(OPENAI_RESPONSES_URL, {
       method: "POST",
       headers: {
@@ -386,31 +414,155 @@ async function parseReceipt(request, env) {
       },
       body: JSON.stringify(openAiReceiptRequest(payload, env))
     });
+    logReceiptParseTiming(env, requestId, "openai_first_request", firstOpenAiStart, {
+      status: response.status,
+      ok: response.ok
+    }, !response.ok);
 
+    const firstResponseJsonStart = Date.now();
     const responseJson = await response.json();
+    logReceiptParseTiming(env, requestId, "openai_first_response_json", firstResponseJsonStart, {
+      status: response.status,
+      ok: response.ok
+    }, !response.ok);
     if (!response.ok) {
-      return jsonResponse(RECEIPT_PARSE_ERROR, 502);
+      return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 502, totalStart, {
+        result: "openai_error",
+        auditInvoked: false
+      });
     }
 
+    const normalizeStart = Date.now();
     const outputText = extractOpenAiOutputText(responseJson);
     if (!outputText) {
-      return jsonResponse(RECEIPT_PARSE_ERROR, 502);
+      logReceiptParseTiming(env, requestId, "first_response_normalize", normalizeStart, {
+        valid: false,
+        reason: "missing_output_text"
+      }, true);
+      return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 502, totalStart, {
+        result: "missing_output_text",
+        auditInvoked: false
+      });
     }
 
     const receipt = normalizeParsedReceipt(JSON.parse(outputText));
     if (!isValidParsedReceipt(receipt)) {
-      return jsonResponse(RECEIPT_PARSE_ERROR, 502);
+      logReceiptParseTiming(env, requestId, "first_response_normalize", normalizeStart, {
+        ...receiptSummaryMetadata(receipt),
+        valid: false
+      }, true);
+      return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 502, totalStart, {
+        result: "invalid_receipt",
+        auditInvoked: false
+      });
     }
+    logReceiptParseTiming(env, requestId, "first_response_normalize", normalizeStart, {
+      ...receiptSummaryMetadata(receipt),
+      valid: true
+    });
 
+    const reconciliationStart = Date.now();
     const reconciledReceipt = reconcileReceiptSubtotal(receipt);
-    if (isReceiptSubtotalReconciled(reconciledReceipt)) {
-      return jsonResponse(reconciledReceipt);
+    const isReconciled = isReceiptSubtotalReconciled(reconciledReceipt);
+    const auditEnabled = isReceiptParseAuditEnabled(env);
+    const auditEligible = !isReconciled;
+    const auditInvoked = auditEligible && auditEnabled;
+    logReceiptParseTiming(env, requestId, "deterministic_reconciliation", reconciliationStart, {
+      ...receiptSummaryMetadata(reconciledReceipt),
+      auditEligible,
+      auditEnabled,
+      auditInvoked,
+      reconciled: isReconciled
+    });
+    if (!auditInvoked) {
+      return receiptParseJsonResponse(env, requestId, reconciledReceipt, 200, totalStart, {
+        result: "success",
+        auditInvoked,
+        ...receiptSummaryMetadata(reconciledReceipt)
+      });
     }
 
-    const auditedReceipt = await auditReceiptIfNeeded(payload, reconciledReceipt, env, fetcher);
-    return jsonResponse(auditedReceipt);
-  } catch {
-    return jsonResponse(RECEIPT_PARSE_ERROR, 502);
+    const auditedReceipt = await auditReceiptIfNeeded(payload, reconciledReceipt, env, fetcher, requestId);
+    return receiptParseJsonResponse(env, requestId, auditedReceipt, 200, totalStart, {
+      result: "success",
+      auditInvoked: true,
+      ...receiptSummaryMetadata(auditedReceipt)
+    });
+  } catch (error) {
+    logReceiptParseTiming(env, requestId, "parse_exception", totalStart, {
+      errorType: error?.name || "Error"
+    }, true);
+    return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 502, totalStart, {
+      result: "exception"
+    });
+  }
+}
+
+function isReceiptParseAuditEnabled(env) {
+  return env.RECEIPT_PARSE_AUDIT === true || env.RECEIPT_PARSE_AUDIT === "true";
+}
+
+function receiptParseRequestId(request) {
+  const headerValue = request.headers.get("X-EvenUp-Request-Id");
+  if (typeof headerValue === "string" && /^[0-9A-Za-z._:-]{1,96}$/.test(headerValue)) {
+    return headerValue;
+  }
+
+  return `receipt-worker-${crypto.randomUUID()}`;
+}
+
+function receiptParseRequestMetadata(payload) {
+  const imageBase64 = typeof payload?.imageBase64 === "string" ? payload.imageBase64 : "";
+  const mimeType = typeof payload?.mimeType === "string" ? payload.mimeType : "unknown";
+  return {
+    imageBytes: imageBase64 ? estimateBase64ByteLength(imageBase64) : 0,
+    base64Length: imageBase64.length,
+    mimeType
+  };
+}
+
+function receiptSummaryMetadata(receipt) {
+  return {
+    itemCount: Array.isArray(receipt?.items) ? receipt.items.length : 0,
+    feeCount: Array.isArray(receipt?.fees) ? receipt.fees.length : 0,
+    warningCount: Array.isArray(receipt?.reviewWarnings) ? receipt.reviewWarnings.length : 0
+  };
+}
+
+function receiptParseJsonResponse(env, requestId, body, status, totalStart, metadata = {}) {
+  const responseStart = Date.now();
+  const response = jsonResponse(body, status);
+  logReceiptParseTiming(env, requestId, "final_response", responseStart, {
+    status,
+    ...metadata
+  }, status >= 400);
+  logReceiptParseTiming(env, requestId, "parse_total", totalStart, {
+    status,
+    ...metadata
+  }, status >= 400);
+  return response;
+}
+
+function logReceiptParseTiming(env, requestId, stage, startMs, metadata = {}, warning = false) {
+  const event = {
+    type: "receipt_parse_timing",
+    requestId,
+    stage,
+    durationMs: Math.max(0, Date.now() - startMs),
+    ...metadata
+  };
+
+  const logger = env.RECEIPT_PARSE_LOGGER;
+  if (logger && typeof logger.log === "function") {
+    logger.log(event);
+    return;
+  }
+
+  const message = JSON.stringify(event);
+  if (warning) {
+    console.warn(message);
+  } else {
+    console.log(message);
   }
 }
 
@@ -693,8 +845,9 @@ function isReceiptSubtotalReconciled(receipt) {
   );
 }
 
-async function auditReceiptIfNeeded(payload, receipt, env, fetcher) {
+async function auditReceiptIfNeeded(payload, receipt, env, fetcher, requestId) {
   try {
+    const auditRequestStart = Date.now();
     const response = await fetcher(OPENAI_RESPONSES_URL, {
       method: "POST",
       headers: {
@@ -703,24 +856,55 @@ async function auditReceiptIfNeeded(payload, receipt, env, fetcher) {
       },
       body: JSON.stringify(openAiReceiptAuditRequest(payload, receipt, env))
     });
+    logReceiptParseTiming(env, requestId, "audit_openai_request", auditRequestStart, {
+      status: response.status,
+      ok: response.ok
+    }, !response.ok);
 
+    const auditResponseJsonStart = Date.now();
     const responseJson = await response.json();
+    logReceiptParseTiming(env, requestId, "audit_response_json", auditResponseJsonStart, {
+      status: response.status,
+      ok: response.ok
+    }, !response.ok);
     if (!response.ok) {
       return receipt;
     }
 
+    const auditNormalizeStart = Date.now();
     const outputText = extractOpenAiOutputText(responseJson);
     if (!outputText) {
+      logReceiptParseTiming(env, requestId, "audit_response_normalize", auditNormalizeStart, {
+        valid: false,
+        reason: "missing_output_text"
+      }, true);
       return receipt;
     }
 
     const auditedReceipt = normalizeParsedReceipt(JSON.parse(outputText));
     if (!isValidParsedReceipt(auditedReceipt)) {
+      logReceiptParseTiming(env, requestId, "audit_response_normalize", auditNormalizeStart, {
+        ...receiptSummaryMetadata(auditedReceipt),
+        valid: false
+      }, true);
       return receipt;
     }
+    logReceiptParseTiming(env, requestId, "audit_response_normalize", auditNormalizeStart, {
+      ...receiptSummaryMetadata(auditedReceipt),
+      valid: true
+    });
 
-    return reconcileReceiptSubtotal(auditedReceipt);
-  } catch {
+    const auditReconciliationStart = Date.now();
+    const reconciledReceipt = reconcileReceiptSubtotal(auditedReceipt);
+    logReceiptParseTiming(env, requestId, "audit_reconciliation", auditReconciliationStart, {
+      ...receiptSummaryMetadata(reconciledReceipt),
+      reconciled: isReceiptSubtotalReconciled(reconciledReceipt)
+    });
+    return reconciledReceipt;
+  } catch (error) {
+    logReceiptParseTiming(env, requestId, "audit_exception", Date.now(), {
+      errorType: error?.name || "Error"
+    }, true);
     return receipt;
   }
 }

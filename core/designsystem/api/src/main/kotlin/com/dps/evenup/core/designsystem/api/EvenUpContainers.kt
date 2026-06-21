@@ -143,6 +143,7 @@ fun EvenUpBottomSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     title: String? = null,
+    headerAction: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (!visible) return
@@ -169,7 +170,18 @@ fun EvenUpBottomSheet(
             verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space16),
         ) {
             if (title != null) {
-                Text(text = title, style = EvenUpTheme.typography.sectionTitle)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = title,
+                        modifier = Modifier.weight(1f),
+                        style = EvenUpTheme.typography.sectionTitle,
+                    )
+                    headerAction?.invoke()
+                }
                 HorizontalDivider(color = EvenUpTheme.colors.divider)
             }
             content()
