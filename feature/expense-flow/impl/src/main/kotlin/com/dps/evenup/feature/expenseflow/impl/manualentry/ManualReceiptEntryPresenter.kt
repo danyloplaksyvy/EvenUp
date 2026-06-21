@@ -190,6 +190,7 @@ class ManualReceiptEntryPresenter(
             ReceiptValidationError.NonPositiveFeeAmount -> "fees" to "Fees must be positive."
             ReceiptValidationError.TotalMismatch -> "total" to "Total must equal items plus tax and tip."
             ReceiptValidationError.NegativeTotal -> "total" to "Total cannot be negative."
+            ReceiptValidationError.FutureDate -> "date" to "Date cannot be in the future."
         }
     }
 

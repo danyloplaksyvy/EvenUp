@@ -150,6 +150,7 @@ class WorkerExpenseRepositoryTest {
         override suspend fun postJson(
             path: String,
             body: String,
+            headers: Map<String, String>,
         ): WorkerApiResult {
             lastPath = path
             lastBody = body

@@ -4,6 +4,8 @@ import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptValidationError
 import com.dps.evenup.domain.receipt.api.ReceiptValidationResult
 import com.dps.evenup.domain.receipt.api.ValidateReceiptUseCase
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 class DefaultValidateReceiptUseCase : ValidateReceiptUseCase {
     override fun validate(receipt: Receipt): ReceiptValidationResult {
@@ -11,6 +13,7 @@ class DefaultValidateReceiptUseCase : ValidateReceiptUseCase {
             if (receipt.merchantName.isBlank()) add(ReceiptValidationError.BlankMerchantName)
             if (receipt.items.isEmpty()) add(ReceiptValidationError.NoItems)
             if (receipt.total.value < 0) add(ReceiptValidationError.NegativeTotal)
+            if (receipt.transactionDateLabel.isFutureIsoDate()) add(ReceiptValidationError.FutureDate)
 
             receipt.items.forEach { item ->
                 if (item.name.isBlank()) add(ReceiptValidationError.BlankItemName)
@@ -38,5 +41,14 @@ class DefaultValidateReceiptUseCase : ValidateReceiptUseCase {
         }
 
         return if (errors.isEmpty()) ReceiptValidationResult.Valid else ReceiptValidationResult(errors)
+    }
+
+    private fun String?.isFutureIsoDate(): Boolean {
+        if (isNullOrBlank()) return false
+        return try {
+            LocalDate.parse(trim()).isAfter(LocalDate.now())
+        } catch (_: DateTimeParseException) {
+            false
+        }
     }
 }

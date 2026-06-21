@@ -1,5 +1,6 @@
 package com.dps.evenup.data.receipt.impl
 
+import android.util.Log
 import com.dps.evenup.core.network.api.WorkerApiClient
 import com.dps.evenup.core.network.api.WorkerApiResult
 import com.dps.evenup.core.network.api.WorkerNetworkError
@@ -31,14 +32,122 @@ class WorkerReceiptRepository(
     },
 ) : ReceiptRepository {
     override suspend fun parseReceiptImage(request: ReceiptImageParseRequest): Receipt {
-        val requestBody = json.encodeToString(request.toDto())
-        val response = workerApiClient.postJson("/v1/receipts/parse", requestBody)
-        return when (response) {
-            is WorkerApiResult.Failure -> throw ReceiptDataException(
-                message = "Receipt parse request failed.",
-                reason = response.error.toReceiptFailureReason(),
+        val requestId = request.requestId ?: UNKNOWN_REQUEST_ID
+        val requestBody = timedStage(
+            requestId = requestId,
+            stage = "request_json",
+            metadata = listOf(
+                "imageBytes=${estimateBase64ByteLength(request.imageBase64)}",
+                "base64Length=${request.imageBase64.length}",
+                "mimeType=${request.mimeType}",
+            ),
+        ) {
+            json.encodeToString(request.toDto())
+        }
+        val response = timedStage(
+            requestId = requestId,
+            stage = "network_post",
+            metadata = listOf("requestBodyBytes=${requestBody.toByteArray(Charsets.UTF_8).size}"),
+        ) {
+            workerApiClient.postJson(
+                path = "/v1/receipts/parse",
+                body = requestBody,
+                headers = mapOf(REQUEST_ID_HEADER to requestId),
             )
-            is WorkerApiResult.Success -> mapReceipt(response.response.body)
+        }
+        return when (response) {
+            is WorkerApiResult.Failure -> {
+                logTiming(
+                    requestId = requestId,
+                    stage = "network_post_result",
+                    durationMs = 0L,
+                    metadata = response.error.safeMetadata(),
+                    warning = true,
+                )
+                throw ReceiptDataException(
+                    message = "Receipt parse request failed.",
+                    reason = response.error.toReceiptFailureReason(),
+                )
+            }
+            is WorkerApiResult.Success -> {
+                logTiming(
+                    requestId = requestId,
+                    stage = "network_post_result",
+                    durationMs = 0L,
+                    metadata = listOf(
+                        "status=${response.response.statusCode}",
+                        "responseBodyBytes=${response.response.body.toByteArray(Charsets.UTF_8).size}",
+                    ),
+                )
+                timedStage(
+                    requestId = requestId,
+                    stage = "response_mapping",
+                    metadata = listOf("status=${response.response.statusCode}"),
+                ) {
+                    mapReceipt(response.response.body).also { receipt ->
+                        logTiming(
+                            requestId = requestId,
+                            stage = "response_mapping_result",
+                            durationMs = 0L,
+                            metadata = listOf(
+                                "itemCount=${receipt.items.size}",
+                                "feeCount=${receipt.fees.size}",
+                                "warningCount=${receipt.parseMetadata.reviewWarnings.size}",
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend inline fun <T> timedStage(
+        requestId: String,
+        stage: String,
+        metadata: List<String> = emptyList(),
+        block: suspend () -> T,
+    ): T {
+        val start = System.nanoTime()
+        return try {
+            block()
+        } finally {
+            logTiming(
+                requestId = requestId,
+                stage = stage,
+                durationMs = elapsedMillis(start),
+                metadata = metadata,
+            )
+        }
+    }
+
+    private fun elapsedMillis(startNanos: Long): Long = (System.nanoTime() - startNanos) / 1_000_000
+
+    private fun logTiming(
+        requestId: String,
+        stage: String,
+        durationMs: Long,
+        metadata: List<String> = emptyList(),
+        warning: Boolean = false,
+    ) {
+        val message = buildString {
+            append("receipt_scan_timing requestId=")
+            append(requestId)
+            append(" stage=")
+            append(stage)
+            append(" durationMs=")
+            append(durationMs)
+            metadata.forEach { value ->
+                append(' ')
+                append(value)
+            }
+        }
+
+        runCatching {
+            if (warning) {
+                Log.w(TAG, message)
+            } else {
+                Log.i(TAG, message)
+            }
         }
     }
 
@@ -62,6 +171,22 @@ class WorkerReceiptRepository(
         localeHint = localeHint,
         currencyHint = currencyHint,
     )
+
+    private companion object {
+        const val TAG = "WorkerReceiptRepository"
+        const val UNKNOWN_REQUEST_ID = "unknown"
+        const val REQUEST_ID_HEADER = "X-EvenUp-Request-Id"
+    }
+}
+
+private fun estimateBase64ByteLength(value: String): Int {
+    val normalized = value.filterNot { character -> character.isWhitespace() }
+    val padding = when {
+        normalized.endsWith("==") -> 2
+        normalized.endsWith("=") -> 1
+        else -> 0
+    }
+    return ((normalized.length * 3) / 4 - padding).coerceAtLeast(0)
 }
 
 private fun WorkerNetworkError.toReceiptFailureReason(): ReceiptDataFailureReason = when (this) {
@@ -72,6 +197,19 @@ private fun WorkerNetworkError.toReceiptFailureReason(): ReceiptDataFailureReaso
     WorkerNetworkError.Timeout -> ReceiptDataFailureReason.Timeout
     is WorkerNetworkError.HttpFailure -> ReceiptDataFailureReason.ParseRejected
     WorkerNetworkError.Unknown -> ReceiptDataFailureReason.Unknown
+}
+
+private fun WorkerNetworkError.safeMetadata(): List<String> = when (this) {
+    WorkerNetworkError.ConnectionFailed -> listOf("error=ConnectionFailed")
+    WorkerNetworkError.InvalidBaseUrl -> listOf("error=InvalidBaseUrl")
+    WorkerNetworkError.InvalidPath -> listOf("error=InvalidPath")
+    WorkerNetworkError.Timeout -> listOf("error=Timeout")
+    is WorkerNetworkError.HttpFailure -> listOf(
+        "error=HttpFailure",
+        "status=$statusCode",
+        "responseBodyBytes=${body.toByteArray(Charsets.UTF_8).size}",
+    )
+    WorkerNetworkError.Unknown -> listOf("error=Unknown")
 }
 
 private fun ReceiptParseResponseDto.toDomain(): Receipt {

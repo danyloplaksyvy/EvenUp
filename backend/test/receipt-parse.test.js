@@ -35,15 +35,23 @@ const parsedReceipt = {
 
 test("POST /v1/receipts/parse calls OpenAI and returns strict receipt JSON", async () => {
   const calls = [];
+  const logger = testLogger();
   const response = await handleRequest(
-    jsonRequest("http://localhost/v1/receipts/parse", {
-      imageBase64: "ZmFrZS1pbWFnZQ==",
-      mimeType: "image/jpeg",
-      localeHint: "en",
-      currencyHint: "EUR"
-    }),
+    jsonRequest(
+      "http://localhost/v1/receipts/parse",
+      {
+        imageBase64: "ZmFrZS1pbWFnZQ==",
+        mimeType: "image/jpeg",
+        localeHint: "en",
+        currencyHint: "EUR"
+      },
+      {
+        "X-EvenUp-Request-Id": "receipt-scan-test"
+      }
+    ),
     {
       OPENAI_API_KEY: "test-key",
+      RECEIPT_PARSE_LOGGER: logger,
       OPENAI_FETCH: async (url, options) => {
         calls.push({ url, options });
         return Response.json({
@@ -62,6 +70,7 @@ test("POST /v1/receipts/parse calls OpenAI and returns strict receipt JSON", asy
   const requestBody = JSON.parse(calls[0].options.body);
   assert.equal(requestBody.text.format.name, "receipt_parse");
   assert.match(JSON.stringify(requestBody), /data:image\/jpeg;base64,ZmFrZS1pbWFnZQ==/);
+  assert.ok(logger.entries.every((entry) => entry.requestId === "receipt-scan-test"));
 });
 
 test("POST /v1/receipts/parse reconciles a single candidate against subtotal", async () => {
@@ -129,8 +138,9 @@ test("POST /v1/receipts/parse reconciles a single candidate against subtotal", a
   ]);
 });
 
-test("POST /v1/receipts/parse returns warning when mismatch remains unresolved", async () => {
+test("POST /v1/receipts/parse returns warning without audit by default when mismatch remains unresolved", async () => {
   const calls = [];
+  const logger = testLogger();
   const mismatchedReceipt = {
     ...parsedReceipt,
     subtotalMinor: 3500,
@@ -144,6 +154,7 @@ test("POST /v1/receipts/parse returns warning when mismatch remains unresolved",
     }),
     {
       OPENAI_API_KEY: "test-key",
+      RECEIPT_PARSE_LOGGER: logger,
       OPENAI_FETCH: async (url, options) => {
         calls.push(JSON.parse(options.body).text.format.name);
         return Response.json({
@@ -156,13 +167,29 @@ test("POST /v1/receipts/parse returns warning when mismatch remains unresolved",
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(calls.length, 2);
-  assert.deepEqual(calls, ["receipt_parse", "receipt_parse_audit"]);
+  assert.deepEqual(calls, ["receipt_parse"]);
+  assert.ok(logger.entries.every((entry) => entry.stage !== "audit_openai_request"));
+  assert.ok(
+    logger.entries.some(
+      (entry) =>
+        entry.stage === "deterministic_reconciliation" &&
+        entry.auditEligible === true &&
+        entry.auditEnabled === false &&
+        entry.auditInvoked === false
+    )
+  );
   assert.match(body.reviewWarnings[0], /does not match printed subtotal/);
 });
 
-test("POST /v1/receipts/parse uses auditor only when deterministic reconciliation fails", async () => {
+test("POST /v1/receipts/parse uses auditor for unresolved mismatch when explicitly enabled", async () => {
   const calls = [];
+  const logger = testLogger();
+  const mismatchedReceipt = {
+    ...parsedReceipt,
+    subtotalMinor: 3500,
+    totalMinor: 4100
+  };
+
   const response = await handleRequest(
     jsonRequest("http://localhost/v1/receipts/parse", {
       imageBase64: "ZmFrZS1pbWFnZQ==",
@@ -170,6 +197,46 @@ test("POST /v1/receipts/parse uses auditor only when deterministic reconciliatio
     }),
     {
       OPENAI_API_KEY: "test-key",
+      RECEIPT_PARSE_AUDIT: "true",
+      RECEIPT_PARSE_LOGGER: logger,
+      OPENAI_FETCH: async (url, options) => {
+        calls.push(JSON.parse(options.body).text.format.name);
+        return Response.json({
+          output_text: JSON.stringify(mismatchedReceipt)
+        });
+      }
+    }
+  );
+
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, ["receipt_parse", "receipt_parse_audit"]);
+  assert.ok(logger.entries.some((entry) => entry.stage === "audit_openai_request"));
+  assert.ok(
+    logger.entries.some(
+      (entry) =>
+        entry.stage === "deterministic_reconciliation" &&
+        entry.auditEligible === true &&
+        entry.auditEnabled === true &&
+        entry.auditInvoked === true
+    )
+  );
+  assert.match(body.reviewWarnings[0], /does not match printed subtotal/);
+});
+
+test("POST /v1/receipts/parse uses auditor only when deterministic reconciliation fails", async () => {
+  const calls = [];
+  const logger = testLogger();
+  const response = await handleRequest(
+    jsonRequest("http://localhost/v1/receipts/parse", {
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      mimeType: "image/jpeg"
+    }),
+    {
+      OPENAI_API_KEY: "test-key",
+      RECEIPT_PARSE_AUDIT: "true",
+      RECEIPT_PARSE_LOGGER: logger,
       OPENAI_FETCH: async (url, options) => {
         calls.push(JSON.parse(options.body).text.format.name);
         return Response.json({
@@ -181,6 +248,16 @@ test("POST /v1/receipts/parse uses auditor only when deterministic reconciliatio
 
   assert.equal(response.status, 200);
   assert.deepEqual(calls, ["receipt_parse"]);
+  assert.ok(logger.entries.every((entry) => entry.stage !== "audit_openai_request"));
+  assert.ok(
+    logger.entries.some(
+      (entry) =>
+        entry.stage === "deterministic_reconciliation" &&
+        entry.auditEligible === false &&
+        entry.auditEnabled === true &&
+        entry.auditInvoked === false
+    )
+  );
 });
 
 test("POST /v1/receipts/parse returns retry-friendly error for invalid request", async () => {
@@ -240,5 +317,13 @@ function item(name, quantity, totalPriceMinor, candidatesMinor, confidence, need
     confidence,
     candidatesMinor,
     needsReview
+  };
+}
+
+function testLogger() {
+  const entries = [];
+  return {
+    entries,
+    log: (entry) => entries.push(entry)
   };
 }

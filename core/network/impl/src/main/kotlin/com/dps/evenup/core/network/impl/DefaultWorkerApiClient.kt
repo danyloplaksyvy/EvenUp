@@ -29,16 +29,19 @@ class DefaultWorkerApiClient(
     override suspend fun postJson(
         path: String,
         body: String,
+        headers: Map<String, String>,
     ): WorkerApiResult = request(
         path = path,
         method = "POST",
         body = body,
+        headers = headers,
     )
 
     private suspend fun request(
         path: String,
         method: String,
         body: String?,
+        headers: Map<String, String> = emptyMap(),
     ): WorkerApiResult = withContext(ioDispatcher) {
         val url = buildUrl(path) ?: return@withContext WorkerApiResult.Failure(WorkerNetworkError.InvalidPath)
         val connection = try {
@@ -54,6 +57,9 @@ class DefaultWorkerApiClient(
             connection.connectTimeout = CONNECT_TIMEOUT_MILLIS
             connection.readTimeout = READ_TIMEOUT_MILLIS
             connection.setRequestProperty("Accept", "application/json")
+            headers.forEach { (name, value) ->
+                connection.setRequestProperty(name, value)
+            }
 
             if (body != null) {
                 val bytes = body.toByteArray(Charsets.UTF_8)

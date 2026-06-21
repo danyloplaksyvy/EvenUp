@@ -40,7 +40,7 @@ class ChoosePeoplePresenter(
             isLoading = false,
             participants = participants,
             payerId = payerId,
-            savedSuggestions = savedNames.toSuggestions(participants),
+            savedSuggestions = savedNames.toSuggestions(participants, query = ""),
         )
     }
 
@@ -50,7 +50,13 @@ class ChoosePeoplePresenter(
     ): ChoosePeopleUiState {
         val clearedState = state.copy(fieldErrors = emptyMap(), submitError = null)
         return when (event) {
-            is ChoosePeopleUiEvent.ParticipantNameInputChanged -> clearedState.copy(participantNameInput = event.value)
+            is ChoosePeopleUiEvent.ParticipantNameInputChanged -> {
+                val savedNames = savedParticipantRepository.getSavedParticipantNames().map { savedName -> savedName.value }
+                clearedState.copy(
+                    participantNameInput = event.value,
+                    savedSuggestions = savedNames.toSuggestions(clearedState.participants, query = event.value),
+                )
+            }
             ChoosePeopleUiEvent.AddParticipantClick -> addParticipantFromInput(clearedState)
             is ChoosePeopleUiEvent.AddSavedParticipantClick -> addParticipant(clearedState, event.name, isSavedLocalName = true)
             is ChoosePeopleUiEvent.DeleteSavedParticipantClick -> deleteSavedParticipant(clearedState, event.name)
@@ -121,7 +127,7 @@ class ChoosePeoplePresenter(
             participantNameInput = "",
             participants = participants,
             payerId = state.payerId ?: participant.id,
-            savedSuggestions = savedNames.toSuggestions(participants),
+            savedSuggestions = savedNames.toSuggestions(participants, query = ""),
         )
     }
 
@@ -134,7 +140,7 @@ class ChoosePeoplePresenter(
             savedParticipantRepository.deleteSavedParticipantName(SavedParticipantName(name))
         }
         val savedNames = savedParticipantRepository.getSavedParticipantNames().map { savedName -> savedName.value }
-        return state.copy(savedSuggestions = savedNames.toSuggestions(state.participants))
+        return state.copy(savedSuggestions = savedNames.toSuggestions(state.participants, query = state.participantNameInput))
     }
 
     private suspend fun removeParticipant(
@@ -151,18 +157,23 @@ class ChoosePeoplePresenter(
         return state.copy(
             participants = participants,
             payerId = payerId,
-            savedSuggestions = savedNames.toSuggestions(participants),
+            savedSuggestions = savedNames.toSuggestions(participants, query = state.participantNameInput),
         )
     }
 
     private fun List<String>.toSuggestions(
         participants: List<ChoosePeopleParticipantUiState>,
+        query: String,
     ): List<SavedParticipantSuggestionUiState> {
+        val normalizedQuery = query.trim()
         return map { name -> name.trim() }
             .filter { name -> name.isNotBlank() }
             .distinctBy { name -> name.lowercase() }
             .filterNot { name ->
                 participants.any { participant -> participant.name.equals(name, ignoreCase = true) }
+            }
+            .filter { name ->
+                normalizedQuery.isBlank() || name.contains(normalizedQuery, ignoreCase = true)
             }
             .mapIndexed { index, name ->
                 SavedParticipantSuggestionUiState(
