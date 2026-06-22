@@ -27,6 +27,7 @@ import com.dps.evenup.feature.expenseflow.impl.assignitems.AssignItemsRoute
 import com.dps.evenup.feature.expenseflow.impl.choosepeople.ChoosePeopleRoute
 import com.dps.evenup.feature.expenseflow.impl.expensesaved.ExpenseSavedRoute
 import com.dps.evenup.feature.expenseflow.impl.feesallocation.FeesAllocationRoute
+import com.dps.evenup.feature.expenseflow.impl.feesallocation.shouldShowFeesAllocation
 import com.dps.evenup.feature.expenseflow.impl.manualentry.ManualReceiptEntryRoute
 import com.dps.evenup.feature.expenseflow.impl.newexpense.NewExpenseRoute
 import com.dps.evenup.feature.expenseflow.impl.receiptscan.ReceiptScanRoute
@@ -107,7 +108,14 @@ object ExpenseFlowNavigationModule {
                     draftRepository = draftRepository,
                     validateItemAssignments = validateItemAssignments,
                     onBack = navigator::navigateBack,
-                    onContinue = { navigator.navigate(FeesAllocationDestination) },
+                    onContinue = {
+                        val draft = draftRepository.getDraft()
+                        if (shouldShowFeesAllocation(draft)) {
+                            navigator.navigate(FeesAllocationDestination)
+                        } else {
+                            navigator.navigate(ReviewExpenseDestination)
+                        }
+                    },
                 )
             }
             entry<FeesAllocationDestination> {
