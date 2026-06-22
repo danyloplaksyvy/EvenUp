@@ -44,6 +44,38 @@ class DefaultAllocateFeesUseCaseTest {
     }
 
     @Test
+    fun `proportional allocation distributes remainder cents to exact fee total`() {
+        val allocation = useCase.allocateProportional(
+            fee = fee(amount = 1_001),
+            participants = participants(),
+            itemAssignments = listOf(
+                assignment("item-1", "p1", 1_000),
+                assignment("item-2", "p2", 1_000),
+                assignment("item-3", "p3", 1_000),
+            ),
+        )
+
+        assertEquals(1_001, allocation.shares.sumOf { share -> share.amount.value })
+        assertEquals(MoneyMinor(334), allocation.shares[0].amount)
+        assertEquals(MoneyMinor(334), allocation.shares[1].amount)
+        assertEquals(MoneyMinor(333), allocation.shares[2].amount)
+    }
+
+    @Test
+    fun `proportional allocation falls back to equal shares when item subtotals are unavailable`() {
+        val allocation = useCase.allocateProportional(
+            fee = fee(amount = 1_001),
+            participants = participants(),
+            itemAssignments = emptyList(),
+        )
+
+        assertEquals(1_001, allocation.shares.sumOf { share -> share.amount.value })
+        assertEquals(MoneyMinor(334), allocation.shares[0].amount)
+        assertEquals(MoneyMinor(334), allocation.shares[1].amount)
+        assertEquals(MoneyMinor(333), allocation.shares[2].amount)
+    }
+
+    @Test
     fun `custom allocation validates exact totals`() {
         val result = useCase.validateCustom(
             fee = fee(amount = 300),

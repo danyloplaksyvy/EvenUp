@@ -17,7 +17,7 @@ fun AssignItemsRoute(
     draftRepository: ExpenseDraftRepository,
     validateItemAssignments: ValidateItemAssignmentsUseCase,
     onBack: () -> Boolean,
-    onContinue: () -> Unit,
+    onContinue: suspend () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val presenter = remember(draftRepository, validateItemAssignments) {

@@ -31,6 +31,11 @@ fun FeesAllocationRoute(
 
     LaunchedEffect(presenter) {
         uiState = try {
+            val draft = draftRepository.getDraft()
+            if (draft != null && !shouldShowFeesAllocation(draft)) {
+                onContinue()
+                return@LaunchedEffect
+            }
             presenter.load()
         } catch (_: RuntimeException) {
             FeesAllocationUiState(

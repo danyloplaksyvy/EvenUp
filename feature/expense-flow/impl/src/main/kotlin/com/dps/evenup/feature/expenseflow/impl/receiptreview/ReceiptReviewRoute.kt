@@ -73,6 +73,7 @@ fun ReceiptReviewRoute(
                                         isSaving = false,
                                         fieldErrors = result.fieldErrors,
                                         firstBlockingSection = result.firstBlockingSection,
+                                        firstBlockingItemId = result.firstBlockingItemId,
                                         validationRequestId = uiState.validationRequestId + 1,
                                     )
                                 }

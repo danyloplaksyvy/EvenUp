@@ -9,6 +9,20 @@ sealed interface AssignItemsUiEvent {
 
     data object ApplyEqualSplitClick : AssignItemsUiEvent
 
+    data object ApplyEqualSplitDismissed : AssignItemsUiEvent
+
+    data object ApplyEqualSplitConfirmed : AssignItemsUiEvent
+
+    data object ClearAssignmentsClick : AssignItemsUiEvent
+
+    data object ClearAssignmentsDismissed : AssignItemsUiEvent
+
+    data object ClearAssignmentsConfirmed : AssignItemsUiEvent
+
+    data object ClearAssignmentsUndoClick : AssignItemsUiEvent
+
+    data object ClearAssignmentsUndoDismissed : AssignItemsUiEvent
+
     data object SplitDismissed : AssignItemsUiEvent
 
     data class SplitModeSelected(val mode: AssignItemsSplitMode) : AssignItemsUiEvent

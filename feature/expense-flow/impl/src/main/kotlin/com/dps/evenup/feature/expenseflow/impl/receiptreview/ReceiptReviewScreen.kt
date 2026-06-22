@@ -59,12 +59,15 @@ import com.dps.evenup.core.designsystem.api.EvenUpMoneyField
 import com.dps.evenup.core.designsystem.api.EvenUpPrimaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpSecondaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextField
+import com.dps.evenup.core.designsystem.api.EvenUpTextButton
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
 import com.dps.evenup.core.designsystem.api.EvenUpValidationSeverity
 import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.CurrencySelector
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.ReceiptDatePickerField
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 @Composable
 fun ReceiptReviewScreen(
@@ -292,6 +295,7 @@ private fun ReceiptReviewDetailsCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReceiptReviewItemsCard(
     uiState: ReceiptReviewUiState,
@@ -308,12 +312,19 @@ private fun ReceiptReviewItemsCard(
                 EvenUpValidationMessage(message = error)
             }
             uiState.items.forEachIndexed { index, item ->
+                val itemRequester = remember(item.id) { BringIntoViewRequester() }
+                LaunchedEffect(uiState.validationRequestId, uiState.firstBlockingItemId) {
+                    if (uiState.firstBlockingItemId == item.id) {
+                        itemRequester.bringIntoView()
+                    }
+                }
                 ReceiptReviewItemRow(
                     item = item,
                     currencyCode = uiState.currencyCode,
                     hasError = uiState.fieldErrors.containsKey("item_name_${item.id}") ||
                         uiState.fieldErrors.containsKey("item_quantity_${item.id}") ||
                         uiState.fieldErrors.containsKey("item_amount_${item.id}"),
+                    modifier = Modifier.bringIntoViewRequester(itemRequester),
                     onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item(item.id))) },
                 )
                 if (index != uiState.items.lastIndex) {
@@ -333,17 +344,26 @@ private fun ReceiptReviewItemRow(
     item: ReceiptReviewItemUiState,
     currencyCode: String,
     hasError: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val rowShape = EvenUpTheme.shapes.input
-    val reviewDescription = item.reviewNote?.let { note -> "Needs review: $note. " }.orEmpty()
+    val suggestedNote = item.suggestedCorrectionNote(currencyCode)
+    val isHighlighted = item.needsReview || item.suggestedCorrection != null
+    val reviewDescription = suggestedNote?.let { note ->
+        if (item.suggestedCorrection != null) {
+            "Needs review: $note. "
+        } else {
+            "Needs review: $note. "
+        }
+    }.orEmpty()
     val quantityDetail = item.quantityDetail(currencyCode)
     val totalLabel = item.totalLabel(currencyCode)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(
-                if (item.needsReview) {
+                if (isHighlighted) {
                     Modifier
                         .background(EvenUpTheme.colors.warningContainer, rowShape)
                         .border(BorderStroke(1.dp, EvenUpTheme.colors.warning.copy(alpha = 0.28f)), rowShape)
@@ -382,7 +402,7 @@ private fun ReceiptReviewItemRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (item.needsReview && item.reviewNote != null) {
+            if (isHighlighted && suggestedNote != null) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
                     verticalAlignment = Alignment.CenterVertically,
@@ -394,7 +414,7 @@ private fun ReceiptReviewItemRow(
                         modifier = Modifier.size(14.dp),
                     )
                     Text(
-                        text = item.reviewNote,
+                        text = suggestedNote,
                         style = EvenUpTheme.typography.caption,
                         color = EvenUpTheme.colors.warning,
                         maxLines = 1,
@@ -561,9 +581,16 @@ private fun ReceiptReviewTotalsCard(
                         ReceiptReviewReconciliationType.ReviewItems -> {
                             onEvent(ReceiptReviewUiEvent.ReviewHighlightedItemsClick)
                         }
-                        ReceiptReviewReconciliationType.Mismatch,
-                        ReceiptReviewReconciliationType.MissingScannedTotal,
-                        -> onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.TotalCheck))
+                        ReceiptReviewReconciliationType.Mismatch -> {
+                            if (uiState.suspectedCorrectionCount > 0) {
+                                onEvent(ReceiptReviewUiEvent.ReviewHighlightedItemsClick)
+                            } else {
+                                onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.TotalCheck))
+                            }
+                        }
+                        ReceiptReviewReconciliationType.MissingScannedTotal -> {
+                            onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.TotalCheck))
+                        }
                         ReceiptReviewReconciliationType.Matched -> Unit
                     }
                 },
@@ -580,9 +607,16 @@ private fun ReceiptReviewSummaryStatus(
 ) {
     val clickAction = when (uiState.reconciliation.type) {
         ReceiptReviewReconciliationType.ReviewItems -> ({ onEvent(ReceiptReviewUiEvent.ReviewHighlightedItemsClick) })
-        ReceiptReviewReconciliationType.Mismatch,
-        ReceiptReviewReconciliationType.MissingScannedTotal,
-        -> ({ onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.TotalCheck)) })
+        ReceiptReviewReconciliationType.Mismatch -> {
+            if (uiState.suspectedCorrectionCount > 0) {
+                ({ onEvent(ReceiptReviewUiEvent.ReviewHighlightedItemsClick) })
+            } else {
+                ({ onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.TotalCheck)) })
+            }
+        }
+        ReceiptReviewReconciliationType.MissingScannedTotal -> {
+            ({ onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.TotalCheck)) })
+        }
         ReceiptReviewReconciliationType.Matched -> null
     }
     val modifier = if (clickAction == null) {
@@ -607,6 +641,16 @@ private fun ReceiptReviewSummaryStatus(
             EvenUpValidationSeverity.Success
         },
     )
+    uiState.reconciliation.suggestedCorrectionActionLabel?.let { label ->
+        EvenUpTextButton(
+            text = label,
+            onClick = { onEvent(ReceiptReviewUiEvent.ReviewHighlightedItemsClick) },
+            modifier = Modifier.semantics {
+                role = Role.Button
+                contentDescription = label
+            },
+        )
+    }
 }
 
 @Composable
@@ -945,6 +989,12 @@ private fun TotalCheckContent(
                 EvenUpValidationSeverity.Success
             },
         )
+        uiState.suggestedCorrectionActionLabel?.let { label ->
+            EvenUpSecondaryButton(
+                text = label,
+                onClick = { onEvent(ReceiptReviewUiEvent.ReviewHighlightedItemsClick) },
+            )
+        }
         if (uiState.unresolvedReviewItemCount > 0) {
             EvenUpSecondaryButton(
                 text = "Review highlighted items",
@@ -974,6 +1024,15 @@ private fun ItemEditContent(
     val showPriceEach = quantity > 1
     val currencySymbol = currencySymbol(currencyCode)
     val averagePriceNote = draft.averagePriceNote(currencyCode)
+    draft.suggestedCorrection?.let { correction ->
+        SuggestedItemCorrectionContent(
+            draft = draft,
+            correction = correction,
+            currencyCode = currencyCode,
+            onUseClick = { onEvent(ReceiptReviewUiEvent.UseSuggestedItemCorrectionClick) },
+            onKeepClick = { onEvent(ReceiptReviewUiEvent.EditDismissed) },
+        )
+    }
     draft.reviewNote?.let { note ->
         EvenUpValidationMessage(
             message = note,
@@ -1057,6 +1116,70 @@ private fun ItemEditContent(
                 text = error,
                 style = EvenUpTheme.typography.caption,
                 color = EvenUpTheme.colors.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestedItemCorrectionContent(
+    draft: ReceiptReviewEditDraft.Item,
+    correction: SuspectedItemCorrection,
+    currencyCode: String,
+    onUseClick: () -> Unit,
+    onKeepClick: () -> Unit,
+) {
+    val quantity = draft.quantity.toIntOrNull()?.coerceAtLeast(1) ?: 1
+    val currentTotal = formatCurrency(formatMoneyInput(correction.currentAmountMinor), currencyCode)
+    val suggestedTotal = formatCurrency(formatMoneyInput(correction.suggestedAmountMinor), currencyCode)
+    val currentLabel = if (quantity > 1) {
+        val currentEach = formatCurrency(formatAverageAmount(correction.currentAmountMinor, quantity), currencyCode)
+        "$currentTotal · $currentEach each"
+    } else {
+        currentTotal
+    }
+    val suggestedLabel = if (quantity > 1) {
+        val suggestedEach = formatCurrency(formatAverageAmount(correction.suggestedAmountMinor, quantity), currencyCode)
+        "$suggestedTotal · $suggestedEach each"
+    } else {
+        suggestedTotal
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "Suggested correction for ${draft.name.ifBlank { "item" }}. Current $currentLabel. Suggested $suggestedLabel."
+            },
+        shape = EvenUpTheme.shapes.input,
+        color = EvenUpTheme.colors.warningContainer,
+        contentColor = EvenUpTheme.colors.warning,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.warning.copy(alpha = 0.28f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(EvenUpTheme.spacing.space12),
+            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+        ) {
+            Text(
+                text = "This correction helps match the receipt total",
+                style = EvenUpTheme.typography.bodySmall,
+                color = EvenUpTheme.colors.warning,
+            )
+            SummaryRow(label = "Current item total", value = currentLabel)
+            SummaryRow(label = "Suggested from receipt", value = suggestedLabel)
+            EvenUpSecondaryButton(
+                text = "Use $suggestedTotal",
+                onClick = onUseClick,
+                modifier = Modifier.semantics {
+                    contentDescription = "Use suggested amount $suggestedTotal"
+                },
+            )
+            EvenUpTextButton(
+                text = "Keep $currentTotal",
+                onClick = onKeepClick,
+                modifier = Modifier.semantics {
+                    contentDescription = "Keep current amount $currentTotal"
+                },
             )
         }
     }
@@ -1229,6 +1352,13 @@ private fun currencySymbol(currencyCode: String): String = when (currencyCode.up
     "USD" -> "$"
     "GBP" -> "£"
     else -> currencyCode.uppercase()
+}
+
+private fun formatAverageAmount(
+    totalMinor: Long,
+    quantity: Int,
+): String {
+    return formatMoneyInput(BigDecimal(totalMinor).divide(BigDecimal(quantity.coerceAtLeast(1)), 2, RoundingMode.HALF_UP))
 }
 
 @Composable

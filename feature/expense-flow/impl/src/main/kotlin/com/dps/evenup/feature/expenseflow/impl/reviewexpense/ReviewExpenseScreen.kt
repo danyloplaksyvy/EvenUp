@@ -1,5 +1,6 @@
 package com.dps.evenup.feature.expenseflow.impl.reviewexpense
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,21 +8,31 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Calculate
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
+import com.dps.evenup.core.designsystem.api.EvenUpBottomSheet
 import com.dps.evenup.core.designsystem.api.EvenUpCard
 import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
@@ -41,6 +52,7 @@ fun ReviewExpenseScreen(
         title = "Review expense",
         onNavigationClick = { onEvent(ReviewExpenseUiEvent.BackClick) },
         modifier = modifier.fillMaxSize(),
+        showStickyNavigationButton = false,
         bottomBar = {
             if (!uiState.isLoading && !uiState.missingDraft) {
                 EvenUpBottomActionBar(
@@ -74,6 +86,7 @@ fun ReviewExpenseScreen(
             )
         }
     }
+    CalculationDetailsSheet(uiState = uiState, onEvent = onEvent)
 }
 
 @Composable
@@ -88,13 +101,14 @@ private fun ReviewExpenseContent(
             .verticalScroll(rememberScrollState())
             .padding(contentPadding)
             .padding(horizontal = EvenUpTheme.spacing.space20)
-            .padding(top = EvenUpTheme.spacing.space16, bottom = EvenUpTheme.spacing.space24),
-        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space24),
+            .padding(top = EvenUpTheme.spacing.space16, bottom = 112.dp),
+        verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space20),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ReviewHeader(uiState = uiState)
         SettlementSummary(uiState = uiState)
-        CalculationDetails(uiState = uiState, onEvent = onEvent)
+        PayerSummary(payerSummary = uiState.payerSummary)
+        CalculationDetailsLauncher(uiState = uiState, onEvent = onEvent)
         uiState.validationError?.let { error ->
             EvenUpValidationMessage(message = error)
         }
@@ -141,33 +155,49 @@ private fun ReviewHeader(uiState: ReviewExpenseUiState) {
             style = EvenUpTheme.typography.body,
             color = EvenUpTheme.colors.textSecondary,
             textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = uiState.totalLabel,
+            modifier = Modifier.semantics {
+                contentDescription = uiState.totalContentDescription
+            },
             style = EvenUpTheme.typography.displayLargeTotal,
             color = EvenUpTheme.colors.textPrimary,
             textAlign = TextAlign.Center,
         )
-        EvenUpCard {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = EvenUpTheme.shapes.input,
+            color = EvenUpTheme.colors.surface,
+            contentColor = EvenUpTheme.colors.textPrimary,
+            border = BorderStroke(1.dp, EvenUpTheme.colors.border),
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription = uiState.paidByContentDescription
+                    }
+                    .padding(
+                        horizontal = EvenUpTheme.spacing.space16,
+                        vertical = EvenUpTheme.spacing.space12,
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Paid by",
-                    style = EvenUpTheme.typography.caption,
-                    color = EvenUpTheme.colors.textSecondary,
-                )
                 EvenUpParticipantAvatar(
                     name = uiState.payerName,
                     colorIndex = uiState.payerColorIndex,
-                    modifier = Modifier.padding(horizontal = EvenUpTheme.spacing.space8),
                 )
                 Text(
-                    text = uiState.payerName,
-                    style = EvenUpTheme.typography.caption,
+                    text = "${uiState.paidByLabel} · ${uiState.participantCountLabel}",
+                    modifier = Modifier.weight(1f),
+                    style = EvenUpTheme.typography.bodyStrong,
                     color = EvenUpTheme.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -175,7 +205,7 @@ private fun ReviewHeader(uiState: ReviewExpenseUiState) {
 }
 
 @Composable
-private fun CalculationDetails(
+private fun CalculationDetailsLauncher(
     uiState: ReviewExpenseUiState,
     onEvent: (ReviewExpenseUiEvent) -> Unit,
 ) {
@@ -183,33 +213,85 @@ private fun CalculationDetails(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onEvent(ReviewExpenseUiEvent.CalculationDetailsToggled) },
+                .clickable { onEvent(ReviewExpenseUiEvent.CalculationDetailsClick) }
+                .semantics {
+                    role = Role.Button
+                    contentDescription = uiState.calculationDetailsContentDescription
+                },
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
+                modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Filled.Calculate,
                     contentDescription = null,
-                    tint = EvenUpTheme.colors.textSecondary,
+                    tint = EvenUpTheme.colors.textPrimary,
                 )
-                Text(
-                    text = "Calculation details",
-                    style = EvenUpTheme.typography.bodyStrong,
-                    color = EvenUpTheme.colors.textPrimary,
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
+                ) {
+                    Text(
+                        text = "Calculation details",
+                        style = EvenUpTheme.typography.bodyStrong,
+                        color = EvenUpTheme.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    uiState.balanceStatusLabel?.let { statusLabel ->
+                        Row(
+                            modifier = Modifier.semantics {
+                                contentDescription = uiState.balanceStatusContentDescription ?: statusLabel
+                            },
+                            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = EvenUpTheme.colors.success,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                text = statusLabel,
+                                style = EvenUpTheme.typography.caption,
+                                color = EvenUpTheme.colors.success,
+                            )
+                        }
+                    }
+                }
             }
             Icon(
-                imageVector = if (uiState.detailsExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = EvenUpTheme.colors.textSecondary,
             )
         }
-        if (uiState.detailsExpanded) {
-            HorizontalDivider(color = EvenUpTheme.colors.divider)
+    }
+}
+
+@Composable
+private fun CalculationDetailsSheet(
+    uiState: ReviewExpenseUiState,
+    onEvent: (ReviewExpenseUiEvent) -> Unit,
+) {
+    EvenUpBottomSheet(
+        visible = uiState.detailsSheetVisible,
+        onDismissRequest = { onEvent(ReviewExpenseUiEvent.CalculationDetailsDismissed) },
+        title = "Calculation details",
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = EvenUpTheme.spacing.space24),
+            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+        ) {
             uiState.detailRows.forEach { detail ->
                 ParticipantDetail(detail = detail)
             }
@@ -219,27 +301,46 @@ private fun CalculationDetails(
 
 @Composable
 private fun ParticipantDetail(detail: ParticipantCalculationDetailUiState) {
-    Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
-            verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = detail.contentDescription
+            },
+        shape = EvenUpTheme.shapes.input,
+        color = EvenUpTheme.colors.surface,
+        contentColor = EvenUpTheme.colors.textPrimary,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.border),
+    ) {
+        Column(
+            modifier = Modifier.padding(EvenUpTheme.spacing.space12),
+            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
         ) {
-            EvenUpParticipantAvatar(
-                name = detail.participantName,
-                colorIndex = detail.participantColorIndex,
-            )
-            Text(
-                text = detail.participantName,
-                style = EvenUpTheme.typography.bodyStrong,
-                color = EvenUpTheme.colors.textPrimary,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                EvenUpParticipantAvatar(
+                    name = detail.participantName,
+                    colorIndex = detail.participantColorIndex,
+                    modifier = Modifier.size(32.dp),
+                )
+                Text(
+                    text = detail.participantName,
+                    modifier = Modifier.weight(1f),
+                    style = EvenUpTheme.typography.bodyStrong,
+                    color = EvenUpTheme.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            DetailLine(label = "Items", value = detail.itemSubtotalLabel)
+            DetailLine(label = "Fees", value = detail.feesLabel)
+            DetailLine(label = "Share", value = detail.totalShareLabel)
+            DetailLine(label = "Paid", value = detail.amountPaidLabel)
+            DetailLine(label = "Result", value = detail.resultLabel)
         }
-        DetailLine(label = "Items", value = detail.itemSubtotalLabel)
-        DetailLine(label = "Fees", value = detail.feesLabel)
-        DetailLine(label = "Total share", value = detail.totalShareLabel)
-        DetailLine(label = "Amount paid", value = detail.amountPaidLabel)
-        DetailLine(label = "Net balance", value = detail.netBalanceLabel)
-        HorizontalDivider(color = EvenUpTheme.colors.divider)
     }
 }
 
@@ -255,13 +356,18 @@ private fun DetailLine(
     ) {
         Text(
             text = label,
+            modifier = Modifier.weight(1f),
             style = EvenUpTheme.typography.bodySmall,
             color = EvenUpTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = value,
             style = EvenUpTheme.typography.bodyStrong,
             color = EvenUpTheme.colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -270,39 +376,25 @@ private fun DetailLine(
 private fun SettlementSummary(uiState: ReviewExpenseUiState) {
     EvenUpCard {
         Text(
-            text = "Settlement Summary",
+            text = "To settle up",
             style = EvenUpTheme.typography.caption,
             color = EvenUpTheme.colors.textSecondary,
         )
         if (uiState.settlementRows.isEmpty()) {
             Text(
-                text = "No one owes anything.",
+                text = "No one needs to pay.",
                 modifier = Modifier.fillMaxWidth(),
                 style = EvenUpTheme.typography.body,
                 color = EvenUpTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
             )
         } else {
-            uiState.settlementRows.forEach { row ->
+            uiState.settlementRows.forEachIndexed { index, row ->
                 SettlementRow(row = row)
+                if (index < uiState.settlementRows.lastIndex) {
+                    HorizontalDivider(color = EvenUpTheme.colors.divider)
+                }
             }
-        }
-        HorizontalDivider(color = EvenUpTheme.colors.divider)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "${uiState.payerName}'s share",
-                style = EvenUpTheme.typography.bodyStrong,
-                color = EvenUpTheme.colors.textSecondary,
-            )
-            Text(
-                text = uiState.payerShareLabel,
-                style = EvenUpTheme.typography.moneyValue,
-                color = EvenUpTheme.colors.textSecondary,
-            )
         }
     }
 }
@@ -310,35 +402,95 @@ private fun SettlementSummary(uiState: ReviewExpenseUiState) {
 @Composable
 private fun SettlementRow(row: SettlementRowUiState) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = EvenUpTheme.spacing.space8)
+            .semantics {
+                contentDescription = row.contentDescription
+            },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             EvenUpParticipantAvatar(
                 name = row.fromParticipantName,
                 colorIndex = row.fromParticipantColorIndex,
+                modifier = Modifier.size(36.dp),
             )
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = row.fromParticipantName,
                     style = EvenUpTheme.typography.bodyStrong,
                     color = EvenUpTheme.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "owes ${row.toParticipantName}",
+                    text = row.actionLabel,
                     style = EvenUpTheme.typography.caption,
                     color = EvenUpTheme.colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
         Text(
             text = row.amountLabel,
-            style = EvenUpTheme.typography.moneyValue,
+            style = EvenUpTheme.typography.bodyStrong,
             color = EvenUpTheme.colors.textPrimary,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun PayerSummary(payerSummary: PayerSummaryUiState) {
+    EvenUpCard(
+        modifier = Modifier.semantics {
+            contentDescription = payerSummary.contentDescription
+        },
+    ) {
+        Text(
+            text = "Payer summary",
+            style = EvenUpTheme.typography.caption,
+            color = EvenUpTheme.colors.textSecondary,
+        )
+        payerSummary.rows.forEach { row ->
+            PayerSummaryRow(row = row)
+        }
+    }
+}
+
+@Composable
+private fun PayerSummaryRow(row: PayerSummaryRowUiState) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = row.contentDescription
+            },
+        horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = row.label,
+            modifier = Modifier.weight(1f),
+            style = if (row.emphasized) EvenUpTheme.typography.bodyStrong else EvenUpTheme.typography.bodySmall,
+            color = if (row.emphasized) EvenUpTheme.colors.textPrimary else EvenUpTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = row.valueLabel,
+            style = if (row.emphasized) EvenUpTheme.typography.bodyStrong else EvenUpTheme.typography.bodySmall,
+            color = EvenUpTheme.colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
         )
     }
 }

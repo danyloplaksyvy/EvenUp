@@ -8,6 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.expense.api.ExpenseDataException
 import com.dps.evenup.data.expense.api.ExpenseDataFailureReason
@@ -35,6 +37,7 @@ fun ReviewExpenseRoute(
         )
     }
     val coroutineScope = rememberCoroutineScope()
+    val hapticFeedback = LocalHapticFeedback.current
     var uiState by remember { mutableStateOf(ReviewExpenseUiState()) }
 
     fun saveExpense() {
@@ -43,6 +46,7 @@ fun ReviewExpenseRoute(
             uiState = try {
                 when (val result = presenter.saveDraft()) {
                     is SaveReviewExpenseResult.Saved -> {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSaved(result.shareUrl)
                         uiState.copy(isSaving = false)
                     }

@@ -19,28 +19,34 @@ import com.dps.evenup.domain.receipt.api.ReceiptItem
 import com.dps.evenup.domain.receipt.api.ReceiptItemId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AssignItemsPresenterTest {
     @Test
-    fun `direct item tap adds selected people to item`() = runBlocking {
+    fun `load auto selects first participant and uses receipt currency`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        val state = presenter.load()
+
+        assertEquals(listOf("p1"), state.selectedParticipantIds)
+        assertEquals(listOf(true, false), state.participants.map { participant -> participant.selected })
+        assertEquals("Assigning to John", state.helperText)
+        assertEquals("$10.00", state.subtotalLabel)
+        assertEquals("$5.00 each", state.items.single().unitPriceLabel)
+    }
+
+    @Test
+    fun `direct item tap assigns full item to one selected participant`() = runBlocking {
         val repository = FakeExpenseDraftRepository(draft())
         val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
 
         var state = presenter.load()
-        assertNull(state.selectedParticipantId)
-
-        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p1"))
         state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
+
         assertEquals(listOf("p1"), state.items.single().assignees.map { assignee -> assignee.participantId })
-
-        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
-        state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
-        assertEquals(listOf("p1", "p2"), state.items.single().assignees.map { assignee -> assignee.participantId })
-
-        state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
-        assertEquals(listOf("p1"), state.items.single().assignees.map { assignee -> assignee.participantId })
+        assertEquals("John", state.items.single().assignmentActionLabel)
+        assertEquals("All items assigned", state.feedback?.message)
 
         presenter.saveDraft(state)
 
@@ -51,24 +57,56 @@ class AssignItemsPresenterTest {
     }
 
     @Test
-    fun `direct item tap removes selected person when they are the only assignee`() = runBlocking {
+    fun `direct item tap with selected people matching quantity assigns by units`() = runBlocking {
         val repository = FakeExpenseDraftRepository(draft())
         val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
 
         var state = presenter.load()
-        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p1"))
-        state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
-        assertEquals(listOf("p1"), state.items.single().assignees.map { assignee -> assignee.participantId })
-
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
         state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
 
-        assertEquals(emptyList<String>(), state.items.single().assignees.map { assignee -> assignee.participantId })
-        assertEquals(AssignItemsItemState.Unassigned, state.items.single().assignmentState)
-        assertEquals(false, state.canContinue)
+        val item = state.items.single()
+        assertEquals(AssignItemsSplitMode.Units, item.splitMode)
+        assertEquals(listOf("p1", "p2"), item.assignees.map { assignee -> assignee.participantId })
+        assertEquals(listOf(1, 1), item.shares.map { share -> share.quantity })
+        assertEquals("John 1x · Amy 1x", item.assignmentActionLabel)
     }
 
     @Test
-    fun `direct tap on custom split opens split sheet instead of replacing assignment`() = runBlocking {
+    fun `direct item tap with multiple selected people and mismatched quantity assigns equal split`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft(quantity = 1))
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
+
+        val item = state.items.single()
+        assertEquals(AssignItemsSplitMode.SharedEqual, item.splitMode)
+        assertEquals(listOf("p1", "p2"), item.assignees.map { assignee -> assignee.participantId })
+        assertEquals("John + Amy · Equal", item.assignmentActionLabel)
+    }
+
+    @Test
+    fun `participant chips toggle multi selection and can deselect all manually`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        assertEquals(listOf("p1", "p2"), state.selectedParticipantIds)
+        assertEquals("Splitting between John and Amy", state.helperText)
+        assertEquals("Amy selected", state.feedback?.message)
+
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+
+        assertEquals(emptyList<String>(), state.selectedParticipantIds)
+        assertEquals("Select people, then tap items", state.helperText)
+    }
+
+    @Test
+    fun `direct tap replaces existing custom split for MVP`() = runBlocking {
         val repository = FakeExpenseDraftRepository(
             draft(
                 assignments = listOf(
@@ -86,31 +124,225 @@ class AssignItemsPresenterTest {
         val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
 
         var state = presenter.load()
-        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p1"))
         state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
 
-        assertEquals("item-1", state.splitSheet?.itemId)
-        assertEquals(AssignItemsSplitMode.CustomAmount, state.splitSheet?.mode)
-        assertEquals(listOf("p1", "p2"), state.items.single().assignees.map { assignee -> assignee.participantId })
+        assertEquals(null, state.splitSheet)
+        assertEquals(AssignItemsSplitMode.Units, state.items.single().splitMode)
+        assertEquals(listOf("p1"), state.items.single().assignees.map { assignee -> assignee.participantId })
     }
 
-    private fun draft(assignments: List<ItemAssignment> = emptyList()): ExpenseDraft = ExpenseDraft(
+    @Test
+    fun `clear assignments requires confirmation and keeps selected participant`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft(
+                assignments = listOf(
+                    ItemAssignment(
+                        receiptItemId = ReceiptItemId("item-1"),
+                        mode = ItemAssignmentMode.Full,
+                        shares = listOf(ItemParticipantShare(ParticipantId("p1"), MoneyMinor(1_000))),
+                    ),
+                ),
+            ),
+        )
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        assertEquals(true, state.canClearAssignments)
+
+        state = presenter.reduce(state, AssignItemsUiEvent.ClearAssignmentsClick)
+        assertEquals(true, state.showClearAssignmentsConfirmation)
+
+        state = presenter.reduce(state, AssignItemsUiEvent.ClearAssignmentsConfirmed)
+
+        assertEquals(false, state.showClearAssignmentsConfirmation)
+        assertEquals(listOf("p1"), state.selectedParticipantIds)
+        assertEquals(AssignItemsItemState.Unassigned, state.items.single().assignmentState)
+        assertEquals(false, state.canContinue)
+        assertEquals("Assignments cleared", state.feedback?.message)
+        assertEquals(true, state.clearUndoItems?.isNotEmpty())
+
+        state = presenter.reduce(state, AssignItemsUiEvent.ClearAssignmentsUndoClick)
+
+        assertEquals(null, state.clearUndoItems)
+        assertEquals(AssignItemsItemState.Assigned, state.items.single().assignmentState)
+        assertEquals(true, state.canContinue)
+        assertEquals("Assignments restored", state.feedback?.message)
+    }
+
+    @Test
+    fun `unit split cannot exceed item quantity from UI controls`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitQuantityChanged("p1", 1))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitQuantityChanged("p1", 1))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitQuantityChanged("p1", 1))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(2, sheet.rows.first { row -> row.participantId == "p1" }.quantity)
+        assertEquals("All units assigned", sheet.statusLabel)
+        assertEquals(null, sheet.error)
+    }
+
+    @Test
+    fun `split all equally confirms before replacing current assignments`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft(
+                assignments = listOf(
+                    ItemAssignment(
+                        receiptItemId = ReceiptItemId("item-1"),
+                        mode = ItemAssignmentMode.Full,
+                        shares = listOf(ItemParticipantShare(ParticipantId("p1"), MoneyMinor(1_000))),
+                    ),
+                ),
+            ),
+        )
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ApplyEqualSplitClick)
+        assertEquals(true, state.showEqualSplitConfirmation)
+
+        state = presenter.reduce(state, AssignItemsUiEvent.ApplyEqualSplitConfirmed)
+
+        assertEquals(false, state.showEqualSplitConfirmation)
+        assertEquals(AssignItemsSplitMode.SharedEqual, state.items.single().splitMode)
+        assertEquals(listOf("p1", "p2"), state.items.single().assignees.map { assignee -> assignee.participantId })
+        assertEquals(listOf(500L, 500L), state.items.single().shares.map { share -> share.amountMinor })
+    }
+
+    @Test
+    fun `split sheet preselects selected people as unit split when quantity matches`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(AssignItemsSplitMode.Units, sheet.mode)
+        assertEquals(listOf(1, 1), sheet.rows.map { row -> row.quantity })
+        assertEquals("All units assigned", sheet.statusLabel)
+        assertEquals(true, sheet.canSave)
+    }
+
+    @Test
+    fun `split sheet preselects selected people as equal split when quantity differs`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft(quantity = 1))
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(AssignItemsSplitMode.SharedEqual, sheet.mode)
+        assertEquals(listOf(true, true), sheet.rows.map { row -> row.included })
+        assertEquals(listOf("$5.00", "$5.00"), sheet.rows.map { row -> row.amountLabel })
+        assertEquals("2 people selected · $5.00 each", sheet.statusLabel)
+    }
+
+    @Test
+    fun `percentage mode autofills selected people and exposes amount labels`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.Percentage))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(AssignItemsSplitMode.Percentage, sheet.mode)
+        assertEquals(listOf("50", "50"), sheet.rows.map { row -> row.percentage })
+        assertEquals(listOf("$5.00", "$5.00"), sheet.rows.map { row -> row.amountLabel })
+        assertEquals("0% remaining", sheet.statusLabel)
+        assertEquals(true, sheet.canSave)
+    }
+
+    @Test
+    fun `amount mode autofills one remaining selected participant`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.CustomAmount))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitCustomAmountChanged("p1", "2.00"))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(listOf("2.00", "8.00"), sheet.rows.map { row -> row.amount })
+        assertEquals("$0.00 remaining", sheet.statusLabel)
+        assertEquals(true, sheet.canSave)
+    }
+
+    @Test
+    fun `assignment feedback scrolls to next unassigned item`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft(includeSecondItem = true))
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
+
+        assertEquals("Pizza assigned to John", state.feedback?.message)
+        assertEquals("item-2", state.scrollToItemId)
+        assertEquals(false, state.canContinue)
+    }
+
+    @Test
+    fun `split save emits all assigned feedback when it completes assignment`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitQuantityChanged("p1", 2))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitSaveClick)
+
+        assertEquals("All items assigned", state.feedback?.message)
+        assertEquals(true, state.canContinue)
+    }
+
+    private fun draft(
+        assignments: List<ItemAssignment> = emptyList(),
+        quantity: Int = 2,
+        includeSecondItem: Boolean = false,
+    ): ExpenseDraft = ExpenseDraft(
         id = ExpenseDraftId("draft-1"),
-        receipt = Receipt(
-            merchantName = "Cafe",
-            currencyCode = CurrencyCode("EUR"),
-            items = listOf(
+        receipt = run {
+            val items = listOf(
                 ReceiptItem(
                     id = ReceiptItemId("item-1"),
                     name = "Pizza",
-                    quantity = Quantity(2),
-                    unitPrice = MoneyMinor(500),
+                    quantity = Quantity(quantity),
+                    unitPrice = MoneyMinor(1_000L / quantity),
                     totalPrice = MoneyMinor(1_000),
                 ),
-            ),
-            fees = emptyList(),
-            total = MoneyMinor(1_000),
-        ),
+            ) + if (includeSecondItem) {
+                listOf(
+                    ReceiptItem(
+                        id = ReceiptItemId("item-2"),
+                        name = "Water",
+                        quantity = Quantity(1),
+                        unitPrice = MoneyMinor(300),
+                        totalPrice = MoneyMinor(300),
+                    ),
+                )
+            } else {
+                emptyList()
+            }
+            Receipt(
+                merchantName = "Cafe",
+                currencyCode = CurrencyCode("USD"),
+                items = items,
+                fees = emptyList(),
+                total = MoneyMinor(items.sumOf { item -> item.totalPrice.value }),
+            )
+        },
         participants = listOf(
             Participant(ParticipantId("p1"), "John", 0),
             Participant(ParticipantId("p2"), "Amy", 1),
