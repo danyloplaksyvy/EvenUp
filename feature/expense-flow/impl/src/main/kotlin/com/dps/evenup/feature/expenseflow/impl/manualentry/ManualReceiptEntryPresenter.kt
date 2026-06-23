@@ -187,8 +187,8 @@ class ManualReceiptEntryPresenter(
             ReceiptValidationError.NoItems -> "items" to "Add at least one item."
             ReceiptValidationError.BlankItemName -> "items" to "Each item needs a name."
             ReceiptValidationError.NonPositiveItemAmount -> "items" to "Each item needs a positive amount."
-            ReceiptValidationError.NonPositiveFeeAmount -> "fees" to "Fees must be positive."
-            ReceiptValidationError.TotalMismatch -> "total" to "Total must equal items plus tax and tip."
+            ReceiptValidationError.NonPositiveFeeAmount -> "fees" to "Review fee amounts."
+            ReceiptValidationError.TotalMismatch -> "total" to "Total must equal items plus fees."
             ReceiptValidationError.NegativeTotal -> "total" to "Total cannot be negative."
             ReceiptValidationError.FutureDate -> "date" to "Date cannot be in the future."
         }

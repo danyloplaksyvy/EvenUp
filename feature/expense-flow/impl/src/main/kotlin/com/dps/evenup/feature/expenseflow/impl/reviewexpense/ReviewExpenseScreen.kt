@@ -337,6 +337,9 @@ private fun ParticipantDetail(detail: ParticipantCalculationDetailUiState) {
             }
             DetailLine(label = "Items", value = detail.itemSubtotalLabel)
             DetailLine(label = "Fees", value = detail.feesLabel)
+            detail.discountsLabel?.let { discountsLabel ->
+                DetailLine(label = "Discounts", value = discountsLabel)
+            }
             DetailLine(label = "Share", value = detail.totalShareLabel)
             DetailLine(label = "Paid", value = detail.amountPaidLabel)
             DetailLine(label = "Result", value = detail.resultLabel)

@@ -6,6 +6,7 @@ import com.dps.evenup.domain.receipt.api.CurrencyCode
 import com.dps.evenup.domain.receipt.api.FeeId
 import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.MoneyMinor
+import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.Quantity
 import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptFee
@@ -22,6 +23,7 @@ import java.time.LocalDate
 
 class ReceiptReviewPresenter(
     private val draftRepository: ExpenseDraftRepository,
+    private val normalizeReceipt: NormalizeReceiptUseCase,
     private val validateReceipt: ValidateReceiptUseCase,
 ) {
     suspend fun load(): ReceiptReviewUiState {
@@ -31,7 +33,7 @@ class ReceiptReviewPresenter(
             submitError = "No receipt draft was found.",
         )
 
-        val receipt = draft.receipt
+        val receipt = normalizeReceipt.normalize(draft.receipt)
         receipt.logParseNotes()
         return ReceiptReviewUiState(
             isLoading = false,
@@ -71,7 +73,7 @@ class ReceiptReviewPresenter(
                     id = fee.id.value,
                     type = fee.type,
                     label = fee.label,
-                    amount = formatMoneyMinor(fee.amount),
+                    amount = formatMoneyMinor(MoneyMinor(kotlin.math.abs(fee.amount.value))),
                 )
             },
             parseCorrections = receipt.parseMetadata.corrections,
@@ -98,9 +100,12 @@ class ReceiptReviewPresenter(
                 firstBlockingItemId = null,
             )
             ReceiptReviewUiEvent.EditCommitClick -> commitEditDraft(clearedState)
-            ReceiptReviewUiEvent.StatusClick -> validateVisibleState(clearedState)
+            ReceiptReviewUiEvent.StatusClick -> openFirstIssue(clearedState)
+            is ReceiptReviewUiEvent.IssueSelected -> selectIssue(clearedState, event.issueId)
+            ReceiptReviewUiEvent.IssueNavigatorDismissed -> clearedState.copy(issueNavigatorVisible = false)
             ReceiptReviewUiEvent.ReviewHighlightedItemsClick -> clearedState.copy(
                 editDraft = null,
+                issueNavigatorVisible = false,
                 firstBlockingSection = if (state.firstSuggestedCorrectionItemId() != null || state.unresolvedReviewItemCount > 0) {
                     ReceiptReviewSection.Items
                 } else {
@@ -108,6 +113,12 @@ class ReceiptReviewPresenter(
                 },
                 firstBlockingItemId = state.firstSuggestedCorrectionItemId(),
                 validationRequestId = state.validationRequestId + 1,
+            )
+            ReceiptReviewUiEvent.UseReceiptTotalClick -> useReceiptTotal(clearedState)
+            ReceiptReviewUiEvent.KeepCalculatedTotalClick -> keepCalculatedTotal(clearedState)
+            ReceiptReviewUiEvent.EditReceiptTotalClick -> clearedState.copy(
+                editDraft = ReceiptReviewEditDraft.ReceiptTotal(clearedState.scannedReceiptTotalAmount),
+                issueNavigatorVisible = false,
             )
             is ReceiptReviewUiEvent.MerchantNameChanged -> clearedState.updateDraft {
                 when (this) {
@@ -202,6 +213,7 @@ class ReceiptReviewPresenter(
                 editDraft = state.editDraft.takeUnless { draft ->
                     draft is ReceiptReviewEditDraft.Item && draft.itemId == event.itemId
                 },
+                receiptTotalConfirmedByUser = false,
                 firstBlockingSection = null,
                 firstBlockingItemId = null,
             )
@@ -244,6 +256,7 @@ class ReceiptReviewPresenter(
                 editDraft = state.editDraft.takeUnless { draft ->
                     draft is ReceiptReviewEditDraft.Fee && draft.feeId == event.feeId
                 },
+                receiptTotalConfirmedByUser = false,
                 firstBlockingSection = null,
                 firstBlockingItemId = null,
             )
@@ -278,6 +291,10 @@ class ReceiptReviewPresenter(
                     isNew = false,
                     reviewNote = item.reviewNote,
                     suggestedCorrection = item.suggestedCorrection,
+                    initialName = item.name,
+                    initialQuantity = quantity.toString(),
+                    initialUnitPrice = unitPrice,
+                    initialLineTotal = item.amount,
                 )
             }
             is ReceiptReviewEditTarget.Fee -> fees.firstOrNull { fee -> fee.id == target.feeId }?.let { fee ->
@@ -295,6 +312,121 @@ class ReceiptReviewPresenter(
     private fun ReceiptReviewUiState.updateDraft(
         transform: ReceiptReviewEditDraft.() -> ReceiptReviewEditDraft,
     ): ReceiptReviewUiState = copy(editDraft = editDraft?.transform())
+
+    private fun openFirstIssue(state: ReceiptReviewUiState): ReceiptReviewUiState {
+        return when {
+            state.issues.size > 1 -> state.copy(issueNavigatorVisible = true)
+            state.issues.size == 1 -> selectIssue(state, state.issues.single().id)
+            else -> validateVisibleState(state)
+        }
+    }
+
+    private fun selectIssue(
+        state: ReceiptReviewUiState,
+        issueId: String,
+    ): ReceiptReviewUiState {
+        val issue = state.issues.firstOrNull { candidate -> candidate.id == issueId } ?: return state
+        return state.navigateToIssue(issue)
+    }
+
+    private fun ReceiptReviewUiState.navigateToIssue(issue: ReceiptReviewIssueUiState): ReceiptReviewUiState {
+        return when (val target = issue.target) {
+            is ReceiptReviewIssueTarget.Details -> copy(
+                issueNavigatorVisible = false,
+                editDraft = draftFor(target.editTarget),
+                firstBlockingSection = ReceiptReviewSection.Details,
+                firstBlockingItemId = null,
+                validationRequestId = validationRequestId + 1,
+            )
+            is ReceiptReviewIssueTarget.Item -> copy(
+                issueNavigatorVisible = false,
+                editDraft = draftFor(ReceiptReviewEditTarget.Item(target.itemId)),
+                firstBlockingSection = ReceiptReviewSection.Items,
+                firstBlockingItemId = target.itemId,
+                validationRequestId = validationRequestId + 1,
+            )
+            is ReceiptReviewIssueTarget.Summary -> copy(
+                issueNavigatorVisible = false,
+                editDraft = draftFor(target.editTarget),
+                firstBlockingSection = ReceiptReviewSection.Summary,
+                firstBlockingItemId = null,
+                validationRequestId = validationRequestId + 1,
+            )
+            ReceiptReviewIssueTarget.Adjustments -> copy(
+                issueNavigatorVisible = false,
+                firstBlockingSection = ReceiptReviewSection.Adjustments,
+                firstBlockingItemId = null,
+                validationRequestId = validationRequestId + 1,
+            )
+        }
+    }
+
+    private fun useReceiptTotal(state: ReceiptReviewUiState): ReceiptReviewUiState {
+        val receiptTotal = state.scannedReceiptTotalMinor ?: return state.copy(
+            fieldErrors = mapOf("summary" to "Enter the receipt total first."),
+        )
+        if (receiptTotal == state.calculatedTotalMinor) {
+            return state.copy(editDraft = null, receiptTotalConfirmedByUser = true)
+        }
+
+        val diagnosis = state.mismatchDiagnosis
+        if (diagnosis?.confidence == DiagnosisConfidence.High && diagnosis.suspectedCorrections.isNotEmpty()) {
+            val correctionsByItem = diagnosis.suspectedCorrections.associateBy { correction -> correction.itemId }
+            val correctedState = state.copy(
+                items = state.items.map { item ->
+                    val correction = correctionsByItem[item.id] ?: return@map item
+                    item.copy(
+                        amount = formatMoneyInput(correction.suggestedAmountMinor),
+                        unitPriceAmount = formatAverageUnitPrice(
+                            totalMinor = correction.suggestedAmountMinor,
+                            quantity = item.quantity.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+                        ),
+                        needsReview = false,
+                        reviewNote = null,
+                        reviewConfirmed = true,
+                        parseMetadata = item.parseMetadata.copy(candidates = emptyList(), needsReview = false),
+                    )
+                },
+                editDraft = null,
+                issueNavigatorVisible = false,
+                receiptTotalConfirmedByUser = true,
+            ).withMismatchDiagnosis()
+            if (correctedState.calculatedTotalMinor == receiptTotal) return correctedState
+        }
+
+        if (receiptTotal > state.calculatedTotalMinor) {
+            val adjustment = receiptTotal - state.calculatedTotalMinor
+            return state.copy(
+                fees = state.fees + ReceiptReviewFeeUiState(
+                    id = nextFeeId(state.fees),
+                    type = FeeType.Other,
+                    label = RECEIPT_TOTAL_ADJUSTMENT_LABEL,
+                    amount = formatMoneyInput(adjustment),
+                ),
+                editDraft = null,
+                issueNavigatorVisible = false,
+                receiptTotalConfirmedByUser = true,
+            ).withMismatchDiagnosis()
+        }
+
+        return state.copy(
+            fieldErrors = mapOf("summary" to "Review item amounts or edit the receipt total to resolve the difference."),
+            firstBlockingSection = ReceiptReviewSection.Summary,
+            firstBlockingItemId = null,
+            validationRequestId = state.validationRequestId + 1,
+        )
+    }
+
+    private fun keepCalculatedTotal(state: ReceiptReviewUiState): ReceiptReviewUiState {
+        return state.copy(
+            scannedReceiptTotalAmount = formatMoneyInput(state.calculatedTotalMinor),
+            receiptTotalConfirmedByUser = true,
+            editDraft = null,
+            issueNavigatorVisible = false,
+            firstBlockingSection = null,
+            firstBlockingItemId = null,
+        ).withMismatchDiagnosis()
+    }
 
     private fun ReceiptReviewEditDraft.recalculateMoneyForQuantityChange(): ReceiptReviewEditDraft {
         if (this !is ReceiptReviewEditDraft.Item) return this
@@ -345,7 +477,11 @@ class ReceiptReviewPresenter(
                 if (value.length != 3) {
                     state.copy(fieldErrors = mapOf("currency" to "Use a 3-letter code."))
                 } else {
-                    state.copy(currencyCode = value, editDraft = null)
+                    state.copy(
+                        currencyCode = value,
+                        currencyConfirmedByUser = true,
+                        editDraft = null,
+                    )
                 }
             }
             is ReceiptReviewEditDraft.ReceiptTotal -> {
@@ -353,7 +489,11 @@ class ReceiptReviewPresenter(
                 if (total == null || total.value <= 0) {
                     state.copy(fieldErrors = mapOf("summary" to "Enter a positive receipt total."))
                 } else {
-                    state.copy(scannedReceiptTotalAmount = formatMoneyMinor(total), editDraft = null)
+                    state.copy(
+                        scannedReceiptTotalAmount = formatMoneyMinor(total),
+                        receiptTotalConfirmedByUser = true,
+                        editDraft = null,
+                    )
                 }
             }
             ReceiptReviewEditDraft.TotalCheck -> state.copy(editDraft = null)
@@ -405,7 +545,11 @@ class ReceiptReviewPresenter(
         } else {
             state.items.map { existing -> if (existing.id == draft.itemId) item else existing }
         }
-        return state.copy(items = items, editDraft = null)
+        return state.copy(
+            items = items,
+            editDraft = null,
+            receiptTotalConfirmedByUser = if (draft.hasChanges) false else state.receiptTotalConfirmedByUser,
+        )
     }
 
     private fun commitFeeDraft(
@@ -421,7 +565,7 @@ class ReceiptReviewPresenter(
             feeDisplayLabel(draft.type)
         }
 
-        if (label.isBlank()) errors["fee_label_$fieldId"] = "Adjustment name is required."
+        if (label.isBlank()) errors["fee_label_$fieldId"] = "${draft.componentName()} name is required."
         if (amount == null || amount.value <= 0) errors["fee_amount_$fieldId"] = "Enter a positive amount."
         if (errors.isNotEmpty()) return state.copy(fieldErrors = errors)
 
@@ -436,7 +580,7 @@ class ReceiptReviewPresenter(
         } else {
             state.fees.map { existing -> if (existing.id == draft.feeId) fee else existing }
         }
-        return state.copy(fees = fees, editDraft = null)
+        return state.copy(fees = fees, editDraft = null, receiptTotalConfirmedByUser = false)
     }
 
     fun validateVisibleState(state: ReceiptReviewUiState): ReceiptReviewUiState {
@@ -469,7 +613,8 @@ class ReceiptReviewPresenter(
             is ReceiptReviewBuildResult.Valid -> receiptResult.receipt
         }
 
-        val validation = validateReceipt.validate(receipt)
+        val normalizedReceipt = normalizeReceipt.normalize(receipt)
+        val validation = validateReceipt.validate(normalizedReceipt)
         if (!validation.isValid) {
             return SaveReceiptReviewResult.Invalid(
                 fieldErrors = validation.errors.toFieldErrors(),
@@ -477,7 +622,7 @@ class ReceiptReviewPresenter(
             )
         }
 
-        draftRepository.saveDraft(existingDraft.copy(receipt = receipt))
+        draftRepository.saveDraft(existingDraft.copy(receipt = normalizedReceipt))
         return SaveReceiptReviewResult.Saved
     }
 
@@ -560,7 +705,7 @@ class ReceiptReviewPresenter(
             val label = if (fee.type == FeeType.Other) fee.label.trim() else fee.displayLabel
             val amount = parseMoneyMinor(fee.amount)
             if (label.isBlank()) {
-                addError("fee_label_${fee.id}", "Adjustment name is required.", ReceiptReviewSection.Adjustments)
+                addError("fee_label_${fee.id}", "${fee.componentName()} name is required.", ReceiptReviewSection.Adjustments)
             }
             if (amount == null || amount.value <= 0) {
                 addError("fee_amount_${fee.id}", "Enter a positive amount.", ReceiptReviewSection.Adjustments)
@@ -646,11 +791,12 @@ class ReceiptReviewPresenter(
             if (label.isBlank() || amount == null || amount.value <= 0) {
                 null
             } else {
+                val signedAmount = fee.signedAmountMinor ?: return@mapNotNull null
                 ReceiptFee(
                     id = FeeId(fee.id),
                     type = fee.type,
                     label = label,
-                    amount = amount,
+                    amount = MoneyMinor(signedAmount),
                 )
             }
         }
@@ -676,6 +822,15 @@ class ReceiptReviewPresenter(
             correction.field in confirmedItemCorrectionFields ||
                 correction.itemName?.trim()?.lowercase() in confirmedItemNames
         }
+        val remainingReviewWarnings = reviewWarnings.filter { warning ->
+            warning.shouldKeepReviewWarning(
+                currencyConfirmedByUser = currencyConfirmedByUser,
+                confirmedItemNames = confirmedItemNames,
+                hasUnresolvedReviewItems = unresolvedReviewItemCount > 0,
+                hasUnresolvedTotalIssue = reconciliation.type == ReceiptReviewReconciliationType.Mismatch ||
+                    reconciliation.type == ReceiptReviewReconciliationType.MissingScannedTotal,
+            )
+        }
 
         return ReceiptReviewBuildResult.Valid(
             Receipt(
@@ -684,11 +839,11 @@ class ReceiptReviewPresenter(
                 transactionDateLabel = receiptDate.ifBlank { null },
                 items = receiptItems,
                 fees = receiptFees,
-                total = MoneyMinor(calculatedTotalMinor),
+                total = requireNotNull(scannedReceiptTotal),
                 subtotal = subtotal,
                 parseMetadata = ReceiptParseMetadata(
                     corrections = remainingCorrections,
-                    reviewWarnings = reviewWarnings,
+                    reviewWarnings = remainingReviewWarnings,
                 ),
             ),
         )
@@ -700,7 +855,7 @@ class ReceiptReviewPresenter(
             ReceiptValidationError.NoItems -> "items" to "Add at least one item."
             ReceiptValidationError.BlankItemName -> "items" to "Each item needs a name."
             ReceiptValidationError.NonPositiveItemAmount -> "items" to "Each item needs a positive amount."
-            ReceiptValidationError.NonPositiveFeeAmount -> "fees" to "Fees must be positive."
+            ReceiptValidationError.NonPositiveFeeAmount -> "fees" to "Review fee and discount amounts."
             ReceiptValidationError.TotalMismatch -> "summary" to "Total must equal items plus fees."
             ReceiptValidationError.NegativeTotal -> "summary" to "Total cannot be negative."
             ReceiptValidationError.FutureDate -> "date" to FUTURE_DATE_ERROR
@@ -778,15 +933,15 @@ class ReceiptReviewPresenter(
         }
         return when {
             correction != null && correction.from.value != correction.to.value -> {
-                "Corrected from ${formatCurrency(formatMoneyMinor(correction.from), currencyCode)} · Check amount"
+                "Amount was corrected to match subtotal"
             }
-            correction != null -> "Amount corrected to match subtotal"
-            parseMetadata.candidates.distinct().size > 1 -> "Multiple amount candidates found"
+            correction != null -> "Amount was corrected to match subtotal"
+            parseMetadata.candidates.distinct().size > 1 -> "Check price from receipt"
             parseMetadata.confidence?.let { confidence -> confidence < LOW_CONFIDENCE_THRESHOLD } == true -> {
-                "Low scan confidence · Check amount"
+                "Low-confidence item name or amount"
             }
             itemWarning != null -> itemWarning
-            parseMetadata.needsReview -> "Check amount"
+            parseMetadata.needsReview -> "Check price from receipt"
             else -> null
         }
     }
@@ -799,11 +954,39 @@ class ReceiptReviewPresenter(
         }
     }
 
+    private fun String.shouldKeepReviewWarning(
+        currencyConfirmedByUser: Boolean,
+        confirmedItemNames: Set<String>,
+        hasUnresolvedReviewItems: Boolean,
+        hasUnresolvedTotalIssue: Boolean,
+    ): Boolean {
+        val normalized = trim().lowercase()
+        if (normalized.isBlank()) return false
+        if ("currency" in normalized) return !currencyConfirmedByUser
+        if (confirmedItemNames.any { itemName -> itemName in normalized }) return false
+        if (normalized.contains("subtotal") ||
+            normalized.contains("candidate") ||
+            normalized.contains("amount") ||
+            normalized.contains("price")
+        ) {
+            return hasUnresolvedReviewItems || hasUnresolvedTotalIssue
+        }
+        return true
+    }
+
     private fun ReceiptReviewItemUiState.isUnitPriceTrusted(): Boolean {
         val quantityValue = quantity.toIntOrNull() ?: return false
         val unitPrice = parseMoneyMinor(unitPriceAmount)?.value ?: return false
         val total = parseMoneyMinor(amount)?.value ?: return false
         return unitPrice * quantityValue == total
+    }
+
+    private fun ReceiptReviewEditDraft.Fee.componentName(): String {
+        return if (type == FeeType.Discount) "Discount" else "Fee"
+    }
+
+    private fun ReceiptReviewFeeUiState.componentName(): String {
+        return if (type == FeeType.Discount) "Discount" else "Fee"
     }
 
     private fun parseMoneyMinor(value: String): MoneyMinor? {
@@ -891,6 +1074,7 @@ class ReceiptReviewPresenter(
         const val MAX_QUANTITY = 999
         const val MONEY_DECIMAL_PLACES = 2
         const val FUTURE_DATE_ERROR = "Date cannot be in the future."
+        const val RECEIPT_TOTAL_ADJUSTMENT_LABEL = "Receipt total fee"
         const val LOW_CONFIDENCE_THRESHOLD = 0.75
         val ITEM_FIELD_INDEX = Regex("""items\[(\d+)]""")
     }

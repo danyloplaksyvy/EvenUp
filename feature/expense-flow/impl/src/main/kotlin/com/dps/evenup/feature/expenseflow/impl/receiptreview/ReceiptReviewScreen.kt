@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -48,7 +49,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
-import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpBottomSheet
 import com.dps.evenup.core.designsystem.api.EvenUpCard
 import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
@@ -170,6 +170,7 @@ private fun ReceiptReviewContent(
         }
     }
     ReceiptReviewEditSheet(uiState = uiState, onEvent = onEvent)
+    ReceiptReviewIssueNavigator(uiState = uiState, onEvent = onEvent)
 }
 
 @Composable
@@ -177,11 +178,33 @@ private fun ReceiptReviewBottomBar(
     uiState: ReceiptReviewUiState,
     onEvent: (ReceiptReviewUiEvent) -> Unit,
 ) {
-    EvenUpBottomActionBar(
-        primaryText = if (uiState.isSaving) "Saving..." else "Continue",
-        onPrimaryClick = { onEvent(ReceiptReviewUiEvent.ContinueClick) },
-        primaryEnabled = !uiState.isSaving,
-    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = EvenUpTheme.colors.background,
+        contentColor = EvenUpTheme.colors.textPrimary,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.divider),
+    ) {
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(EvenUpTheme.spacing.space16),
+            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+        ) {
+            if (!uiState.isSaving && !uiState.canContinue) {
+                uiState.continueBlockedMessage?.let { message ->
+                    EvenUpValidationMessage(
+                        message = message,
+                        severity = EvenUpValidationSeverity.Warning,
+                    )
+                }
+            }
+            EvenUpPrimaryButton(
+                text = if (uiState.isSaving) "Saving..." else "Continue",
+                onClick = { onEvent(ReceiptReviewUiEvent.ContinueClick) },
+                enabled = uiState.canContinue,
+            )
+        }
+    }
 }
 
 @Composable
@@ -194,7 +217,7 @@ private fun ReceiptReviewHeader(
         verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
     ) {
         Text(
-            text = uiState.summaryTotalLabel,
+            text = uiState.scannedReceiptTotalLabel ?: uiState.summaryTotalLabel,
             style = EvenUpTheme.typography.displayLargeTotal,
             color = EvenUpTheme.colors.textPrimary,
         )
@@ -222,7 +245,7 @@ private fun ReceiptReviewStatusMessage(
             .semantics {
                 if (isWarning) role = Role.Button
                 contentDescription = if (isWarning) {
-                    "Warning: ${uiState.statusLabel}"
+                    "Warning: ${uiState.statusAccessibilityLabel}"
                 } else {
                     uiState.statusLabel
                 }
@@ -278,7 +301,7 @@ private fun ReceiptReviewDetailsCard(
             HorizontalDivider(color = EvenUpTheme.colors.divider)
             ReviewValueRow(
                 label = "Date",
-                value = uiState.dateLabel.ifBlank { "Not set" },
+                value = uiState.dateDisplayLabel.ifBlank { "Not set" },
                 isError = uiState.fieldErrors.containsKey("date"),
                 supportingText = uiState.fieldErrors["date"],
                 onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Date)) },
@@ -287,8 +310,10 @@ private fun ReceiptReviewDetailsCard(
             ReviewValueRow(
                 label = "Currency",
                 value = uiState.currencyCode,
-                isError = uiState.fieldErrors.containsKey("currency"),
-                supportingText = uiState.fieldErrors["currency"],
+                isError = uiState.fieldErrors.containsKey("currency") ||
+                    uiState.issues.any { issue -> issue.kind == ReceiptReviewIssueKind.UncertainCurrency },
+                supportingText = uiState.fieldErrors["currency"]
+                    ?: uiState.issues.firstOrNull { issue -> issue.kind == ReceiptReviewIssueKind.UncertainCurrency }?.message,
                 onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Currency)) },
             )
         }
@@ -448,34 +473,61 @@ private fun ReceiptReviewAdjustmentsCard(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
     ) {
-        SectionHeader(title = "Adjustments", detail = uiState.adjustmentCountLabel)
+        SectionHeader(
+            title = if (uiState.additiveFees.isEmpty() && uiState.discounts.isNotEmpty()) "Discounts" else "Fees",
+            detail = if (uiState.additiveFees.isEmpty() && uiState.discounts.isNotEmpty()) {
+                uiState.discountCountLabel
+            } else {
+                uiState.feeCountLabel
+            },
+        )
         EvenUpCard {
             uiState.fieldErrors["fees"]?.let { error ->
                 EvenUpValidationMessage(message = error)
             }
-            if (uiState.fees.isEmpty()) {
+            if (uiState.additiveFees.isEmpty() && uiState.discounts.isEmpty()) {
                 Text(
-                    text = "No adjustments",
+                    text = "No fees or discounts",
                     style = EvenUpTheme.typography.bodySmall,
                     color = EvenUpTheme.colors.textSecondary,
                     textAlign = TextAlign.Start,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            uiState.fees.forEachIndexed { index, fee ->
-                ReceiptReviewAdjustmentRow(
+            uiState.additiveFees.forEachIndexed { index, fee ->
+                ReceiptReviewFeeRow(
                     fee = fee,
                     currencyCode = uiState.currencyCode,
                     hasError = uiState.fieldErrors.containsKey("fee_label_${fee.id}") ||
                         uiState.fieldErrors.containsKey("fee_amount_${fee.id}"),
                     onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Fee(fee.id))) },
                 )
-                if (index != uiState.fees.lastIndex) {
+                if (index != uiState.additiveFees.lastIndex || uiState.discounts.isNotEmpty()) {
+                    HorizontalDivider(color = EvenUpTheme.colors.divider)
+                }
+            }
+            if (uiState.discounts.isNotEmpty()) {
+                Text(
+                    text = "Discounts",
+                    style = EvenUpTheme.typography.caption,
+                    color = EvenUpTheme.colors.textSecondary,
+                    modifier = Modifier.padding(top = EvenUpTheme.spacing.space4),
+                )
+            }
+            uiState.discounts.forEachIndexed { index, fee ->
+                ReceiptReviewFeeRow(
+                    fee = fee,
+                    currencyCode = uiState.currencyCode,
+                    hasError = uiState.fieldErrors.containsKey("fee_label_${fee.id}") ||
+                        uiState.fieldErrors.containsKey("fee_amount_${fee.id}"),
+                    onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Fee(fee.id))) },
+                )
+                if (index != uiState.discounts.lastIndex) {
                     HorizontalDivider(color = EvenUpTheme.colors.divider)
                 }
             }
             SecondaryListActionRow(
-                text = "+ Add adjustment",
+                text = "+ Add fee",
                 onClick = { onEvent(ReceiptReviewUiEvent.AddFeeClick) },
             )
         }
@@ -483,7 +535,7 @@ private fun ReceiptReviewAdjustmentsCard(
 }
 
 @Composable
-private fun ReceiptReviewAdjustmentRow(
+private fun ReceiptReviewFeeRow(
     fee: ReceiptReviewFeeUiState,
     currencyCode: String,
     hasError: Boolean,
@@ -495,7 +547,7 @@ private fun ReceiptReviewAdjustmentRow(
             .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
-                contentDescription = "Edit ${fee.label.ifBlank { "adjustment" }}"
+                contentDescription = "Edit ${fee.label.ifBlank { if (fee.isDiscount) "discount" else "fee" }}"
             }
             .padding(vertical = EvenUpTheme.spacing.space8),
         horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
@@ -510,7 +562,7 @@ private fun ReceiptReviewAdjustmentRow(
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = formatCurrency(fee.amount, currencyCode),
+            text = fee.amountLabel(currencyCode),
             style = EvenUpTheme.typography.moneyValue,
             color = if (hasError) EvenUpTheme.colors.error else EvenUpTheme.colors.textPrimary,
             textAlign = TextAlign.End,
@@ -568,11 +620,17 @@ private fun ReceiptReviewTotalsCard(
         SectionHeader(title = "Summary", detail = uiState.summaryStatusLabel)
         EvenUpCard {
             SummaryRow(label = "Subtotal", value = uiState.derivedSubtotalLabel)
-            SummaryRow(label = "Adjustments", value = uiState.adjustmentsTotalLabel)
+            if (uiState.feeTotalMinor > 0L) {
+                SummaryRow(label = "Fees", value = uiState.feesTotalLabel)
+            }
+            if (uiState.discountTotalMinor > 0L) {
+                SummaryRow(label = "Discounts", value = uiState.discountsTotalLabel)
+            }
+            SummaryRow(label = "Calculated total", value = uiState.calculatedTotalLabel)
             HorizontalDivider(color = EvenUpTheme.colors.divider)
             SummaryActionRow(
-                label = "Total",
-                value = uiState.summaryTotalLabel,
+                label = "Receipt total",
+                value = uiState.scannedReceiptTotalLabel ?: "Not detected",
                 showChevron = uiState.reconciliation.isIssue,
                 isError = uiState.fieldErrors.containsKey("summary"),
                 supportingText = uiState.fieldErrors["summary"],
@@ -846,9 +904,109 @@ private fun ReceiptReviewEditSheet(
             null -> Unit
         }
         EvenUpPrimaryButton(
-            text = "Done",
+            text = editDraft.primaryActionLabel(),
             onClick = { onEvent(ReceiptReviewUiEvent.EditCommitClick) },
+            modifier = Modifier.semantics {
+                contentDescription = editDraft.primaryActionAccessibilityLabel()
+            },
         )
+    }
+}
+
+private fun ReceiptReviewEditDraft?.primaryActionLabel(): String = when (this) {
+    is ReceiptReviewEditDraft.Item -> primaryActionLabel
+    is ReceiptReviewEditDraft.Fee -> if (isNew) "Add fee" else "Save changes"
+    null -> "Done"
+    else -> "Save changes"
+}
+
+private fun ReceiptReviewEditDraft?.primaryActionAccessibilityLabel(): String = when (this) {
+    is ReceiptReviewEditDraft.Item -> when (primaryActionLabel) {
+        "Confirm amount" -> "Confirm amount for ${name.ifBlank { "item" }}"
+        "Add item" -> "Add item"
+        else -> "Save changes for ${name.ifBlank { "item" }}"
+    }
+    else -> primaryActionLabel()
+}
+
+@Composable
+private fun ReceiptReviewIssueNavigator(
+    uiState: ReceiptReviewUiState,
+    onEvent: (ReceiptReviewUiEvent) -> Unit,
+) {
+    EvenUpBottomSheet(
+        visible = uiState.issueNavigatorVisible,
+        onDismissRequest = { onEvent(ReceiptReviewUiEvent.IssueNavigatorDismissed) },
+        title = "Review issues",
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+        ) {
+            uiState.issues.forEach { issue ->
+                IssueNavigatorRow(
+                    issue = issue,
+                    onClick = { onEvent(ReceiptReviewUiEvent.IssueSelected(issue.id)) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun IssueNavigatorRow(
+    issue: ReceiptReviewIssueUiState,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = "${issue.accessibilityLabel} ${issue.actionLabel}"
+            },
+        shape = EvenUpTheme.shapes.input,
+        color = EvenUpTheme.colors.surfaceElevated,
+        contentColor = EvenUpTheme.colors.textPrimary,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.border),
+    ) {
+        Row(
+            modifier = Modifier.padding(EvenUpTheme.spacing.space12),
+            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ErrorOutline,
+                contentDescription = null,
+                tint = EvenUpTheme.colors.warning,
+                modifier = Modifier.size(20.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
+            ) {
+                Text(
+                    text = issue.title,
+                    style = EvenUpTheme.typography.body,
+                    color = EvenUpTheme.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = issue.message,
+                    style = EvenUpTheme.typography.caption,
+                    color = EvenUpTheme.colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = issue.actionLabel,
+                style = EvenUpTheme.typography.caption,
+                color = EvenUpTheme.colors.textPrimary,
+                textAlign = TextAlign.End,
+            )
+        }
     }
 }
 
@@ -859,7 +1017,11 @@ private fun editSheetTitle(draft: ReceiptReviewEditDraft?): String = when (draft
     is ReceiptReviewEditDraft.ReceiptTotal -> "Edit scanned total"
     ReceiptReviewEditDraft.TotalCheck -> "Total check"
     is ReceiptReviewEditDraft.Item -> if (draft.isNew) "Add item" else "Edit item"
-    is ReceiptReviewEditDraft.Fee -> if (draft.isNew) "Add adjustment" else "Edit adjustment"
+    is ReceiptReviewEditDraft.Fee -> when {
+        draft.isNew -> "Add fee"
+        draft.type == FeeType.Discount -> "Edit discount"
+        else -> "Edit fee"
+    }
     null -> ""
 }
 
@@ -888,7 +1050,7 @@ private fun EditSheetHeaderAction(
             val feeId = editDraft.feeId ?: return
             if (editDraft.isNew) return
             EvenUpIconButton(
-                contentDescription = "Delete adjustment",
+                contentDescription = if (editDraft.type == FeeType.Discount) "Delete discount" else "Delete fee",
                 onClick = { onEvent(ReceiptReviewUiEvent.RemoveFeeClick(feeId)) },
             ) {
                 Icon(
@@ -981,6 +1143,13 @@ private fun TotalCheckContent(
         uiState.reconciliation.differenceLabel?.let { difference ->
             SummaryRow(label = "Difference", value = difference)
         }
+        uiState.reconciliation.reason?.let { reason ->
+            Text(
+                text = reason,
+                style = EvenUpTheme.typography.bodySmall,
+                color = EvenUpTheme.colors.textSecondary,
+            )
+        }
         EvenUpValidationMessage(
             message = uiState.reconciliation.message,
             severity = if (uiState.reconciliation.isIssue) {
@@ -1005,8 +1174,25 @@ private fun TotalCheckContent(
             uiState.reconciliation.type == ReceiptReviewReconciliationType.MissingScannedTotal
         ) {
             EvenUpSecondaryButton(
-                text = if (uiState.scannedReceiptTotalLabel == null) "Enter scanned total" else "Edit scanned total",
-                onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.ReceiptTotal)) },
+                text = "Use receipt total",
+                onClick = { onEvent(ReceiptReviewUiEvent.UseReceiptTotalClick) },
+                modifier = Modifier.semantics {
+                    contentDescription = "Use receipt total and reconcile safe differences"
+                },
+            )
+            EvenUpSecondaryButton(
+                text = "Keep calculated total",
+                onClick = { onEvent(ReceiptReviewUiEvent.KeepCalculatedTotalClick) },
+                modifier = Modifier.semantics {
+                    contentDescription = "Keep calculated total as the confirmed receipt total"
+                },
+            )
+            EvenUpSecondaryButton(
+                text = if (uiState.scannedReceiptTotalLabel == null) "Enter manually" else "Edit manually",
+                onClick = { onEvent(ReceiptReviewUiEvent.EditReceiptTotalClick) },
+                modifier = Modifier.semantics {
+                    contentDescription = "Edit receipt total manually"
+                },
             )
         }
     }
@@ -1275,13 +1461,14 @@ private fun FeeEditContent(
     val fieldId = draft.feeId ?: "draft"
     FeeTypeSelector(
         selectedType = draft.type,
+        includeDiscount = draft.type == FeeType.Discount,
         onTypeSelected = { onEvent(ReceiptReviewUiEvent.FeeTypeChanged(it)) },
     )
-    if (draft.type == FeeType.Other) {
+    if (draft.type == FeeType.Other || draft.type == FeeType.Discount) {
         EvenUpTextField(
             value = draft.label,
             onValueChange = { onEvent(ReceiptReviewUiEvent.FeeLabelChanged(it)) },
-            label = "Adjustment name",
+            label = if (draft.type == FeeType.Discount) "Discount name" else "Fee name",
             isError = fieldErrors.containsKey("fee_label_$fieldId"),
             supportingText = fieldErrors["fee_label_$fieldId"],
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
@@ -1295,7 +1482,7 @@ private fun FeeEditContent(
         EvenUpMoneyField(
             value = draft.amount,
             onValueChange = { onEvent(ReceiptReviewUiEvent.FeeAmountChanged(it)) },
-            label = "Amount",
+            label = if (draft.type == FeeType.Discount) "Discount amount" else "Fee amount",
             modifier = Modifier.weight(1f),
             isError = fieldErrors.containsKey("fee_amount_$fieldId"),
             supportingText = fieldErrors["fee_amount_$fieldId"],
@@ -1306,11 +1493,12 @@ private fun FeeEditContent(
 @Composable
 private fun FeeTypeSelector(
     selectedType: FeeType,
+    includeDiscount: Boolean,
     onTypeSelected: (FeeType) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
         Text(
-            text = "Adjustment type",
+            text = "Fee type",
             style = EvenUpTheme.typography.bodySmall,
             color = EvenUpTheme.colors.textSecondary,
         )
@@ -1318,7 +1506,14 @@ private fun FeeTypeSelector(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
         ) {
-            listOf(FeeType.Tax, FeeType.Tip, FeeType.ServiceFee, FeeType.Other).forEach { type ->
+            val types = buildList {
+                add(FeeType.Tax)
+                add(FeeType.Tip)
+                add(FeeType.ServiceFee)
+                add(FeeType.Other)
+                if (includeDiscount) add(FeeType.Discount)
+            }
+            types.forEach { type ->
                 val selected = type == selectedType
                 Surface(
                     modifier = Modifier

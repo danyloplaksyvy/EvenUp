@@ -117,6 +117,27 @@ class ReceiptMismatchDiagnoserTest {
         assertEquals(SuspectedCorrectionReason.MultipleAmountCandidates, diagnosis?.suspectedCorrections?.single()?.reason)
     }
 
+    @Test
+    fun `generates exact correction from quantity line total mismatch`() {
+        val diagnosis = diagnose(
+            items = listOf(
+                item(
+                    id = "item-1",
+                    name = "Solomillo a la Sal",
+                    amountMinor = 2_200,
+                    quantity = 2,
+                ),
+            ),
+            scannedTotalMinor = 6_195,
+            calculatedTotalMinor = 3_995,
+        )
+
+        val correction = diagnosis?.suspectedCorrections?.single()
+        assertEquals(4_400L, correction?.suggestedAmountMinor)
+        assertEquals(SuspectedCorrectionReason.QuantityLineTotalMismatch, correction?.reason)
+        assertEquals(DiagnosisConfidence.High, correction?.confidence)
+    }
+
     private fun diagnose(
         items: List<ReceiptMismatchItem>,
         scannedTotalMinor: Long,
@@ -135,12 +156,14 @@ class ReceiptMismatchDiagnoserTest {
         id: String,
         name: String,
         amountMinor: Long,
+        quantity: Int = 1,
         parseMetadata: ReceiptItemParseMetadata = ReceiptItemParseMetadata(),
     ): ReceiptMismatchItem {
         return ReceiptMismatchItem(
             id = id,
             name = name,
             currentAmountMinor = amountMinor,
+            quantity = quantity,
             parseMetadata = parseMetadata,
         )
     }

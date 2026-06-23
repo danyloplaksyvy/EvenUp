@@ -11,7 +11,17 @@ sealed interface ReceiptReviewUiEvent {
 
     data object StatusClick : ReceiptReviewUiEvent
 
+    data class IssueSelected(val issueId: String) : ReceiptReviewUiEvent
+
+    data object IssueNavigatorDismissed : ReceiptReviewUiEvent
+
     data object ReviewHighlightedItemsClick : ReceiptReviewUiEvent
+
+    data object UseReceiptTotalClick : ReceiptReviewUiEvent
+
+    data object KeepCalculatedTotalClick : ReceiptReviewUiEvent
+
+    data object EditReceiptTotalClick : ReceiptReviewUiEvent
 
     data class MerchantNameChanged(val value: String) : ReceiptReviewUiEvent
 

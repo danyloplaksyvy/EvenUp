@@ -31,6 +31,7 @@ data class ParticipantExpenseSummary(
     val personShare: MoneyMinor,
     val amountPaid: MoneyMinor,
     val netBalance: MoneyMinor,
+    val discountCreditTotal: MoneyMinor = MoneyMinor.Zero,
 )
 
 data class SettlementRow(

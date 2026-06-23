@@ -54,6 +54,7 @@ data class ParticipantCalculationDetailUiState(
     val participantColorIndex: Int,
     val itemSubtotalLabel: String,
     val feesLabel: String,
+    val discountsLabel: String? = null,
     val totalShareLabel: String,
     val amountPaidLabel: String,
     val resultLabel: String,

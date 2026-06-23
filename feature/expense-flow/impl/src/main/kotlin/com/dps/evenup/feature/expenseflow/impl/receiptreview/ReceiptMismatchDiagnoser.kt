@@ -64,11 +64,14 @@ internal object ReceiptMismatchDiagnoser {
                     correction.to.value to SuspectedCorrectionReason.CorrectedToMatchSubtotal,
                 )
             }
+        val quantityCandidates = quantityLineTotalCandidates().map { candidate ->
+            candidate to SuspectedCorrectionReason.QuantityLineTotalMismatch
+        }
         val visualCandidates = visualDigitCandidates(currentAmountMinor).map { candidate ->
             candidate to SuspectedCorrectionReason.VisualDigitMismatch
         }
 
-        return (metadataCandidates + tiedCorrections + visualCandidates)
+        return (metadataCandidates + tiedCorrections + quantityCandidates + visualCandidates)
             .filter { (amount, _) -> amount > 0 && amount != currentAmountMinor }
             .map { (amount, reason) ->
                 CorrectionCandidate(
@@ -131,6 +134,13 @@ internal object ReceiptMismatchDiagnoser {
         }.distinct()
     }
 
+    private fun ReceiptMismatchItem.quantityLineTotalCandidates(): List<Long> {
+        if (quantity <= 1) return emptyList()
+        return listOf(currentAmountMinor * quantity)
+            .filter { candidate -> candidate > 0L }
+            .distinct()
+    }
+
     private fun ReceiptParseCorrection.matchesItem(
         index: Int,
         itemName: String,
@@ -159,6 +169,7 @@ internal data class ReceiptMismatchItem(
     val id: String,
     val name: String,
     val currentAmountMinor: Long,
+    val quantity: Int,
     val parseMetadata: ReceiptItemParseMetadata,
 )
 
@@ -188,6 +199,7 @@ enum class DiagnosisConfidence {
 
 enum class SuspectedCorrectionReason {
     CandidateAmountMatchesTotal,
+    QuantityLineTotalMismatch,
     VisualDigitMismatch,
     CorrectedToMatchSubtotal,
     LowScanConfidence,

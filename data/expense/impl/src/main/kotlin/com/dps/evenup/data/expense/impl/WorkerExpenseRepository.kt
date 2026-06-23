@@ -18,6 +18,7 @@ import com.dps.evenup.domain.expense.api.ItemParticipantShare
 import com.dps.evenup.domain.expense.api.ParticipantExpenseSummary
 import com.dps.evenup.domain.expense.api.SettlementRow
 import com.dps.evenup.domain.participant.api.Participant
+import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptFee
 import com.dps.evenup.domain.receipt.api.ReceiptItem
@@ -108,7 +109,7 @@ private fun ReceiptItem.toDto(): ReceiptItemDto = ReceiptItemDto(
 
 private fun ReceiptFee.toDto(): ReceiptFeeDto = ReceiptFeeDto(
     id = id.value,
-    type = type.name,
+    type = type.toWireType(),
     label = label,
     amountMinor = amount.value,
 )
@@ -154,10 +155,19 @@ private fun ParticipantExpenseSummary.toDto(): ParticipantExpenseSummaryDto = Pa
     participantId = participantId.value,
     assignedItemTotalMinor = assignedItemTotal.value,
     allocatedFeeTotalMinor = allocatedFeeTotal.value,
+    discountCreditTotalMinor = discountCreditTotal.value,
     shareMinor = personShare.value,
     paidMinor = amountPaid.value,
     netBalanceMinor = netBalance.value,
 )
+
+private fun FeeType.toWireType(): String = when (this) {
+    FeeType.Tax -> "TAX"
+    FeeType.Tip -> "TIP"
+    FeeType.ServiceFee -> "SERVICE_FEE"
+    FeeType.Discount -> "DISCOUNT"
+    FeeType.Other -> "OTHER"
+}
 
 private fun SettlementRow.toDto(): SettlementRowDto = SettlementRowDto(
     fromParticipantId = fromParticipantId.value,
@@ -253,6 +263,7 @@ private data class ParticipantExpenseSummaryDto(
     val participantId: String,
     val assignedItemTotalMinor: Long,
     val allocatedFeeTotalMinor: Long,
+    val discountCreditTotalMinor: Long,
     val shareMinor: Long,
     val paidMinor: Long,
     val netBalanceMinor: Long,

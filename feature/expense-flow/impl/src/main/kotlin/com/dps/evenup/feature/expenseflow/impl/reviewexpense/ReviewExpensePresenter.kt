@@ -134,6 +134,9 @@ class ReviewExpensePresenter(
                 val participant = participantsById[participantSummary.participantId] ?: return@mapNotNull null
                 val itemSubtotalLabel = formatMoney(participantSummary.assignedItemTotal, currencyCode)
                 val feesLabel = formatMoney(participantSummary.allocatedFeeTotal, currencyCode)
+                val discountsLabel = participantSummary.discountCreditTotal
+                    .takeIf { discount -> discount.value > 0L }
+                    ?.let { discount -> "-${formatMoney(discount, currencyCode)}" }
                 val totalShareLabel = formatMoney(participantSummary.personShare, currencyCode)
                 val amountPaidLabel = formatMoney(participantSummary.amountPaid, currencyCode)
                 val resultLabel = participantSummary.netBalance.toResultLabel(currencyCode)
@@ -143,6 +146,7 @@ class ReviewExpensePresenter(
                     participantColorIndex = participantColorIndexes.getValue(participant.id),
                     itemSubtotalLabel = itemSubtotalLabel,
                     feesLabel = feesLabel,
+                    discountsLabel = discountsLabel,
                     totalShareLabel = totalShareLabel,
                     amountPaidLabel = amountPaidLabel,
                     resultLabel = resultLabel,
@@ -305,6 +309,9 @@ class ReviewExpensePresenter(
         }
         return "${participant.name}, items ${spokenMoney(assignedItemTotal, currencyCode)}, " +
             "fees ${spokenMoney(allocatedFeeTotal, currencyCode)}, " +
+            discountCreditTotal.takeIf { discount -> discount.value > 0L }?.let { discount ->
+                "discounts ${spokenMoney(discount, currencyCode)}, "
+            }.orEmpty() +
             "total share ${spokenMoney(personShare, currencyCode)}, " +
             "paid ${spokenMoney(amountPaid, currencyCode)}, result $resultDescription."
     }

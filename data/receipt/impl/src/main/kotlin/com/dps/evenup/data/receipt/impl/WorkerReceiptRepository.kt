@@ -226,7 +226,7 @@ private fun ReceiptParseResponseDto.toDomain(): Receipt {
             reviewWarnings = reviewWarnings.map { warning -> warning.trim() }.filter { warning -> warning.isNotEmpty() },
         ),
     )
-    return receipt.reconcileSubtotalIfNeeded()
+    return receipt.sanitizeIncludedTaxFees().reconcileSubtotalIfNeeded()
 }
 
 private fun ReceiptItemDto.toDomain(index: Int): ReceiptItem {
@@ -264,6 +264,7 @@ private fun String.toFeeType(): FeeType = when (uppercase()) {
     "TAX" -> FeeType.Tax
     "TIP" -> FeeType.Tip
     "SERVICE_FEE" -> FeeType.ServiceFee
+    "DISCOUNT" -> FeeType.Discount
     else -> FeeType.Other
 }
 
@@ -325,11 +326,12 @@ private fun ReceiptParseCorrectionDto.toDomain(): ReceiptParseCorrection = Recei
 )
 
 private fun Receipt.reconcileSubtotalIfNeeded(): Receipt {
-    val subtotalValue = subtotal?.value ?: return this
     val itemSum = items.sumOf { item -> item.totalPrice.value }
-    if (itemSum == subtotalValue) return this
+    val feeSum = fees.sumOf { fee -> fee.amount.value }
+    val subtotalValue = subtotal?.value
+    if (subtotalValue != null && itemSum == subtotalValue && subtotalValue + feeSum == total.value) return this
 
-    val candidateCorrection = candidateCorrections(subtotalValue).singleOrNull() ?: return this
+    val candidateCorrection = candidateCorrections(itemSubtotalTargets()).singleOrNull() ?: return this
     val correctedItems = items.mapIndexed { index, item ->
         if (index == candidateCorrection.index) {
             val correctedTotal = MoneyMinor(candidateCorrection.toMinor)
@@ -348,39 +350,136 @@ private fun Receipt.reconcileSubtotalIfNeeded(): Receipt {
 
     return copy(
         items = correctedItems,
+        subtotal = MoneyMinor(candidateCorrection.targetSubtotal),
         parseMetadata = parseMetadata.copy(
             corrections = parseMetadata.corrections + ReceiptParseCorrection(
                 field = "items[${candidateCorrection.index}].totalPriceMinor",
                 itemName = candidateCorrection.itemName,
                 from = MoneyMinor(candidateCorrection.fromMinor),
                 to = MoneyMinor(candidateCorrection.toMinor),
-                reason = "Corrected locally to match printed subtotal; digit likely misread.",
+                reason = candidateCorrection.reason,
             ),
         ),
     )
 }
 
-private fun Receipt.candidateCorrections(subtotalValue: Long): List<SubtotalCorrectionCandidate> {
+private fun Receipt.sanitizeIncludedTaxFees(): Receipt {
+    val corrections = mutableListOf<ReceiptParseCorrection>()
+    val keptFees = fees.filterIndexed { index, fee ->
+        val shouldRemove = shouldRemoveIncludedTaxFee(fee = fee, feeIndex = index)
+        if (shouldRemove) {
+            corrections += ReceiptParseCorrection(
+                field = "fees[$index].amountMinor",
+                itemName = null,
+                from = fee.amount,
+                to = MoneyMinor(0),
+                reason = "Removed included VAT/tax duplicated from receipt total.",
+            )
+        }
+        !shouldRemove
+    }
+    if (corrections.isEmpty()) return this
+
+    return copy(
+        fees = keptFees,
+        parseMetadata = parseMetadata.copy(
+            corrections = parseMetadata.corrections + corrections,
+        ),
+    )
+}
+
+private fun Receipt.shouldRemoveIncludedTaxFee(
+    fee: ReceiptFee,
+    feeIndex: Int,
+): Boolean {
+    if (!fee.isTaxLike() || fee.amount.value <= 0L) return false
+    if (fee.label.isIncludedTaxLabel()) return true
+    if (fee.amount.value == total.value || fee.amount.value == subtotal?.value) return true
+
+    val feesWithoutCurrent = fees.filterIndexed { index, _ -> index != feeIndex }
+    return reconcilesWithFees(feesWithoutCurrent)
+}
+
+private fun Receipt.reconcilesWithFees(fees: List<ReceiptFee>): Boolean {
+    val itemSum = items.sumOf { item -> item.totalPrice.value }
+    val feeSum = fees.sumOf { fee -> fee.amount.value }
+    val subtotalValue = subtotal?.value
+    return if (subtotalValue != null) {
+        itemSum == subtotalValue && subtotalValue + feeSum == total.value
+    } else {
+        itemSum + feeSum == total.value
+    }
+}
+
+private fun ReceiptFee.isTaxLike(): Boolean {
+    val normalized = label.normalizedForTaxMatching()
+    return type == FeeType.Tax || normalized.split(" ").any { word -> word in taxLabelWords }
+}
+
+private fun String.isIncludedTaxLabel(): Boolean {
+    val normalized = normalizedForTaxMatching()
+    return includedTaxPhrases.any { phrase -> normalized.contains(phrase) }
+}
+
+private fun String.normalizedForTaxMatching(): String {
+    return lowercase()
+        .replace(".", " ")
+        .replace("-", " ")
+        .replace("_", " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+}
+
+private fun Receipt.itemSubtotalTargets(): List<Long> {
+    return listOfNotNull(
+        subtotal?.value,
+        total.value - fees.sumOf { fee -> fee.amount.value },
+    ).filter { target -> target > 0L }.distinct()
+}
+
+private fun Receipt.candidateCorrections(subtotalTargets: List<Long>): List<SubtotalCorrectionCandidate> {
     val itemSum = items.sumOf { item -> item.totalPrice.value }
     return items.flatMapIndexed { index, item ->
         val candidates = (item.parseMetadata.candidates.map { candidate -> candidate.value } +
+            item.quantityLineTotalCandidates() +
             visuallySimilarSingleDigitTotals(item.totalPrice.value))
             .distinct()
             .filter { candidate -> candidate > 0 && candidate != item.totalPrice.value }
 
-        candidates.mapNotNull { candidate ->
-            if (itemSum - item.totalPrice.value + candidate == subtotalValue) {
+        candidates.flatMap { candidate ->
+            subtotalTargets.mapNotNull { subtotalValue ->
+                if (itemSum - item.totalPrice.value + candidate != subtotalValue) return@mapNotNull null
                 SubtotalCorrectionCandidate(
                     index = index,
                     itemName = item.name,
                     fromMinor = item.totalPrice.value,
                     toMinor = candidate,
+                    targetSubtotal = subtotalValue,
+                    reason = correctionReason(item, candidate, subtotalValue),
                 )
-            } else {
-                null
             }
         }
-    }.distinct()
+    }.distinctBy { candidate -> candidate.index to candidate.toMinor }
+}
+
+private fun ReceiptItem.quantityLineTotalCandidates(): List<Long> {
+    val quantity = quantity.value
+    if (quantity <= 1) return emptyList()
+    return listOf(totalPrice.value * quantity, unitPrice.value * quantity)
+        .filter { candidate -> candidate > 0L }
+        .distinct()
+}
+
+private fun correctionReason(
+    item: ReceiptItem,
+    candidate: Long,
+    subtotalValue: Long,
+): String {
+    return if (candidate in item.quantityLineTotalCandidates()) {
+        "Corrected quantity line total to match expected item subtotal $subtotalValue; unit price was likely parsed as the line total."
+    } else {
+        "Corrected locally to match expected item subtotal $subtotalValue; digit likely misread."
+    }
 }
 
 private fun visuallySimilarSingleDigitTotals(value: Long): List<Long> {
@@ -409,6 +508,8 @@ private data class SubtotalCorrectionCandidate(
     val itemName: String,
     val fromMinor: Long,
     val toMinor: Long,
+    val targetSubtotal: Long,
+    val reason: String,
 )
 
 private val visuallySimilarDigits = mapOf(
@@ -418,4 +519,25 @@ private val visuallySimilarDigits = mapOf(
     '6' to listOf('0', '5', '8'),
     '8' to listOf('0', '3', '6', '9'),
     '9' to listOf('8'),
+)
+
+private val includedTaxPhrases = listOf(
+    "di cui iva",
+    "iva inclusa",
+    "vat included",
+    "incl vat",
+    "includes tax",
+    "tax included",
+    "mwst enthalten",
+    "tva incluse",
+    "iva incluido",
+)
+
+private val taxLabelWords = listOf(
+    "tax",
+    "vat",
+    "iva",
+    "gst",
+    "mwst",
+    "tva",
 )

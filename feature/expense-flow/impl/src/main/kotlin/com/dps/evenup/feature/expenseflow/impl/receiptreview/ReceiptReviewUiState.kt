@@ -6,7 +6,12 @@ import com.dps.evenup.domain.receipt.api.ReceiptParseCorrection
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeParseException
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 data class ReceiptReviewUiState(
     val isLoading: Boolean = true,
@@ -22,6 +27,9 @@ data class ReceiptReviewUiState(
     val reviewWarnings: List<String> = emptyList(),
     val reviewWarningCount: Int = 0,
     val uncertainItemCount: Int = 0,
+    val receiptTotalConfirmedByUser: Boolean = false,
+    val currencyConfirmedByUser: Boolean = false,
+    val issueNavigatorVisible: Boolean = false,
     val editDraft: ReceiptReviewEditDraft? = null,
     val fieldErrors: Map<String, String> = emptyMap(),
     val firstBlockingSection: ReceiptReviewSection? = null,
@@ -30,16 +38,25 @@ data class ReceiptReviewUiState(
     val submitError: String? = null,
 ) {
     val itemCountLabel: String = "${items.size} items"
-    val adjustmentCountLabel: String = when (fees.size) {
-        0 -> "No adjustments"
-        1 -> "1 adjustment"
-        else -> "${fees.size} adjustments"
+    val additiveFees: List<ReceiptReviewFeeUiState> = fees.filterNot { fee -> fee.isDiscount }
+    val discounts: List<ReceiptReviewFeeUiState> = fees.filter { fee -> fee.isDiscount }
+    val feeCountLabel: String = when (additiveFees.size) {
+        0 -> "No fees"
+        1 -> "1 fee"
+        else -> "${additiveFees.size} fees"
+    }
+    val discountCountLabel: String = when (discounts.size) {
+        0 -> "No discounts"
+        1 -> "1 discount"
+        else -> "${discounts.size} discounts"
     }
     val derivedSubtotalAmount: String = formatMoneyInput(itemSubtotalMinor)
-    val derivedAdjustmentsAmount: String = formatMoneyInput(adjustmentTotalMinor)
+    val derivedFeesAmount: String = formatMoneyInput(feeTotalMinor)
+    val derivedDiscountsAmount: String = formatMoneyInput(discountTotalMinor)
     val calculatedTotalAmount: String = formatMoneyInput(calculatedTotalMinor)
     val derivedSubtotalLabel: String = formatCurrency(derivedSubtotalAmount, currencyCode)
-    val adjustmentsTotalLabel: String = formatCurrency(derivedAdjustmentsAmount, currencyCode)
+    val feesTotalLabel: String = formatCurrency(derivedFeesAmount, currencyCode)
+    val discountsTotalLabel: String = "-${formatCurrency(derivedDiscountsAmount, currencyCode)}"
     val calculatedTotalLabel: String = formatCurrency(calculatedTotalAmount, currencyCode)
     val scannedReceiptTotalLabel: String? = scannedReceiptTotalAmount.takeIf { it.isNotBlank() }
         ?.let { amount -> formatCurrency(amount, currencyCode) }
@@ -50,33 +67,47 @@ data class ReceiptReviewUiState(
         "Review $count suggested ${if (count == 1) "correction" else "corrections"}"
     }
     val reconciliation: ReceiptReviewReconciliationUiState = buildReconciliation()
-    val summaryStatusLabel: String = if (reconciliation.isIssue || hasInvalidRequiredFields) {
-        "Needs review"
-    } else {
-        "Matches receipt"
+    val issues: List<ReceiptReviewIssueUiState> = buildIssues()
+    val blockingIssues: List<ReceiptReviewIssueUiState> = issues.filter { issue -> issue.severity == ReceiptReviewIssueSeverity.Blocking }
+    val firstIssue: ReceiptReviewIssueUiState? = blockingIssues.firstOrNull() ?: issues.firstOrNull()
+    val dateDisplayLabel: String = dateLabel.toReceiptDisplayDate()
+    val summaryStatusLabel: String = when {
+        reconciliation.type == ReceiptReviewReconciliationType.Mismatch -> "Total differs"
+        unresolvedReviewItemCount > 0 -> "Items need review"
+        hasInvalidRequiredFields -> "Needs review"
+        receiptTotalConfirmedByUser -> "Confirmed"
+        else -> "Ready"
     }
     val statusLabel: String = when {
-        reconciliation.type == ReceiptReviewReconciliationType.Mismatch && suspectedCorrectionCount > 0 -> {
-            "$suspectedCorrectionCount likely item ${if (suspectedCorrectionCount == 1) "error" else "errors"} found"
-        }
-        reconciliation.type == ReceiptReviewReconciliationType.Mismatch -> "Total differs · Review item amounts"
-        unresolvedReviewItemCount > 0 -> "$unresolvedReviewItemCount ${if (unresolvedReviewItemCount == 1) "item needs" else "items need"} review"
-        reconciliation.type == ReceiptReviewReconciliationType.MissingScannedTotal -> "Receipt total not detected"
-        reviewWarningCount > 0 -> "Review needed"
-        hasInvalidRequiredFields -> "Missing or uncertain fields"
-        else -> "AI found ${items.size} ${if (items.size == 1) "item" else "items"} · Matches scanned receipt"
+        blockingIssues.size > 1 -> "${blockingIssues.size} issues need review"
+        blockingIssues.size == 1 -> blockingIssues.single().title
+        issues.size > 1 -> "${issues.size} receipt notes to review"
+        issues.size == 1 -> issues.single().title
+        receiptTotalConfirmedByUser -> "Receipt total confirmed"
+        else -> "AI found ${items.size} ${if (items.size == 1) "item" else "items"} · Ready"
     }
-    val hasWarningStatus: Boolean = reconciliation.isIssue || unresolvedReviewItemCount > 0 ||
-        reviewWarningCount > 0 || hasInvalidRequiredFields || fieldErrors.isNotEmpty() || submitError != null
+    val statusAccessibilityLabel: String = firstIssue?.accessibilityLabel ?: statusLabel
+    val hasActiveWarningStatus: Boolean = issues.isNotEmpty() || fieldErrors.isNotEmpty() || submitError != null
+    val hasWarningStatus: Boolean = hasActiveWarningStatus
+    val canContinue: Boolean = !isSaving && blockingIssues.isEmpty()
+    val continueBlockedMessage: String? = blockingIssues.firstOrNull()?.let { issue ->
+        "Fix: ${issue.title}"
+    }
 
     val itemSubtotalMinor: Long
         get() = items.sumOf { item -> parseMoneyMinorValue(item.amount) ?: 0L }
 
     val adjustmentTotalMinor: Long
-        get() = fees.sumOf { fee -> parseMoneyMinorValue(fee.amount) ?: 0L }
+        get() = feeTotalMinor - discountTotalMinor
+
+    val feeTotalMinor: Long
+        get() = additiveFees.sumOf { fee -> fee.amountMinor ?: 0L }
+
+    val discountTotalMinor: Long
+        get() = discounts.sumOf { fee -> fee.amountMinor ?: 0L }
 
     val calculatedTotalMinor: Long
-        get() = itemSubtotalMinor + adjustmentTotalMinor
+        get() = itemSubtotalMinor + feeTotalMinor - discountTotalMinor
 
     val scannedReceiptTotalMinor: Long?
         get() = parseMoneyMinorValue(scannedReceiptTotalAmount)
@@ -91,7 +122,7 @@ data class ReceiptReviewUiState(
             item.name.isBlank() || item.quantity.toIntOrNull()?.let { it > 0 } != true ||
                 parseMoneyMinorValue(item.amount)?.let { it > 0 } != true
         } || fees.any { fee ->
-            fee.displayLabel.isBlank() || parseMoneyMinorValue(fee.amount)?.let { it > 0 } != true
+            !fee.hasValidAmount
         }
 
     private val hasInvalidRequiredFields: Boolean
@@ -100,7 +131,7 @@ data class ReceiptReviewUiState(
             item.name.isBlank() || item.quantity.toIntOrNull()?.let { it > 0 } != true ||
                 parseMoneyMinorValue(item.amount)?.let { it > 0 } != true
         } || fees.any { fee ->
-            fee.displayLabel.isBlank() || parseMoneyMinorValue(fee.amount)?.let { it > 0 } != true
+            !fee.hasValidAmount
         }
 
     private val hasFutureDate: Boolean
@@ -113,6 +144,7 @@ data class ReceiptReviewUiState(
                     id = item.id,
                     name = item.name,
                     currentAmountMinor = parseMoneyMinorValue(item.amount) ?: return@mapNotNull null,
+                    quantity = item.quantity.toIntOrNull()?.coerceAtLeast(1) ?: 1,
                     parseMetadata = item.parseMetadata,
                 )
             },
@@ -120,6 +152,10 @@ data class ReceiptReviewUiState(
             scannedTotalMinor = scannedReceiptTotalMinor,
             calculatedTotalMinor = calculatedTotalMinor,
         )
+    }
+
+    private fun firstSuggestedCorrectionItemId(): String? {
+        return items.firstOrNull { item -> item.suggestedCorrection != null }?.id
     }
 
     private fun buildReconciliation(): ReceiptReviewReconciliationUiState {
@@ -132,10 +168,13 @@ data class ReceiptReviewUiState(
             )
             total != calculatedTotalMinor -> {
                 val delta = total - calculatedTotalMinor
+                val direction = if (delta > 0) "higher than" else "lower than"
                 ReceiptReviewReconciliationUiState(
-                    message = "Receipt says ${formatCurrency(formatMoneyInput(total), currencyCode)} · Difference ${formatCurrency(formatMoneyInput(kotlin.math.abs(delta)), currencyCode)}",
+                    message = "Total differs by ${formatCurrency(formatMoneyInput(kotlin.math.abs(delta)), currencyCode)}",
                     isIssue = true,
                     type = ReceiptReviewReconciliationType.Mismatch,
+                    detail = "Receipt total is ${formatCurrency(formatMoneyInput(total), currencyCode)} · Calculated total is ${formatCurrency(formatMoneyInput(calculatedTotalMinor), currencyCode)}",
+                    reason = "Calculated total is ${formatCurrency(formatMoneyInput(kotlin.math.abs(delta)), currencyCode)} $direction the receipt total.",
                     scannedReceiptTotalLabel = formatCurrency(formatMoneyInput(total), currencyCode),
                     differenceLabel = formatCurrency(formatMoneyInput(kotlin.math.abs(delta)), currencyCode),
                     suggestedCorrectionActionLabel = suggestedCorrectionActionLabel,
@@ -147,13 +186,229 @@ data class ReceiptReviewUiState(
                 type = ReceiptReviewReconciliationType.ReviewItems,
             )
             else -> ReceiptReviewReconciliationUiState(
-                message = "Matches scanned receipt",
+                message = if (receiptTotalConfirmedByUser) "Receipt total confirmed" else "Matches scanned receipt",
                 isIssue = false,
                 type = ReceiptReviewReconciliationType.Matched,
                 scannedReceiptTotalLabel = formatCurrency(formatMoneyInput(total), currencyCode),
             )
         }
     }
+
+    private fun buildIssues(): List<ReceiptReviewIssueUiState> = buildList {
+        if (merchantName.isBlank()) {
+            add(
+                ReceiptReviewIssueUiState(
+                    id = "merchant",
+                    kind = ReceiptReviewIssueKind.MissingMerchant,
+                    severity = ReceiptReviewIssueSeverity.Blocking,
+                    target = ReceiptReviewIssueTarget.Details(ReceiptReviewEditTarget.Merchant),
+                    title = "Merchant is required",
+                    message = "Add the merchant name before continuing.",
+                    actionLabel = "Edit merchant",
+                    accessibilityLabel = "Merchant is required. Edit merchant.",
+                ),
+            )
+        }
+
+        val parsedDate = dateLabel.toLocalDateOrNull()
+        when {
+            dateLabel.isBlank() -> add(
+                ReceiptReviewIssueUiState(
+                    id = "missing_date",
+                    kind = ReceiptReviewIssueKind.MissingDate,
+                    severity = ReceiptReviewIssueSeverity.Warning,
+                    target = ReceiptReviewIssueTarget.Details(ReceiptReviewEditTarget.Date),
+                    title = "Receipt date missing",
+                    message = "Add a date if it is visible on the receipt.",
+                    actionLabel = "Edit date",
+                    accessibilityLabel = "Receipt date is missing. Edit date.",
+                ),
+            )
+            parsedDate == null -> add(
+                ReceiptReviewIssueUiState(
+                    id = "invalid_date",
+                    kind = ReceiptReviewIssueKind.InvalidDate,
+                    severity = ReceiptReviewIssueSeverity.Blocking,
+                    target = ReceiptReviewIssueTarget.Details(ReceiptReviewEditTarget.Date),
+                    title = "Date needs review",
+                    message = "Use a valid receipt date.",
+                    actionLabel = "Edit date",
+                    accessibilityLabel = "Date needs review. Edit date.",
+                ),
+            )
+            parsedDate.isAfter(LocalDate.now()) -> add(
+                ReceiptReviewIssueUiState(
+                    id = "future_date",
+                    kind = ReceiptReviewIssueKind.FutureDate,
+                    severity = ReceiptReviewIssueSeverity.Blocking,
+                    target = ReceiptReviewIssueTarget.Details(ReceiptReviewEditTarget.Date),
+                    title = "Date cannot be in the future",
+                    message = "Choose a receipt date that is today or earlier.",
+                    actionLabel = "Edit date",
+                    accessibilityLabel = "Date cannot be in the future. Edit date.",
+                ),
+            )
+        }
+
+        if (currencyCode.trim().length != 3) {
+            add(
+                ReceiptReviewIssueUiState(
+                    id = "currency_invalid",
+                    kind = ReceiptReviewIssueKind.InvalidCurrency,
+                    severity = ReceiptReviewIssueSeverity.Blocking,
+                    target = ReceiptReviewIssueTarget.Details(ReceiptReviewEditTarget.Currency),
+                    title = "Currency needs review",
+                    message = "Choose the receipt currency before continuing.",
+                    actionLabel = "Edit currency",
+                    accessibilityLabel = "Currency needs review. Edit currency.",
+                ),
+            )
+        } else if (!currencyConfirmedByUser && reviewWarnings.any { warning -> warning.contains("currency", ignoreCase = true) }) {
+            add(
+                ReceiptReviewIssueUiState(
+                    id = "currency_uncertain",
+                    kind = ReceiptReviewIssueKind.UncertainCurrency,
+                    severity = ReceiptReviewIssueSeverity.Warning,
+                    target = ReceiptReviewIssueTarget.Details(ReceiptReviewEditTarget.Currency),
+                    title = "Check receipt currency",
+                    message = "The scan was not fully certain about the currency.",
+                    actionLabel = "Review currency",
+                    accessibilityLabel = "Check receipt currency. Review currency.",
+                ),
+            )
+        }
+
+        when (reconciliation.type) {
+            ReceiptReviewReconciliationType.Mismatch -> add(
+                ReceiptReviewIssueUiState(
+                    id = "total_mismatch",
+                    kind = ReceiptReviewIssueKind.TotalMismatch,
+                    severity = ReceiptReviewIssueSeverity.Blocking,
+                    target = firstSuggestedCorrectionItemId()?.let { itemId ->
+                        ReceiptReviewIssueTarget.Item(itemId)
+                    } ?: ReceiptReviewIssueTarget.Summary(ReceiptReviewEditTarget.TotalCheck),
+                    title = if (suspectedCorrectionCount > 0) {
+                        "$suspectedCorrectionCount likely item ${if (suspectedCorrectionCount == 1) "error" else "errors"} found"
+                    } else {
+                        "Total differs by ${reconciliation.differenceLabel.orEmpty()}"
+                    },
+                    message = reconciliation.detail ?: reconciliation.message,
+                    actionLabel = if (suspectedCorrectionCount > 0) "Review item amounts" else "Review total",
+                    accessibilityLabel = "${reconciliation.message}. ${if (suspectedCorrectionCount > 0) "Review item amounts." else "Review total."}",
+                ),
+            )
+            ReceiptReviewReconciliationType.MissingScannedTotal -> add(
+                ReceiptReviewIssueUiState(
+                    id = "total_missing",
+                    kind = ReceiptReviewIssueKind.InvalidTotal,
+                    severity = ReceiptReviewIssueSeverity.Blocking,
+                    target = ReceiptReviewIssueTarget.Summary(ReceiptReviewEditTarget.ReceiptTotal),
+                    title = "Receipt total not detected",
+                    message = "Confirm the receipt total before continuing.",
+                    actionLabel = "Enter total",
+                    accessibilityLabel = "Receipt total not detected. Enter total.",
+                ),
+            )
+            else -> Unit
+        }
+
+        items.forEach { item ->
+            if (item.needsReview) {
+                val note = item.reviewNote ?: "Check price from receipt"
+                add(
+                    ReceiptReviewIssueUiState(
+                        id = "item_${item.id}",
+                        kind = ReceiptReviewIssueKind.ItemAmountReview,
+                        severity = ReceiptReviewIssueSeverity.Blocking,
+                        target = ReceiptReviewIssueTarget.Item(item.id),
+                        title = "${item.name.ifBlank { "Item" }} needs review",
+                        message = note,
+                        actionLabel = "Review item",
+                        accessibilityLabel = "Needs review: $note. Edit ${item.name.ifBlank { "item" }}.",
+                    ),
+                )
+            }
+        }
+
+        items.forEach { item ->
+            val quantity = item.quantity.toIntOrNull()
+            val amount = parseMoneyMinorValue(item.amount)
+            when {
+                item.name.isBlank() -> add(
+                    ReceiptReviewIssueUiState(
+                        id = "item_name_${item.id}",
+                        kind = ReceiptReviewIssueKind.InvalidItem,
+                        severity = ReceiptReviewIssueSeverity.Blocking,
+                        target = ReceiptReviewIssueTarget.Item(item.id),
+                        title = "Item name missing",
+                        message = "Add a name for this item.",
+                        actionLabel = "Edit item",
+                        accessibilityLabel = "Item name missing. Edit item.",
+                    ),
+                )
+                quantity == null || quantity <= 0 -> add(
+                    ReceiptReviewIssueUiState(
+                        id = "item_quantity_${item.id}",
+                        kind = ReceiptReviewIssueKind.InvalidItem,
+                        severity = ReceiptReviewIssueSeverity.Blocking,
+                        target = ReceiptReviewIssueTarget.Item(item.id),
+                        title = "Item quantity needs review",
+                        message = "Use a quantity from 1 to 999.",
+                        actionLabel = "Edit item",
+                        accessibilityLabel = "Item quantity needs review. Edit item.",
+                    ),
+                )
+                amount == null || amount <= 0 -> add(
+                    ReceiptReviewIssueUiState(
+                        id = "item_amount_${item.id}",
+                        kind = ReceiptReviewIssueKind.InvalidItem,
+                        severity = ReceiptReviewIssueSeverity.Blocking,
+                        target = ReceiptReviewIssueTarget.Item(item.id),
+                        title = "Item amount needs review",
+                        message = "Enter a positive item total.",
+                        actionLabel = "Edit item",
+                        accessibilityLabel = "Item amount needs review. Edit item.",
+                    ),
+                )
+            }
+        }
+    }
+}
+
+data class ReceiptReviewIssueUiState(
+    val id: String,
+    val kind: ReceiptReviewIssueKind,
+    val severity: ReceiptReviewIssueSeverity,
+    val target: ReceiptReviewIssueTarget,
+    val title: String,
+    val message: String,
+    val actionLabel: String,
+    val accessibilityLabel: String,
+)
+
+enum class ReceiptReviewIssueKind {
+    TotalMismatch,
+    MissingDate,
+    InvalidDate,
+    FutureDate,
+    MissingMerchant,
+    UncertainCurrency,
+    InvalidCurrency,
+    InvalidTotal,
+    ItemAmountReview,
+    InvalidItem,
+}
+
+enum class ReceiptReviewIssueSeverity {
+    Blocking,
+    Warning,
+}
+
+sealed interface ReceiptReviewIssueTarget {
+    data class Details(val editTarget: ReceiptReviewEditTarget) : ReceiptReviewIssueTarget
+    data class Item(val itemId: String) : ReceiptReviewIssueTarget
+    data class Summary(val editTarget: ReceiptReviewEditTarget) : ReceiptReviewIssueTarget
+    data object Adjustments : ReceiptReviewIssueTarget
 }
 
 data class ReceiptReviewItemUiState(
@@ -196,12 +451,23 @@ data class ReceiptReviewFeeUiState(
     val amount: String = "",
 ) {
     val displayLabel: String = feeDisplayLabel(type, label)
+    val isDiscount: Boolean = type == FeeType.Discount
+    val amountMinor: Long? = parseMoneyMinorValue(amount)
+    val signedAmountMinor: Long? = amountMinor?.let { value -> if (isDiscount) -value else value }
+    val hasValidAmount: Boolean = displayLabel.isNotBlank() && amountMinor?.let { value -> value > 0L } == true
+
+    fun amountLabel(currencyCode: String): String {
+        val label = formatCurrency(amount, currencyCode)
+        return if (isDiscount) "-$label" else label
+    }
 }
 
 data class ReceiptReviewReconciliationUiState(
     val message: String,
     val isIssue: Boolean,
     val type: ReceiptReviewReconciliationType,
+    val detail: String? = null,
+    val reason: String? = null,
     val scannedReceiptTotalLabel: String? = null,
     val differenceLabel: String? = null,
     val suggestedCorrectionActionLabel: String? = null,
@@ -258,9 +524,29 @@ sealed interface ReceiptReviewEditDraft {
         val isNew: Boolean,
         val reviewNote: String? = null,
         val suggestedCorrection: SuspectedItemCorrection? = null,
+        val initialName: String = name,
+        val initialQuantity: String = quantity,
+        val initialUnitPrice: String = unitPrice,
+        val initialLineTotal: String = lineTotal,
     ) : ReceiptReviewEditDraft {
         val showsPriceEach: Boolean
             get() = quantity.toIntOrNull()?.let { it > 1 } == true
+
+        val hasReviewIssue: Boolean
+            get() = reviewNote != null || suggestedCorrection != null
+
+        val hasChanges: Boolean
+            get() = name != initialName ||
+                quantity != initialQuantity ||
+                unitPrice != initialUnitPrice ||
+                lineTotal != initialLineTotal
+
+        val primaryActionLabel: String
+            get() = when {
+                isNew -> "Add item"
+                hasReviewIssue && !hasChanges -> "Confirm amount"
+                else -> "Save changes"
+            }
 
         fun averagePriceNote(currencyCode: String): String? {
             val quantityValue = quantity.toIntOrNull()?.takeIf { it > 1 } ?: return null
@@ -293,7 +579,7 @@ internal fun formatCurrency(amount: String, currencyCode: String): String {
     val value = parseMoneyMinorValue(amount)?.let(::formatMoneyInput) ?: amount.trim().ifBlank { "0.00" }
     val prefix = when (currencyCode.uppercase()) {
         "EUR" -> "€"
-        "USD" -> "\$"
+        "USD" -> "$"
         "GBP" -> "£"
         else -> "${currencyCode.uppercase()} "
     }
@@ -303,7 +589,7 @@ internal fun formatCurrency(amount: String, currencyCode: String): String {
 internal fun parseMoneyMinorValue(value: String): Long? {
     val normalized = value.trim()
         .removePrefix("€")
-        .removePrefix("\$")
+        .removePrefix("$")
         .removePrefix("£")
         .replace(',', '.')
     if (normalized.isBlank()) return null
@@ -333,17 +619,31 @@ internal fun feeDisplayLabel(type: FeeType, label: String = ""): String {
         FeeType.Tax -> "Tax"
         FeeType.Tip -> "Tip"
         FeeType.ServiceFee -> "Service charge"
+        FeeType.Discount -> label.trim().ifBlank { "Discount" }
         FeeType.Other -> label.trim().ifBlank { "Other" }
     }
 }
 
 internal fun String.toLocalDateOrNull(): LocalDate? {
     if (isBlank()) return null
-    return try {
-        LocalDate.parse(trim())
-    } catch (_: DateTimeParseException) {
-        null
+    val value = trim()
+    return listOf<(String) -> LocalDate>(
+        { text -> LocalDate.parse(text) },
+        { text -> LocalDateTime.parse(text).toLocalDate() },
+        { text -> OffsetDateTime.parse(text).toLocalDate() },
+        { text -> ZonedDateTime.parse(text).toLocalDate() },
+    ).firstNotNullOfOrNull { parser ->
+        try {
+            parser(value)
+        } catch (_: DateTimeParseException) {
+            null
+        }
     }
+}
+
+internal fun String.toReceiptDisplayDate(): String {
+    val date = toLocalDateOrNull() ?: return trim()
+    return date.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.US))
 }
 
 internal const val MAX_RECEIPT_REVIEW_MONEY_MINOR = 9_999_999L

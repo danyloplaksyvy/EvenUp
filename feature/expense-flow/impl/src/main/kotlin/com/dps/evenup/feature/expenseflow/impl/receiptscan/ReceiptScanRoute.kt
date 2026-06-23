@@ -29,6 +29,7 @@ import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.receipt.api.ReceiptDataException
 import com.dps.evenup.data.receipt.api.ReceiptDataFailureReason
 import com.dps.evenup.data.receipt.api.ReceiptRepository
+import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.ValidateReceiptUseCase
 import kotlinx.coroutines.launch
 
@@ -38,6 +39,7 @@ fun ReceiptScanRoute(
     receiptRepository: ReceiptRepository,
     receiptImageReader: ReceiptImageReader,
     receiptCaptureTargetFactory: ReceiptCaptureTargetFactory,
+    normalizeReceipt: NormalizeReceiptUseCase,
     validateReceipt: ValidateReceiptUseCase,
     onBack: () -> Boolean,
     onManualEntry: () -> Unit,
@@ -47,11 +49,12 @@ fun ReceiptScanRoute(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
-    val presenter = remember(draftRepository, receiptRepository, receiptImageReader, validateReceipt) {
+    val presenter = remember(draftRepository, receiptRepository, receiptImageReader, normalizeReceipt, validateReceipt) {
         ReceiptScanPresenter(
             draftRepository = draftRepository,
             receiptRepository = receiptRepository,
             imageReader = receiptImageReader,
+            normalizeReceipt = normalizeReceipt,
             validateReceipt = validateReceipt,
         )
     }

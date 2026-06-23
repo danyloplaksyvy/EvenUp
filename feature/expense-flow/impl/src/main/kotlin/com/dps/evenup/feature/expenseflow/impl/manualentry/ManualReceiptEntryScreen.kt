@@ -218,7 +218,7 @@ private fun ManualReceiptFeesSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
         Text(
-            text = "Fees & Taxes",
+            text = "Fees",
             style = EvenUpTheme.typography.button,
             color = EvenUpTheme.colors.textPrimary,
         )

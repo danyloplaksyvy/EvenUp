@@ -13,6 +13,7 @@ import com.dps.evenup.domain.expense.api.ExpenseDraftId
 import com.dps.evenup.domain.participant.api.ParticipantId
 import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptValidationError
+import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.ValidateReceiptUseCase
 import java.util.UUID
 
@@ -20,6 +21,7 @@ class ReceiptScanPresenter(
     private val draftRepository: ExpenseDraftRepository,
     private val receiptRepository: ReceiptRepository,
     private val imageReader: ReceiptImageReader,
+    private val normalizeReceipt: NormalizeReceiptUseCase,
     private val validateReceipt: ValidateReceiptUseCase,
 ) {
     suspend fun parseImage(
@@ -50,7 +52,7 @@ class ReceiptScanPresenter(
                 Base64.encodeToString(image.bytes, Base64.NO_WRAP)
             }
 
-            val receipt = timedStage(
+            val parsedReceipt = timedStage(
                 requestId = requestId,
                 stage = "repository_parse",
                 metadata = listOf(
@@ -64,10 +66,20 @@ class ReceiptScanPresenter(
                         imageBase64 = imageBase64,
                         mimeType = image.mimeType,
                         localeHint = DEFAULT_LOCALE_HINT,
-                        currencyHint = DEFAULT_CURRENCY_HINT,
+                        currencyHint = null,
                         requestId = requestId,
                     ),
                 )
+            }
+            val receipt = timedStage(
+                requestId = requestId,
+                stage = "receipt_normalize",
+                metadata = listOf(
+                    "feeCount=${parsedReceipt.fees.size}",
+                    "datePresent=${!parsedReceipt.transactionDateLabel.isNullOrBlank()}",
+                ),
+            ) {
+                normalizeReceipt.normalize(parsedReceipt)
             }
 
             val validation = timedStage(
@@ -193,7 +205,7 @@ class ReceiptScanPresenter(
         contains(ReceiptValidationError.BlankMerchantName) -> "Merchant name was missing."
         contains(ReceiptValidationError.BlankItemName) -> "One or more receipt items were missing names."
         contains(ReceiptValidationError.NonPositiveItemAmount) -> "One or more item amounts were invalid."
-        contains(ReceiptValidationError.NonPositiveFeeAmount) -> "One or more fee amounts were invalid."
+        contains(ReceiptValidationError.NonPositiveFeeAmount) -> "One or more fee or discount amounts were invalid."
         contains(ReceiptValidationError.NegativeTotal) -> "Receipt total was invalid."
         contains(ReceiptValidationError.FutureDate) -> "Receipt date was in the future."
         contains(ReceiptValidationError.TotalMismatch) -> "Receipt total did not match its items and fees."
@@ -203,7 +215,6 @@ class ReceiptScanPresenter(
     private companion object {
         const val TAG = "ReceiptScan"
         const val DEFAULT_LOCALE_HINT = "en-US"
-        const val DEFAULT_CURRENCY_HINT = "USD"
         const val PENDING_PAYER_ID = "pending-payer"
     }
 }

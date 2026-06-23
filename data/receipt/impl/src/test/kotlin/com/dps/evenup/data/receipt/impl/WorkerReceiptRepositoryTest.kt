@@ -52,6 +52,33 @@ class WorkerReceiptRepositoryTest {
     }
 
     @Test
+    fun `discount fee type maps to discount and preserves negative amount`() = runBlocking {
+        val repository = WorkerReceiptRepository(
+            FakeWorkerApiClient(receiptJson(feeType = "DISCOUNT", feeLabel = "Promo", feeAmountMinor = -250, totalMinor = 3350)),
+        )
+
+        val receipt = repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+
+        assertEquals(FeeType.Discount, receipt.fees.single().type)
+        assertEquals(-250L, receipt.fees.single().amount.value)
+    }
+
+    @Test
+    fun `old backend response removes included tax duplicated from receipt total`() = runBlocking {
+        val repository = WorkerReceiptRepository(FakeWorkerApiClient(crownePlazaDuplicateTaxReceiptJson()))
+
+        val receipt = repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+
+        assertEquals(listOf(FeeType.Discount), receipt.fees.map { fee -> fee.type })
+        assertEquals(listOf(-2_655L), receipt.fees.map { fee -> fee.amount.value })
+        assertEquals(8_850L, receipt.subtotal?.value)
+        assertEquals(6_195L, receipt.total.value)
+        assertEquals("fees[0].amountMinor", receipt.parseMetadata.corrections.single().field)
+        assertEquals(6_195L, receipt.parseMetadata.corrections.single().from.value)
+        assertEquals(0L, receipt.parseMetadata.corrections.single().to.value)
+    }
+
+    @Test
     fun `request id is kept out of worker request body`() = runBlocking {
         val apiClient = FakeWorkerApiClient(receiptJson())
         val repository = WorkerReceiptRepository(apiClient)
@@ -85,6 +112,24 @@ class WorkerReceiptRepositoryTest {
     }
 
     @Test
+    fun `old backend response reconciles quantity unit price parsed as line total`() = runBlocking {
+        val repository = WorkerReceiptRepository(FakeWorkerApiClient(crownePlazaReceiptJson()))
+
+        val receipt = repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+
+        val solomillo = receipt.items.first { item -> item.name == "Solomillo a la Sal" }
+        assertEquals(4_400L, solomillo.totalPrice.value)
+        assertEquals(2_200L, solomillo.unitPrice.value)
+        assertEquals(true, solomillo.parseMetadata.needsReview)
+        assertEquals(listOf(4_400L, 2_200L), solomillo.parseMetadata.candidates.map { it.value })
+        assertEquals(8_850L, receipt.subtotal?.value)
+        assertEquals("items[2].totalPriceMinor", receipt.parseMetadata.corrections.single().field)
+        assertEquals(2_200L, receipt.parseMetadata.corrections.single().from.value)
+        assertEquals(4_400L, receipt.parseMetadata.corrections.single().to.value)
+        assertEquals(true, receipt.parseMetadata.corrections.single().reason.contains("quantity line total", ignoreCase = true))
+    }
+
+    @Test
     fun `invalid values produce controlled errors`() {
         val repository = WorkerReceiptRepository(FakeWorkerApiClient(receiptJson(quantity = 1.5)))
 
@@ -97,6 +142,9 @@ class WorkerReceiptRepositoryTest {
 
     private fun receiptJson(
         feeType: String = "TAX",
+        feeLabel: String = "Tax",
+        feeAmountMinor: Long = 600,
+        totalMinor: Long = 4200,
         quantity: Double = 2.0,
     ): String = """
         {
@@ -117,12 +165,12 @@ class WorkerReceiptRepositoryTest {
           "fees": [
             {
               "type": "$feeType",
-              "label": "Tax",
-              "amountMinor": 600
+              "label": "$feeLabel",
+              "amountMinor": $feeAmountMinor
             }
           ],
           "subtotalMinor": 3600,
-          "totalMinor": 4200,
+          "totalMinor": $totalMinor,
           "confidence": 0.92,
           "corrections": [
             {
@@ -163,6 +211,63 @@ class WorkerReceiptRepositoryTest {
           ],
           "subtotalMinor": 5800,
           "totalMinor": 6525,
+          "confidence": 0.84
+        }
+    """.trimIndent()
+
+    private fun crownePlazaReceiptJson(): String = """
+        {
+          "merchantName": "Crowne Plaza Barcelona - Fira Center",
+          "transactionDate": "2019-03-10",
+          "currency": "EUR",
+          "items": [
+            {"name": "Burrata", "quantity": 1, "unitPriceMinor": 1600, "totalPriceMinor": 1600},
+            {"name": "Pan de Coca", "quantity": 1, "unitPriceMinor": 350, "totalPriceMinor": 350},
+            {"name": "Solomillo a la Sal", "quantity": 2, "unitPriceMinor": 2200, "totalPriceMinor": 2200},
+            {"name": "100% Chocolate fondant", "quantity": 1, "unitPriceMinor": 850, "totalPriceMinor": 850},
+            {"name": "Agua 1/2", "quantity": 1, "unitPriceMinor": 450, "totalPriceMinor": 450},
+            {"name": "Copa Aphrodisiaque T.", "quantity": 2, "unitPriceMinor": 600, "totalPriceMinor": 1200}
+          ],
+          "fees": [
+            {
+              "type": "DISCOUNT",
+              "label": "Portal Reserva 30%",
+              "amountMinor": -2655
+            }
+          ],
+          "subtotalMinor": 6650,
+          "totalMinor": 6195,
+          "confidence": 0.84
+        }
+    """.trimIndent()
+
+    private fun crownePlazaDuplicateTaxReceiptJson(): String = """
+        {
+          "merchantName": "Crowne Plaza Barcelona - Fira Center",
+          "transactionDate": "2019-03-10",
+          "currency": "EUR",
+          "items": [
+            {"name": "Burrata", "quantity": 1, "unitPriceMinor": 1600, "totalPriceMinor": 1600},
+            {"name": "Pan de Coca", "quantity": 1, "unitPriceMinor": 350, "totalPriceMinor": 350},
+            {"name": "Solomillo a la Sal", "quantity": 2, "unitPriceMinor": 2200, "totalPriceMinor": 4400},
+            {"name": "100% Chocolate fondant", "quantity": 1, "unitPriceMinor": 850, "totalPriceMinor": 850},
+            {"name": "Agua 1/2", "quantity": 1, "unitPriceMinor": 450, "totalPriceMinor": 450},
+            {"name": "Copa Aphrodisiaque T.", "quantity": 2, "unitPriceMinor": 600, "totalPriceMinor": 1200}
+          ],
+          "fees": [
+            {
+              "type": "TAX",
+              "label": "Tax",
+              "amountMinor": 6195
+            },
+            {
+              "type": "DISCOUNT",
+              "label": "Portal Reserva 30%",
+              "amountMinor": -2655
+            }
+          ],
+          "subtotalMinor": 8850,
+          "totalMinor": 6195,
           "confidence": 0.84
         }
     """.trimIndent()

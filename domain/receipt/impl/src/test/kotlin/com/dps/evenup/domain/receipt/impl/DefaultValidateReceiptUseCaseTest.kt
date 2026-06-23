@@ -38,6 +38,44 @@ class DefaultValidateReceiptUseCaseTest {
     }
 
     @Test
+    fun `discount reduces total and validates as negative receipt component`() {
+        val result = useCase.validate(
+            validReceipt().copy(
+                items = listOf(validItem().copy(totalPrice = MoneyMinor(1_500))),
+                fees = listOf(
+                    ReceiptFee(FeeId("tip"), FeeType.Tip, "Tip", MoneyMinor(300)),
+                    ReceiptFee(FeeId("discount"), FeeType.Discount, "Discount", MoneyMinor(-200)),
+                ),
+                total = MoneyMinor(1_600),
+                subtotal = null,
+            ),
+        )
+
+        assertTrue(result.isValid)
+    }
+
+    @Test
+    fun `discount must be negative and additive fees must be positive`() {
+        val positiveDiscount = useCase.validate(
+            validReceipt().copy(
+                fees = listOf(ReceiptFee(FeeId("discount"), FeeType.Discount, "Discount", MoneyMinor(100))),
+                total = MoneyMinor(1_100),
+            ),
+        )
+        val negativeTax = useCase.validate(
+            validReceipt().copy(
+                fees = listOf(ReceiptFee(FeeId("tax"), FeeType.Tax, "Tax", MoneyMinor(-100))),
+                total = MoneyMinor(900),
+            ),
+        )
+
+        assertFalse(positiveDiscount.isValid)
+        assertTrue(ReceiptValidationError.NonPositiveFeeAmount in positiveDiscount.errors)
+        assertFalse(negativeTax.isValid)
+        assertTrue(ReceiptValidationError.NonPositiveFeeAmount in negativeTax.errors)
+    }
+
+    @Test
     fun `items plus fees mismatch returns total mismatch without parsed subtotal`() {
         val result = useCase.validate(
             validReceipt().copy(
