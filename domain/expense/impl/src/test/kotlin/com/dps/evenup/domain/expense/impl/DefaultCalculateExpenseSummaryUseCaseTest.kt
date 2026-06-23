@@ -41,6 +41,46 @@ class DefaultCalculateExpenseSummaryUseCaseTest {
         assertEquals(MoneyMinor(4_550), summary.settlementRows[1].amount)
     }
 
+    @Test
+    fun `discount credits reduce participant shares proportionally to assigned items`() {
+        val summary = useCase.calculate(
+            receipt = receipt().copy(
+                fees = receipt().fees + ReceiptFee(FeeId("discount"), FeeType.Discount, "Promo", MoneyMinor(-1_000)),
+                total = MoneyMinor(11_050),
+            ),
+            participants = participants(),
+            payerId = ParticipantId("anna"),
+            itemAssignments = itemAssignments(),
+            feeAllocations = feeAllocations(),
+        )
+
+        val anna = summary.participantSummaries.first { participant -> participant.participantId == ParticipantId("anna") }
+        val ben = summary.participantSummaries.first { participant -> participant.participantId == ParticipantId("ben") }
+        val chris = summary.participantSummaries.first { participant -> participant.participantId == ParticipantId("chris") }
+
+        assertEquals(MoneyMinor(300), anna.discountCreditTotal)
+        assertEquals(MoneyMinor(300), ben.discountCreditTotal)
+        assertEquals(MoneyMinor(400), chris.discountCreditTotal)
+        assertEquals(MoneyMinor(11_050), summary.participantShareTotal)
+        assertEquals(MoneyMinor.Zero, summary.netBalanceTotal)
+    }
+
+    @Test
+    fun `discount credits fall back to equal split when assigned item subtotals are unavailable`() {
+        val summary = useCase.calculate(
+            receipt = receipt().copy(
+                fees = listOf(ReceiptFee(FeeId("discount"), FeeType.Discount, "Promo", MoneyMinor(-100))),
+                total = MoneyMinor(9_900),
+            ),
+            participants = participants(),
+            payerId = ParticipantId("anna"),
+            itemAssignments = emptyList(),
+            feeAllocations = emptyList(),
+        )
+
+        assertEquals(listOf(34L, 33L, 33L), summary.participantSummaries.map { it.discountCreditTotal.value })
+    }
+
     private fun participants(): List<Participant> = listOf(
         Participant(ParticipantId("anna"), "Anna", 0),
         Participant(ParticipantId("ben"), "Ben", 1),

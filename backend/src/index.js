@@ -10,6 +10,14 @@ const MAX_SHARE_ID_ATTEMPTS = 5;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_MODEL = "gpt-4.1-mini";
 const MAX_RECEIPT_IMAGE_BYTES = 7 * 1024 * 1024;
+const VISUALLY_SIMILAR_DIGITS = {
+  "0": ["6", "8"],
+  "3": ["8"],
+  "5": ["6"],
+  "6": ["0", "5", "8"],
+  "8": ["0", "3", "6", "9"],
+  "9": ["8"]
+};
 const RECEIPT_PARSE_ERROR = {
   error: {
     code: "RECEIPT_PARSE_FAILED",
@@ -607,7 +615,11 @@ function openAiReceiptRequest(payload, env) {
               "Preserve visible receipt item order.",
               "Use null for transactionDate if no date is visible.",
               "Use fee type DISCOUNT for discounts and keep discount amountMinor negative.",
+              "Do not return VAT, IVA, GST, or tax summary rows as fees when they are already included in the printed total.",
+              "Only return true extra charges as additive fees. If a tax summary row shows both tax amount and gross total, never use the gross or receipt total as the tax amount.",
               "Do not invent items or prices.",
+              "unitPriceMinor is the per-unit price. totalPriceMinor is the printed line total for that item.",
+              "For quantity greater than 1, totalPriceMinor must be the line total, usually quantity times unitPriceMinor. Do not copy the unit price into totalPriceMinor when a separate line total is visible.",
               "For each item, return candidatesMinor with the parsed totalPriceMinor first and any visually plausible alternatives after it.",
               "Set item confidence between 0 and 1 and needsReview true for ambiguous item prices.",
               "Return empty corrections and reviewWarnings arrays in the first extraction pass."
@@ -657,6 +669,8 @@ function openAiReceiptAuditRequest(payload, extractedReceipt, env) {
               "Return strict JSON only through the requested schema.",
               "Validate that item totals sum to subtotalMinor and subtotalMinor plus fees equals totalMinor.",
               "If there is a mismatch, identify likely OCR price mistakes from the image.",
+              "Remove VAT, IVA, GST, or tax rows that are already included in the printed total instead of treating them as additive fees.",
+              "For rows with quantity greater than 1, check whether the extracted line total incorrectly used the unit price.",
               "Do not invent items. Prefer corrections where digits are visually similar.",
               "Return corrected JSON, corrections, and reviewWarnings."
             ].join(" ")
@@ -728,17 +742,20 @@ function reconcileReceiptSubtotal(receipt) {
     return receipt;
   }
 
+  receipt = sanitizeIncludedTaxFees(receipt);
+
   const itemSum = sumItemTotals(receipt.items);
-  if (itemSum === receipt.subtotalMinor) {
+  const feeSum = sumFeeAmounts(receipt.fees);
+  if (itemSum === receipt.subtotalMinor && receipt.subtotalMinor + feeSum === receipt.totalMinor) {
     return withTotalMismatchWarningIfNeeded(receipt);
   }
 
-  const replacement = chooseSingleCandidateReplacement(receipt.items, receipt.subtotalMinor);
+  const replacement = chooseSingleCandidateReplacement(receipt.items, itemSubtotalTargets(receipt));
   if (!replacement) {
     return withTotalMismatchWarningIfNeeded(
       withReviewWarning(
         receipt,
-        `Receipt item sum ${itemSum} does not match printed subtotal ${receipt.subtotalMinor}.`
+        `Receipt item sum ${itemSum} does not match expected item subtotal.`
       )
     );
   }
@@ -760,43 +777,180 @@ function reconcileReceiptSubtotal(receipt) {
     itemName: receipt.items[replacement.index].name || null,
     fromMinor: replacement.fromMinor,
     toMinor: replacement.toMinor,
-    reason: `Corrected to match printed subtotal ${receipt.subtotalMinor}; digit likely misread.`
+    reason: correctionReason(replacement)
   };
 
   return withTotalMismatchWarningIfNeeded({
     ...receipt,
+    subtotalMinor: replacement.targetSubtotal,
     items,
     corrections: [...receipt.corrections, correction]
   });
 }
 
-function chooseSingleCandidateReplacement(items, targetSubtotal) {
+function sanitizeIncludedTaxFees(receipt) {
+  const keptFees = [];
+  const corrections = [];
+
+  receipt.fees.forEach((fee, index) => {
+    if (shouldRemoveIncludedTaxFee(receipt, fee, index)) {
+      corrections.push({
+        field: `fees[${index}].amountMinor`,
+        itemName: null,
+        fromMinor: fee.amountMinor,
+        toMinor: 0,
+        reason: "Removed included VAT/tax duplicated from receipt total."
+      });
+      return;
+    }
+
+    keptFees.push(fee);
+  });
+
+  if (corrections.length === 0) return receipt;
+
+  return {
+    ...receipt,
+    fees: keptFees,
+    corrections: [...receipt.corrections, ...corrections]
+  };
+}
+
+function shouldRemoveIncludedTaxFee(receipt, fee, feeIndex) {
+  if (!isTaxLikeFee(fee) || fee.amountMinor <= 0) return false;
+  if (isIncludedTaxLabel(fee.label)) return true;
+  if (fee.amountMinor === receipt.totalMinor || fee.amountMinor === receipt.subtotalMinor) return true;
+
+  const feesWithoutCurrent = receipt.fees.filter((_, index) => index !== feeIndex);
+  return isReceiptReconciledWithFees(receipt, feesWithoutCurrent);
+}
+
+function isReceiptReconciledWithFees(receipt, fees) {
+  const itemSum = sumItemTotals(receipt.items);
+  const feeSum = sumFeeAmounts(fees);
+  if (Number.isInteger(receipt.subtotalMinor)) {
+    return itemSum === receipt.subtotalMinor && receipt.subtotalMinor + feeSum === receipt.totalMinor;
+  }
+
+  return itemSum + feeSum === receipt.totalMinor;
+}
+
+function isTaxLikeFee(fee) {
+  const label = normalizeText(fee.label);
+  return String(fee.type || "").toUpperCase() === "TAX" || /\b(tax|vat|iva|gst|mwst|tva)\b/.test(label);
+}
+
+function isIncludedTaxLabel(label) {
+  const normalized = normalizeText(label);
+  return [
+    "di cui iva",
+    "iva inclusa",
+    "vat included",
+    "incl vat",
+    "includes tax",
+    "tax included",
+    "mwst enthalten",
+    "tva incluse",
+    "iva incluido"
+  ].some((phrase) => normalized.includes(phrase));
+}
+
+function normalizeText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function itemSubtotalTargets(receipt) {
+  return uniqueIntegers([
+    receipt.subtotalMinor,
+    receipt.totalMinor - sumFeeAmounts(receipt.fees)
+  ]).filter((target) => target > 0);
+}
+
+function chooseSingleCandidateReplacement(items, targetSubtotals) {
   const currentSum = sumItemTotals(items);
   const options = [];
 
   items.forEach((item, index) => {
     const fromMinor = item.totalPriceMinor;
-    for (const candidate of item.candidatesMinor || []) {
-      if (candidate === fromMinor) continue;
-      if (currentSum - fromMinor + candidate !== targetSubtotal) continue;
-      options.push({
-        index,
-        fromMinor,
-        toMinor: candidate,
-        confidence: typeof item.confidence === "number" ? item.confidence : 0,
-        delta: Math.abs(candidate - fromMinor),
-        needsReview: Boolean(item.needsReview)
-      });
+    for (const candidate of correctionCandidates(item)) {
+      if (candidate.amountMinor === fromMinor) continue;
+      for (const targetSubtotal of targetSubtotals) {
+        if (currentSum - fromMinor + candidate.amountMinor !== targetSubtotal) continue;
+        options.push({
+          index,
+          fromMinor,
+          toMinor: candidate.amountMinor,
+          targetSubtotal,
+          reason: candidate.reason,
+          priority: candidate.priority,
+          confidence: typeof item.confidence === "number" ? item.confidence : 0,
+          delta: Math.abs(candidate.amountMinor - fromMinor),
+          needsReview: Boolean(item.needsReview)
+        });
+      }
     }
   });
 
   options.sort((left, right) => {
     if (left.needsReview !== right.needsReview) return left.needsReview ? -1 : 1;
+    if (left.priority !== right.priority) return left.priority - right.priority;
     if (left.confidence !== right.confidence) return right.confidence - left.confidence;
     return left.delta - right.delta;
   });
 
-  return options[0] || null;
+  return options.length === 1 ? options[0] : null;
+}
+
+function correctionCandidates(item) {
+  const candidates = [];
+  for (const amountMinor of quantityLineTotalCandidates(item)) {
+    candidates.push({ amountMinor, reason: "quantity_line_total", priority: 0 });
+  }
+  for (const amountMinor of item.candidatesMinor || []) {
+    candidates.push({ amountMinor, reason: "candidate", priority: 1 });
+  }
+  for (const amountMinor of visuallySimilarSingleDigitTotals(item.totalPriceMinor)) {
+    candidates.push({ amountMinor, reason: "visual_digit", priority: 2 });
+  }
+
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    if (!Number.isInteger(candidate.amountMinor) || candidate.amountMinor <= 0) return false;
+    if (seen.has(candidate.amountMinor)) return false;
+    seen.add(candidate.amountMinor);
+    return true;
+  });
+}
+
+function quantityLineTotalCandidates(item) {
+  if (!Number.isInteger(item.quantity) || item.quantity <= 1) return [];
+  return uniqueIntegers([
+    item.totalPriceMinor * item.quantity,
+    item.unitPriceMinor * item.quantity
+  ]);
+}
+
+function visuallySimilarSingleDigitTotals(value) {
+  const digits = String(value);
+  return Array.from(digits).flatMap((digit, index) =>
+    (VISUALLY_SIMILAR_DIGITS[digit] || [])
+      .map((replacement) => Number(digits.slice(0, index) + replacement + digits.slice(index + 1)))
+      .filter(Number.isInteger)
+  );
+}
+
+function correctionReason(replacement) {
+  if (replacement.reason === "quantity_line_total") {
+    return `Corrected quantity line total to match expected item subtotal ${replacement.targetSubtotal}; unit price was likely parsed as the line total.`;
+  }
+  if (replacement.reason === "visual_digit") {
+    return `Corrected to match expected item subtotal ${replacement.targetSubtotal}; digit likely misread.`;
+  }
+  return `Corrected to match expected item subtotal ${replacement.targetSubtotal}.`;
 }
 
 function sumItemTotals(items) {
@@ -1130,7 +1284,9 @@ function renderFees(fees, currency) {
     return "";
   }
 
-  return `<div class="fees">${fees
+  const additiveFees = fees.filter((fee) => !isDiscountFee(fee) && firstNumber(fee.amountMinor) > 0);
+  const discounts = fees.filter(isDiscountFee);
+  const feeRows = additiveFees
     .map(
       (fee) =>
         `<div class="row muted"><span>${escapeHtml(fee.label || fee.type || "Fee")}</span><span>${formatMoney(
@@ -1138,7 +1294,22 @@ function renderFees(fees, currency) {
           currency
         )}</span></div>`
     )
-    .join("")}</div>`;
+    .join("");
+  const discountRows = discounts
+    .map((fee) => {
+      const amount = Math.abs(firstNumber(fee.amountMinor));
+      return `<div class="row muted"><span>${escapeHtml(fee.label || "Discount")}</span><span>-${formatMoney(
+        amount,
+        currency
+      )}</span></div>`;
+    })
+    .join("");
+
+  return `<div class="fees">${feeRows}${discountRows}</div>`;
+}
+
+function isDiscountFee(fee) {
+  return String(fee?.type || "").toUpperCase() === "DISCOUNT" || firstNumber(fee?.amountMinor) < 0;
 }
 
 function participantName(participantId, participants) {

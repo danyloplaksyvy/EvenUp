@@ -1,6 +1,9 @@
 package com.dps.evenup.feature.expenseflow.impl.feesallocation
 
+import com.dps.evenup.domain.receipt.api.FeeId
+import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.MoneyMinor
+import com.dps.evenup.domain.receipt.api.ReceiptFee
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,6 +22,19 @@ class FeesAllocationRoutingTest {
     @Test
     fun `positive fee shows fees allocation`() {
         assertTrue(shouldShowFeesAllocation(feesAllocationDraft(fees = listOf(fee(amount = 1)))))
+    }
+
+    @Test
+    fun `discount only receipt skips fees allocation`() {
+        assertFalse(
+            shouldShowFeesAllocation(
+                feesAllocationDraft(
+                    fees = listOf(
+                        ReceiptFee(FeeId("discount"), FeeType.Discount, "Promo", MoneyMinor(-100)),
+                    ),
+                ),
+            ),
+        )
     }
 
     private fun fee(amount: Long) = feesAllocationFee(amount = MoneyMinor(amount))

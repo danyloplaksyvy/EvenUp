@@ -8,6 +8,7 @@ import com.dps.evenup.domain.receipt.api.CurrencyCode
 import com.dps.evenup.domain.receipt.api.FeeId
 import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.MoneyMinor
+import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.Quantity
 import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptFee
@@ -181,7 +182,7 @@ class ReceiptReviewPresenterTest {
     }
 
     @Test
-    fun `other adjustment requires name and commits type aware label`() = runBlocking {
+    fun `other fee requires name and commits type aware label`() = runBlocking {
         val presenter = presenter()
         var state = presenter.load()
 
@@ -203,7 +204,7 @@ class ReceiptReviewPresenterTest {
     }
 
     @Test
-    fun `editing and deleting adjustment updates derived receipt total`() = runBlocking {
+    fun `editing and deleting fee updates derived receipt total`() = runBlocking {
         val presenter = presenter(
             draft = draft().copy(
                 receipt = draft().receipt.copy(
@@ -229,6 +230,65 @@ class ReceiptReviewPresenterTest {
         assertEquals("12.00", state.scannedReceiptTotalAmount)
         assertEquals("10.00", state.calculatedTotalAmount)
         assertTrue(state.fees.isEmpty())
+    }
+
+    @Test
+    fun `parsed discount is shown separately and saved as negative amount`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft().copy(
+                receipt = draft().receipt.copy(
+                    fees = listOf(ReceiptFee(FeeId("discount"), FeeType.Discount, "Promo", MoneyMinor(-100))),
+                    total = MoneyMinor(900),
+                ),
+            ),
+        )
+        val presenter = presenter(repository = repository)
+        val state = presenter.load()
+
+        assertEquals("0.00", state.derivedFeesAmount)
+        assertEquals("1.00", state.derivedDiscountsAmount)
+        assertEquals("-€1.00", state.discountsTotalLabel)
+        assertEquals("9.00", state.calculatedTotalAmount)
+        assertEquals("Promo", state.discounts.single().displayLabel)
+
+        val result = presenter.saveDraft(state)
+
+        assertEquals(SaveReceiptReviewResult.Saved, result)
+        assertEquals(FeeType.Discount, repository.draft?.receipt?.fees?.single()?.type)
+        assertEquals(MoneyMinor(-100), repository.draft?.receipt?.fees?.single()?.amount)
+    }
+
+    @Test
+    fun `normalized duplicate tax does not block continue`() = runBlocking {
+        val duplicateTax = ReceiptFee(FeeId("tax"), FeeType.Tax, "Tax", MoneyMinor(6_195))
+        val discount = ReceiptFee(FeeId("discount"), FeeType.Discount, "Portal Reserva 30%", MoneyMinor(-2_655))
+        val presenter = presenter(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    merchantName = "Crowne Plaza Barcelona - Fira Center",
+                    items = listOf(
+                        validItem("item-1", "Burrata", 1_600),
+                        validItem("item-2", "Pan de Coca", 350),
+                        validItem("item-3", "Solomillo a la Sal", 4_400, quantity = 2),
+                        validItem("item-4", "100% Chocolate fondant", 850),
+                        validItem("item-5", "Agua 1/2", 450),
+                        validItem("item-6", "Copa Aphrodisiaque T.", 1_200, quantity = 2),
+                    ),
+                    fees = listOf(duplicateTax, discount),
+                    subtotal = MoneyMinor(8_850),
+                    total = MoneyMinor(6_195),
+                ),
+            ),
+            normalizeReceipt = RemoveDuplicateTaxNormalizeReceipt,
+        )
+
+        val state = presenter.load()
+
+        assertEquals(listOf("Portal Reserva 30%"), state.fees.map { fee -> fee.displayLabel })
+        assertEquals("61.95", state.calculatedTotalAmount)
+        assertEquals("AI found 6 items · Ready", state.statusLabel)
+        assertTrue(state.canContinue)
+        assertFalse(state.hasWarningStatus)
     }
 
     @Test
@@ -262,7 +322,7 @@ class ReceiptReviewPresenterTest {
         val state = presenter.load()
 
         assertEquals("€10.00", state.summaryTotalLabel)
-        assertEquals("Matches receipt", state.summaryStatusLabel)
+        assertEquals("Ready", state.summaryStatusLabel)
         assertEquals("Matches scanned receipt", state.reconciliation.message)
         assertEquals(ReceiptReviewReconciliationType.Matched, state.reconciliation.type)
         assertFalse(state.reconciliation.isIssue)
@@ -280,10 +340,10 @@ class ReceiptReviewPresenterTest {
         assertEquals("11.00", state.calculatedTotalAmount)
         assertEquals("10.00", state.scannedReceiptTotalAmount)
         assertEquals("€11.00", state.summaryTotalLabel)
-        assertEquals("Needs review", state.summaryStatusLabel)
-        assertEquals("Total differs · Review item amounts", state.statusLabel)
+        assertEquals("Total differs", state.summaryStatusLabel)
+        assertEquals("Total differs by €1.00", state.statusLabel)
         assertEquals(ReceiptReviewReconciliationType.Mismatch, state.reconciliation.type)
-        assertEquals("Receipt says €10.00 · Difference €1.00", state.reconciliation.message)
+        assertEquals("Total differs by €1.00", state.reconciliation.message)
     }
 
     @Test
@@ -335,7 +395,7 @@ class ReceiptReviewPresenterTest {
         val result = presenter.saveDraft(validated)
 
         assertEquals(ReceiptReviewSection.Summary, validated.firstBlockingSection)
-        assertTrue(validated.fieldErrors["summary"].orEmpty().contains("Receipt says"))
+        assertTrue(validated.fieldErrors["summary"].orEmpty().contains("Total differs"))
         assertTrue(result is SaveReceiptReviewResult.Invalid)
         assertEquals(0, repository.saveCount)
     }
@@ -348,7 +408,7 @@ class ReceiptReviewPresenterTest {
 
         assertEquals("2 likely item errors found", state.statusLabel)
         assertEquals("Review 2 suggested corrections", state.suggestedCorrectionActionLabel)
-        assertEquals("Receipt says €65.25 · Difference €1.10", state.reconciliation.message)
+        assertEquals("Total differs by €1.10", state.reconciliation.message)
         assertEquals(
             listOf(
                 "Receipt likely says €5.60 · Difference €0.20",
@@ -390,7 +450,7 @@ class ReceiptReviewPresenterTest {
 
         assertEquals("65.25", state.calculatedTotalAmount)
         assertEquals("65.25", state.scannedReceiptTotalAmount)
-        assertEquals("Matches receipt", state.summaryStatusLabel)
+        assertEquals("Ready", state.summaryStatusLabel)
         assertFalse(state.hasWarningStatus)
         assertEquals(listOf(null, null, null), state.items.map { item -> item.suggestedCorrection })
     }
@@ -406,7 +466,7 @@ class ReceiptReviewPresenterTest {
 
         assertEquals(ReceiptReviewSection.Items, validated.firstBlockingSection)
         assertEquals("item-1", validated.firstBlockingItemId)
-        assertTrue(validated.fieldErrors["summary"].orEmpty().contains("Receipt says"))
+        assertTrue(validated.fieldErrors["summary"].orEmpty().contains("Total differs"))
         assertTrue(result is SaveReceiptReviewResult.Invalid)
         assertEquals(0, repository.saveCount)
     }
@@ -435,8 +495,8 @@ class ReceiptReviewPresenterTest {
         )
         val state = presenter.load()
 
-        assertEquals("1 item needs review", state.statusLabel)
-        assertEquals("Corrected from €11.00 · Check amount", state.items.single().reviewNote)
+        assertEquals("Rissol needs review", state.statusLabel)
+        assertEquals("Amount was corrected to match subtotal", state.items.single().reviewNote)
         assertEquals("Review highlighted item before continuing", state.reconciliation.message)
         assertEquals(ReceiptReviewReconciliationType.ReviewItems, state.reconciliation.type)
     }
@@ -465,9 +525,9 @@ class ReceiptReviewPresenterTest {
         )
         val state = presenter.load()
 
-        assertEquals("2 items need review", state.statusLabel)
+        assertEquals("2 issues need review", state.statusLabel)
         assertEquals("Review highlighted items before continuing", state.reconciliation.message)
-        assertEquals(listOf("Check amount", "Low scan confidence · Check amount"), state.items.map { it.reviewNote })
+        assertEquals(listOf("Check price from receipt", "Low-confidence item name or amount"), state.items.map { it.reviewNote })
     }
 
     @Test
@@ -544,7 +604,7 @@ class ReceiptReviewPresenterTest {
 
         assertEquals(ReceiptReviewSection.Details, validated.firstBlockingSection)
         assertEquals(1, validated.validationRequestId)
-        assertFalse(validated.fieldErrors.isEmpty())
+        assertTrue(validated.editDraft is ReceiptReviewEditDraft.Merchant)
     }
 
     @Test
@@ -582,8 +642,8 @@ class ReceiptReviewPresenterTest {
         var state = presenter.load()
 
         assertTrue(state.items.single().needsReview)
-        assertEquals("Corrected from €11.00 · Check amount", state.items.single().reviewNote)
-        assertEquals("1 item needs review", state.statusLabel)
+        assertEquals("Amount was corrected to match subtotal", state.items.single().reviewNote)
+        assertEquals("Dessert needs review", state.statusLabel)
         assertTrue(state.reconciliation.isIssue)
 
         state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-1")))
@@ -598,11 +658,307 @@ class ReceiptReviewPresenterTest {
         assertTrue(repository.draft?.receipt?.parseMetadata?.corrections.orEmpty().isEmpty())
     }
 
+    @Test
+    fun `matched total with subtotal parser warning does not create active issue`() = runBlocking {
+        val presenter = presenter(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    parseMetadata = ReceiptParseMetadata(
+                        reviewWarnings = listOf("Item amounts should be checked against the printed subtotal."),
+                    ),
+                ),
+            ),
+        )
+        val state = presenter.load()
+
+        assertTrue(state.issues.isEmpty())
+        assertFalse(state.hasWarningStatus)
+        assertTrue(state.canContinue)
+
+        val nextState = presenter.reduce(state, ReceiptReviewUiEvent.StatusClick)
+
+        assertEquals(null, nextState.editDraft)
+        assertFalse(nextState.issueNavigatorVisible)
+        assertEquals(null, nextState.firstBlockingSection)
+    }
+
+    @Test
+    fun `confirming final flagged item clears stale parser warnings and saved metadata`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft().copy(
+                receipt = draft().receipt.copy(
+                    items = listOf(
+                        validItem(
+                            id = "item-1",
+                            name = "Dessert",
+                            amountMinor = 1_000,
+                            parseMetadata = ReceiptItemParseMetadata(
+                                candidates = listOf(MoneyMinor(1_000), MoneyMinor(1_100)),
+                                needsReview = true,
+                            ),
+                        ),
+                    ),
+                    parseMetadata = ReceiptParseMetadata(
+                        reviewWarnings = listOf(
+                            "Dessert amount may be wrong.",
+                            "Check item amounts against the subtotal.",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val presenter = presenter(repository = repository)
+        var state = presenter.load()
+
+        assertFalse(state.canContinue)
+        assertEquals("Dessert needs review", state.statusLabel)
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-1")))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+
+        assertEquals("Ready", state.summaryStatusLabel)
+        assertFalse(state.hasWarningStatus)
+        assertTrue(state.canContinue)
+        assertEquals(SaveReceiptReviewResult.Saved, presenter.saveDraft(state))
+        assertTrue(repository.draft?.receipt?.parseMetadata?.reviewWarnings.orEmpty().isEmpty())
+    }
+
+    @Test
+    fun `quantity line total correction appears reviewable and clears after confirmation`() = runBlocking {
+        val presenter = presenter(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    merchantName = "Crowne Plaza Barcelona - Fira Center",
+                    items = listOf(
+                        validItem("item-1", "Burrata", 1_600),
+                        validItem("item-2", "Pan de Coca", 350),
+                        validItem(
+                            id = "item-3",
+                            name = "Solomillo a la Sal",
+                            amountMinor = 4_400,
+                            quantity = 2,
+                            parseMetadata = ReceiptItemParseMetadata(
+                                candidates = listOf(MoneyMinor(4_400), MoneyMinor(2_200)),
+                                needsReview = true,
+                            ),
+                        ),
+                        validItem("item-4", "100% Chocolate fondant", 850),
+                        validItem("item-5", "Agua 1/2", 450),
+                        validItem("item-6", "Copa Aphrodisiaque T.", 1_200, quantity = 2),
+                    ),
+                    fees = listOf(
+                        ReceiptFee(FeeId("discount"), FeeType.Discount, "Portal Reserva 30%", MoneyMinor(-2_655)),
+                    ),
+                    total = MoneyMinor(6_195),
+                    parseMetadata = ReceiptParseMetadata(
+                        corrections = listOf(
+                            ReceiptParseCorrection(
+                                field = "items[2].totalPriceMinor",
+                                itemName = "Solomillo a la Sal",
+                                from = MoneyMinor(2_200),
+                                to = MoneyMinor(4_400),
+                                reason = "Corrected quantity line total to match expected item subtotal.",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        var state = presenter.load()
+
+        assertEquals("Solomillo a la Sal needs review", state.statusLabel)
+        assertEquals("Review highlighted item before continuing", state.reconciliation.message)
+        assertFalse(state.canContinue)
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-3")))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+
+        assertTrue(state.canContinue)
+        assertEquals("Ready", state.summaryStatusLabel)
+        assertFalse(state.hasWarningStatus)
+    }
+
+    @Test
+    fun `multiple issues show issue navigator from status click`() = runBlocking {
+        val presenter = presenter()
+        val state = presenter.load().copy(
+            merchantName = "",
+            scannedReceiptTotalAmount = "11.00",
+        )
+
+        val nextState = presenter.reduce(state, ReceiptReviewUiEvent.StatusClick)
+
+        assertTrue(nextState.issueNavigatorVisible)
+        assertEquals(2, nextState.blockingIssues.size)
+        assertEquals(listOf("Merchant is required", "Total differs by €1.00"), nextState.blockingIssues.map { it.title })
+    }
+
+    @Test
+    fun `selecting item issue opens item draft and requests row focus`() = runBlocking {
+        val presenter = presenter(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    items = listOf(
+                        validItem(
+                            id = "item-1",
+                            name = "Dessert",
+                            amountMinor = 1_000,
+                            parseMetadata = ReceiptItemParseMetadata(needsReview = true),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val state = presenter.load()
+
+        val nextState = presenter.reduce(state.copy(issueNavigatorVisible = true), ReceiptReviewUiEvent.IssueSelected("item_item-1"))
+
+        assertFalse(nextState.issueNavigatorVisible)
+        assertEquals(ReceiptReviewSection.Items, nextState.firstBlockingSection)
+        assertEquals("item-1", nextState.firstBlockingItemId)
+        assertTrue(nextState.editDraft is ReceiptReviewEditDraft.Item)
+    }
+
+    @Test
+    fun `item edit draft exposes confirm amount CTA when flagged value is unchanged`() = runBlocking {
+        val presenter = presenter(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    items = listOf(
+                        validItem(
+                            id = "item-1",
+                            name = "Dessert",
+                            amountMinor = 1_000,
+                            parseMetadata = ReceiptItemParseMetadata(needsReview = true),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        var state = presenter.load()
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-1")))
+
+        val draft = state.editDraft as ReceiptReviewEditDraft.Item
+        assertEquals("Confirm amount", draft.primaryActionLabel)
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.ItemLineTotalChanged("10.01"))
+
+        assertEquals("Save changes", (state.editDraft as ReceiptReviewEditDraft.Item).primaryActionLabel)
+    }
+
+    @Test
+    fun `keep calculated total confirms calculated total and clears mismatch`() = runBlocking {
+        val presenter = presenter()
+        var state = presenter.load().copy(scannedReceiptTotalAmount = "11.00")
+
+        assertTrue(state.reconciliation.isIssue)
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.KeepCalculatedTotalClick)
+
+        assertEquals("10.00", state.scannedReceiptTotalAmount)
+        assertTrue(state.receiptTotalConfirmedByUser)
+        assertFalse(state.reconciliation.isIssue)
+        assertEquals("Receipt total confirmed", state.statusLabel)
+    }
+
+    @Test
+    fun `use receipt total adds positive fee when receipt total is higher`() = runBlocking {
+        val presenter = presenter()
+        var state = presenter.load().copy(scannedReceiptTotalAmount = "11.25")
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.UseReceiptTotalClick)
+
+        assertEquals("1.25", state.fees.single().amount)
+        assertEquals("Receipt total fee", state.fees.single().displayLabel)
+        assertEquals("11.25", state.calculatedTotalAmount)
+        assertFalse(state.reconciliation.isIssue)
+    }
+
+    @Test
+    fun `use receipt total keeps lower unsafe mismatch blocking`() = runBlocking {
+        val presenter = presenter()
+        val state = presenter.load().copy(scannedReceiptTotalAmount = "9.00")
+
+        val nextState = presenter.reduce(state, ReceiptReviewUiEvent.UseReceiptTotalClick)
+
+        assertEquals("Review item amounts or edit the receipt total to resolve the difference.", nextState.fieldErrors["summary"])
+        assertEquals(ReceiptReviewSection.Summary, nextState.firstBlockingSection)
+        assertTrue(nextState.reconciliation.isIssue)
+    }
+
+    @Test
+    fun `date label displays readable date without raw iso timestamp`() = runBlocking {
+        val presenter = presenter(draft = draft().copy(receipt = draft().receipt.copy(transactionDateLabel = "2018-11-03T16:39:00")))
+
+        val state = presenter.load()
+
+        assertEquals("2018-11-03T16:39:00", state.dateLabel)
+        assertEquals("3 Nov 2018", state.dateDisplayLabel)
+    }
+
+    @Test
+    fun `currency warning becomes actionable currency issue`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    parseMetadata = ReceiptParseMetadata(reviewWarnings = listOf("Currency was uncertain.")),
+                ),
+            ),
+        )
+        val presenter = presenter(repository = repository)
+
+        var state = presenter.load()
+
+        assertEquals(ReceiptReviewIssueKind.UncertainCurrency, state.issues.single().kind)
+        assertEquals("Check receipt currency", state.issues.single().title)
+        assertEquals(ReceiptReviewEditTarget.Currency, (state.issues.single().target as ReceiptReviewIssueTarget.Details).editTarget)
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Currency))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+
+        assertTrue(state.currencyConfirmedByUser)
+        assertTrue(state.issues.isEmpty())
+        assertFalse(state.hasWarningStatus)
+        assertEquals(SaveReceiptReviewResult.Saved, presenter.saveDraft(state))
+        assertTrue(repository.draft?.receipt?.parseMetadata?.reviewWarnings.orEmpty().isEmpty())
+    }
+
+    @Test
+    fun `continue state follows blocking issues`() = runBlocking {
+        val presenter = presenter(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    items = listOf(
+                        validItem(
+                            id = "item-1",
+                            name = "Dessert",
+                            amountMinor = 1_000,
+                            parseMetadata = ReceiptItemParseMetadata(needsReview = true),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        var state = presenter.load()
+
+        assertFalse(state.canContinue)
+        assertEquals("Fix: Dessert needs review", state.continueBlockedMessage)
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-1")))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+
+        assertTrue(state.canContinue)
+        assertEquals(null, state.continueBlockedMessage)
+    }
+
     private fun presenter(
         draft: ExpenseDraft = draft(),
         repository: FakeExpenseDraftRepository = FakeExpenseDraftRepository(draft),
+        normalizeReceipt: NormalizeReceiptUseCase = NoOpNormalizeReceipt,
     ): ReceiptReviewPresenter = ReceiptReviewPresenter(
         draftRepository = repository,
+        normalizeReceipt = normalizeReceipt,
         validateReceipt = AlwaysValidReceipt,
     )
 
@@ -671,5 +1027,19 @@ class ReceiptReviewPresenterTest {
 
     private object AlwaysValidReceipt : ValidateReceiptUseCase {
         override fun validate(receipt: Receipt): ReceiptValidationResult = ReceiptValidationResult.Valid
+    }
+
+    private object NoOpNormalizeReceipt : NormalizeReceiptUseCase {
+        override fun normalize(receipt: Receipt): Receipt = receipt
+    }
+
+    private object RemoveDuplicateTaxNormalizeReceipt : NormalizeReceiptUseCase {
+        override fun normalize(receipt: Receipt): Receipt {
+            return receipt.copy(
+                fees = receipt.fees.filterNot { fee ->
+                    fee.type == FeeType.Tax && fee.amount == receipt.total
+                },
+            )
+        }
     }
 }

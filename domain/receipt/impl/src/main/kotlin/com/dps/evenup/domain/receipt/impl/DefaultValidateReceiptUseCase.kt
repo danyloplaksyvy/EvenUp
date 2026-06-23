@@ -1,5 +1,6 @@
 package com.dps.evenup.domain.receipt.impl
 
+import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptValidationError
 import com.dps.evenup.domain.receipt.api.ReceiptValidationResult
@@ -23,7 +24,10 @@ class DefaultValidateReceiptUseCase : ValidateReceiptUseCase {
             }
 
             receipt.fees.forEach { fee ->
-                if (fee.amount.value <= 0) add(ReceiptValidationError.NonPositiveFeeAmount)
+                when (fee.type) {
+                    FeeType.Discount -> if (fee.amount.value >= 0) add(ReceiptValidationError.NonPositiveFeeAmount)
+                    else -> if (fee.amount.value <= 0) add(ReceiptValidationError.NonPositiveFeeAmount)
+                }
             }
 
             val itemTotal = receipt.items.sumOf { it.totalPrice.value }

@@ -133,9 +133,213 @@ test("POST /v1/receipts/parse reconciles a single candidate against subtotal", a
       itemName: "Rissol",
       fromMinor: 580,
       toMinor: 560,
-      reason: "Corrected to match printed subtotal 5800; digit likely misread."
+      reason: "Corrected to match expected item subtotal 5800."
     }
   ]);
+});
+
+test("POST /v1/receipts/parse reconciles quantity unit price parsed as line total", async () => {
+  const receiptWithQuantityLineTotalError = {
+    merchantName: "Crowne Plaza Barcelona - Fira Center",
+    transactionDate: "2019-03-10",
+    currency: "EUR",
+    items: [
+      item("Burrata", 1, 1600, [1600], 0.94, false),
+      item("Pan de Coca", 1, 350, [350], 0.94, false),
+      {
+        name: "Solomillo a la Sal",
+        quantity: 2,
+        unitPriceMinor: 2200,
+        totalPriceMinor: 2200,
+        confidence: 0.84,
+        candidatesMinor: [2200],
+        needsReview: false
+      },
+      item("100% Chocolate fondant", 1, 850, [850], 0.94, false),
+      item("Agua 1/2", 1, 450, [450], 0.94, false),
+      item("Copa Aphrodisiaque T.", 2, 1200, [1200], 0.94, false)
+    ],
+    fees: [
+      {
+        type: "DISCOUNT",
+        label: "Portal Reserva 30%",
+        amountMinor: -2655
+      }
+    ],
+    subtotalMinor: 6650,
+    totalMinor: 6195,
+    confidence: 0.84,
+    corrections: [],
+    reviewWarnings: []
+  };
+
+  const response = await handleRequest(
+    jsonRequest("http://localhost/v1/receipts/parse", {
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      mimeType: "image/jpeg",
+      localeHint: "es-ES",
+      currencyHint: "EUR"
+    }),
+    {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_FETCH: async () =>
+        Response.json({
+          output_text: JSON.stringify(receiptWithQuantityLineTotalError)
+        })
+    }
+  );
+
+  const body = await response.json();
+  const solomillo = body.items[2];
+
+  assert.equal(response.status, 200);
+  assert.equal(body.subtotalMinor, 8850);
+  assert.equal(solomillo.totalPriceMinor, 4400);
+  assert.equal(solomillo.unitPriceMinor, 2200);
+  assert.equal(solomillo.needsReview, true);
+  assert.deepEqual(solomillo.candidatesMinor, [4400, 2200]);
+  assert.deepEqual(body.reviewWarnings, []);
+  assert.equal(body.corrections[0].field, "items[2].totalPriceMinor");
+  assert.equal(body.corrections[0].itemName, "Solomillo a la Sal");
+  assert.equal(body.corrections[0].fromMinor, 2200);
+  assert.equal(body.corrections[0].toMinor, 4400);
+  assert.match(body.corrections[0].reason, /quantity line total/i);
+});
+
+test("POST /v1/receipts/parse removes tax fee duplicated from receipt total", async () => {
+  const response = await handleRequest(
+    jsonRequest("http://localhost/v1/receipts/parse", {
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      mimeType: "image/jpeg",
+      localeHint: "es-ES",
+      currencyHint: "EUR"
+    }),
+    {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_FETCH: async () =>
+        Response.json({
+          output_text: JSON.stringify(crownePlazaReceiptWithFees([
+            {
+              type: "TAX",
+              label: "Tax",
+              amountMinor: 6195
+            },
+            {
+              type: "DISCOUNT",
+              label: "Portal Reserva 30%",
+              amountMinor: -2655
+            }
+          ]))
+        })
+    }
+  );
+
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.fees, [
+    {
+      type: "DISCOUNT",
+      label: "Portal Reserva 30%",
+      amountMinor: -2655
+    }
+  ]);
+  assert.deepEqual(body.reviewWarnings, []);
+  assert.deepEqual(body.corrections, [
+    {
+      field: "fees[0].amountMinor",
+      itemName: null,
+      fromMinor: 6195,
+      toMinor: 0,
+      reason: "Removed included VAT/tax duplicated from receipt total."
+    }
+  ]);
+});
+
+test("POST /v1/receipts/parse removes included IVA when discount already reconciles total", async () => {
+  const response = await handleRequest(
+    jsonRequest("http://localhost/v1/receipts/parse", {
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      mimeType: "image/jpeg",
+      localeHint: "es-ES",
+      currencyHint: "EUR"
+    }),
+    {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_FETCH: async () =>
+        Response.json({
+          output_text: JSON.stringify(crownePlazaReceiptWithFees([
+            {
+              type: "TAX",
+              label: "IVA 10%",
+              amountMinor: 563
+            },
+            {
+              type: "DISCOUNT",
+              label: "Portal Reserva 30%",
+              amountMinor: -2655
+            }
+          ]))
+        })
+    }
+  );
+
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.fees, [
+    {
+      type: "DISCOUNT",
+      label: "Portal Reserva 30%",
+      amountMinor: -2655
+    }
+  ]);
+  assert.deepEqual(body.reviewWarnings, []);
+  assert.equal(body.corrections[0].field, "fees[0].amountMinor");
+  assert.equal(body.corrections[0].fromMinor, 563);
+  assert.equal(body.corrections[0].toMinor, 0);
+});
+
+test("POST /v1/receipts/parse keeps true additive tax", async () => {
+  const receiptWithAdditiveTax = {
+    merchantName: "Bella Roma",
+    transactionDate: "2026-06-15",
+    currency: "EUR",
+    items: [item("Pasta", 1, 1000, [1000], 0.92, false)],
+    fees: [
+      {
+        type: "TAX",
+        label: "Tax",
+        amountMinor: 100
+      }
+    ],
+    subtotalMinor: 1000,
+    totalMinor: 1100,
+    confidence: 0.92,
+    corrections: [],
+    reviewWarnings: []
+  };
+
+  const response = await handleRequest(
+    jsonRequest("http://localhost/v1/receipts/parse", {
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      mimeType: "image/jpeg"
+    }),
+    {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_FETCH: async () =>
+        Response.json({
+          output_text: JSON.stringify(receiptWithAdditiveTax)
+        })
+    }
+  );
+
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.fees, receiptWithAdditiveTax.fees);
+  assert.deepEqual(body.corrections, []);
+  assert.deepEqual(body.reviewWarnings, []);
 });
 
 test("POST /v1/receipts/parse returns warning without audit by default when mismatch remains unresolved", async () => {
@@ -143,8 +347,8 @@ test("POST /v1/receipts/parse returns warning without audit by default when mism
   const logger = testLogger();
   const mismatchedReceipt = {
     ...parsedReceipt,
-    subtotalMinor: 3500,
-    totalMinor: 4100
+    subtotalMinor: 3400,
+    totalMinor: 4000
   };
 
   const response = await handleRequest(
@@ -178,7 +382,7 @@ test("POST /v1/receipts/parse returns warning without audit by default when mism
         entry.auditInvoked === false
     )
   );
-  assert.match(body.reviewWarnings[0], /does not match printed subtotal/);
+  assert.match(body.reviewWarnings[0], /does not match expected item subtotal/);
 });
 
 test("POST /v1/receipts/parse uses auditor for unresolved mismatch when explicitly enabled", async () => {
@@ -186,8 +390,8 @@ test("POST /v1/receipts/parse uses auditor for unresolved mismatch when explicit
   const logger = testLogger();
   const mismatchedReceipt = {
     ...parsedReceipt,
-    subtotalMinor: 3500,
-    totalMinor: 4100
+    subtotalMinor: 3400,
+    totalMinor: 4000
   };
 
   const response = await handleRequest(
@@ -222,7 +426,7 @@ test("POST /v1/receipts/parse uses auditor for unresolved mismatch when explicit
         entry.auditInvoked === true
     )
   );
-  assert.match(body.reviewWarnings[0], /does not match printed subtotal/);
+  assert.match(body.reviewWarnings[0], /does not match expected item subtotal/);
 });
 
 test("POST /v1/receipts/parse uses auditor only when deterministic reconciliation fails", async () => {
@@ -305,6 +509,28 @@ function receiptParseError() {
       code: "RECEIPT_PARSE_FAILED",
       message: "Could not read this receipt. Please try again or enter it manually."
     }
+  };
+}
+
+function crownePlazaReceiptWithFees(fees) {
+  return {
+    merchantName: "Crowne Plaza Barcelona - Fira Center",
+    transactionDate: "2019-03-10",
+    currency: "EUR",
+    items: [
+      item("Burrata", 1, 1600, [1600], 0.94, false),
+      item("Pan de Coca", 1, 350, [350], 0.94, false),
+      item("Solomillo a la Sal", 2, 4400, [4400], 0.94, false),
+      item("100% Chocolate fondant", 1, 850, [850], 0.94, false),
+      item("Agua 1/2", 1, 450, [450], 0.94, false),
+      item("Copa Aphrodisiaque T.", 2, 1200, [1200], 0.94, false)
+    ],
+    fees,
+    subtotalMinor: 8850,
+    totalMinor: 6195,
+    confidence: 0.84,
+    corrections: [],
+    reviewWarnings: []
   };
 }
 

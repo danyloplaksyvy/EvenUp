@@ -31,6 +31,7 @@ enum class FeeType {
     Tax,
     Tip,
     ServiceFee,
+    Discount,
     Other,
 }
 

@@ -34,7 +34,9 @@ import com.dps.evenup.domain.expense.impl.DefaultValidateExpenseBeforeSaveUseCas
 import com.dps.evenup.domain.expense.impl.DefaultValidateItemAssignmentsUseCase
 import com.dps.evenup.domain.participant.api.ValidateParticipantsUseCase
 import com.dps.evenup.domain.participant.impl.DefaultValidateParticipantsUseCase
+import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.ValidateReceiptUseCase
+import com.dps.evenup.domain.receipt.impl.DefaultNormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.impl.DefaultValidateReceiptUseCase
 import dagger.Module
 import dagger.Provides
@@ -149,4 +151,7 @@ object ReceiptDraftModule {
 
     @Provides
     fun provideValidateReceiptUseCase(): ValidateReceiptUseCase = DefaultValidateReceiptUseCase()
+
+    @Provides
+    fun provideNormalizeReceiptUseCase(): NormalizeReceiptUseCase = DefaultNormalizeReceiptUseCase()
 }

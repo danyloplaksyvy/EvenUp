@@ -13,6 +13,7 @@ import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
 import com.dps.evenup.domain.expense.api.ValidateItemAssignmentsUseCase
 import com.dps.evenup.domain.participant.api.ValidateParticipantsUseCase
+import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.ValidateReceiptUseCase
 import com.dps.evenup.feature.expenseflow.api.AssignItemsDestination
 import com.dps.evenup.feature.expenseflow.api.ChoosePeopleDestination
@@ -57,6 +58,7 @@ object ExpenseFlowNavigationModule {
         validateExpenseBeforeSave: ValidateExpenseBeforeSaveUseCase,
         validateItemAssignments: ValidateItemAssignmentsUseCase,
         validateParticipants: ValidateParticipantsUseCase,
+        normalizeReceipt: NormalizeReceiptUseCase,
         validateReceipt: ValidateReceiptUseCase,
     ): EvenUpEntryProviderInstaller = EvenUpEntryProviderInstaller { scope ->
         with(scope) {
@@ -72,6 +74,7 @@ object ExpenseFlowNavigationModule {
                     receiptRepository = receiptRepository,
                     receiptImageReader = receiptImageReader,
                     receiptCaptureTargetFactory = receiptCaptureTargetFactory,
+                    normalizeReceipt = normalizeReceipt,
                     validateReceipt = validateReceipt,
                     onBack = navigator::navigateBack,
                     onManualEntry = { navigator.navigate(ManualEntryDestination) },
@@ -89,6 +92,7 @@ object ExpenseFlowNavigationModule {
             entry<ReceiptReviewDestination> {
                 ReceiptReviewRoute(
                     draftRepository = draftRepository,
+                    normalizeReceipt = normalizeReceipt,
                     validateReceipt = validateReceipt,
                     onBack = navigator::navigateBack,
                     onContinue = { navigator.navigate(ChoosePeopleDestination) },

@@ -9,20 +9,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
+import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.ValidateReceiptUseCase
 import kotlinx.coroutines.launch
 
 @Composable
 fun ReceiptReviewRoute(
     draftRepository: ExpenseDraftRepository,
+    normalizeReceipt: NormalizeReceiptUseCase,
     validateReceipt: ValidateReceiptUseCase,
     onBack: () -> Boolean,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val presenter = remember(draftRepository, validateReceipt) {
+    val presenter = remember(draftRepository, normalizeReceipt, validateReceipt) {
         ReceiptReviewPresenter(
             draftRepository = draftRepository,
+            normalizeReceipt = normalizeReceipt,
             validateReceipt = validateReceipt,
         )
     }

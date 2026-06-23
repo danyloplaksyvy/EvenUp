@@ -10,6 +10,7 @@ import com.dps.evenup.domain.participant.api.Participant
 import com.dps.evenup.domain.participant.api.ParticipantId
 import com.dps.evenup.domain.receipt.api.CurrencyCode
 import com.dps.evenup.domain.receipt.api.FeeId
+import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.MoneyMinor
 import com.dps.evenup.domain.receipt.api.ReceiptFee
 import java.math.BigDecimal
@@ -561,7 +562,7 @@ class FeesAllocationPresenter(
     }
 
     private fun ExpenseDraft.positiveFees(): List<ReceiptFee> {
-        return receipt.fees.filter { fee -> fee.amount.value > 0L }
+        return receipt.fees.filter { fee -> fee.type != FeeType.Discount && fee.amount.value > 0L }
     }
 
     private fun ExpenseDraft.hasAssignedItemSubtotal(): Boolean {
