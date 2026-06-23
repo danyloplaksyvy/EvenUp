@@ -8,6 +8,7 @@ import com.dps.evenup.domain.expense.api.ItemAssignment
 import com.dps.evenup.domain.expense.api.ItemAssignmentMode
 import com.dps.evenup.domain.expense.api.ItemAssignmentValidationResult
 import com.dps.evenup.domain.expense.api.ItemParticipantShare
+import com.dps.evenup.domain.expense.api.PercentageBasisPoints
 import com.dps.evenup.domain.expense.api.ValidateItemAssignmentsUseCase
 import com.dps.evenup.domain.participant.api.Participant
 import com.dps.evenup.domain.participant.api.ParticipantId
@@ -73,6 +74,22 @@ class AssignItemsPresenterTest {
     }
 
     @Test
+    fun `assigned item with three people keeps all assignees and uses compact label`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft(quantity = 3, includeThirdParticipant = true))
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p3"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
+
+        val item = state.items.single()
+        assertEquals(AssignItemsSplitMode.Units, item.splitMode)
+        assertEquals(listOf("p1", "p2", "p3"), item.assignees.map { assignee -> assignee.participantId })
+        assertEquals("3 people · Units", item.assignmentActionLabel)
+    }
+
+    @Test
     fun `direct item tap with multiple selected people and mismatched quantity assigns equal split`() = runBlocking {
         val repository = FakeExpenseDraftRepository(draft(quantity = 1))
         val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
@@ -85,6 +102,23 @@ class AssignItemsPresenterTest {
         assertEquals(AssignItemsSplitMode.SharedEqual, item.splitMode)
         assertEquals(listOf("p1", "p2"), item.assignees.map { assignee -> assignee.participantId })
         assertEquals("John + Amy · Equal", item.assignmentActionLabel)
+    }
+
+    @Test
+    fun `selected participant chips do not change assigned or unassigned item row labels`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft(includeSecondItem = true))
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+
+        val assignedItem = state.items.first { item -> item.id == "item-1" }
+        val unassignedItem = state.items.first { item -> item.id == "item-2" }
+        assertEquals(listOf("p1"), assignedItem.assignees.map { assignee -> assignee.participantId })
+        assertEquals("John", assignedItem.assignmentActionLabel)
+        assertEquals(emptyList<String>(), unassignedItem.assignees.map { assignee -> assignee.participantId })
+        assertEquals("Unassigned", unassignedItem.assignmentActionLabel)
     }
 
     @Test
@@ -264,6 +298,111 @@ class AssignItemsPresenterTest {
     }
 
     @Test
+    fun `percentage mode for assigned item uses item assignees instead of selected chips`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft(
+                assignments = listOf(
+                    sharedEqualAssignment("p1", "p2"),
+                ),
+                includeThirdParticipant = true,
+            ),
+        )
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p3"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.Percentage))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(AssignItemsSplitMode.Percentage, sheet.mode)
+        assertEquals(listOf("p1", "p2", "p3"), sheet.rows.map { row -> row.participantId })
+        assertEquals(listOf("50", "50", ""), sheet.rows.map { row -> row.percentage })
+        assertEquals(listOf("$5.00", "$5.00", ""), sheet.rows.map { row -> row.amountLabel })
+        assertEquals(listOf(true, true, false), sheet.rows.map { row -> row.included })
+        assertEquals("0% remaining", sheet.statusLabel)
+    }
+
+    @Test
+    fun `custom amount mode for assigned item uses item assignees instead of selected chips`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft(
+                assignments = listOf(
+                    sharedEqualAssignment("p1", "p2"),
+                ),
+                includeThirdParticipant = true,
+            ),
+        )
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p3"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.CustomAmount))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(AssignItemsSplitMode.CustomAmount, sheet.mode)
+        assertEquals(listOf("p1", "p2", "p3"), sheet.rows.map { row -> row.participantId })
+        assertEquals(listOf("5.00", "5.00", ""), sheet.rows.map { row -> row.amount })
+        assertEquals(listOf(true, true, false), sheet.rows.map { row -> row.included })
+        assertEquals("$0.00 remaining", sheet.statusLabel)
+    }
+
+    @Test
+    fun `shared equal mode for assigned item uses item assignees instead of selected chips`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft(
+                assignments = listOf(
+                    byUnitsAssignment("p1", "p2"),
+                ),
+                includeThirdParticipant = true,
+            ),
+        )
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p3"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.SharedEqual))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(AssignItemsSplitMode.SharedEqual, sheet.mode)
+        assertEquals(listOf("p1", "p2", "p3"), sheet.rows.map { row -> row.participantId })
+        assertEquals(listOf(true, true, false), sheet.rows.map { row -> row.included })
+        assertEquals(listOf("$5.00", "$5.00", ""), sheet.rows.map { row -> row.amountLabel })
+        assertEquals("2 people selected · $5.00 each", sheet.statusLabel)
+    }
+
+    @Test
+    fun `existing percentage assignment keeps saved percentages when switching back to percent`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft(
+                assignments = listOf(
+                    percentageAssignment(
+                        "p1" to 7000,
+                        "p2" to 3000,
+                    ),
+                ),
+                includeThirdParticipant = true,
+            ),
+        )
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p3"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.CustomAmount))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.Percentage))
+
+        val sheet = requireNotNull(state.splitSheet)
+        assertEquals(AssignItemsSplitMode.Percentage, sheet.mode)
+        assertEquals(listOf("70", "30", ""), sheet.rows.map { row -> row.percentage })
+        assertEquals(listOf("$7.00", "$3.00", ""), sheet.rows.map { row -> row.amountLabel })
+        assertEquals(listOf(true, true, false), sheet.rows.map { row -> row.included })
+        assertEquals("0% remaining", sheet.statusLabel)
+    }
+
+    @Test
     fun `amount mode autofills one remaining selected participant`() = runBlocking {
         val repository = FakeExpenseDraftRepository(draft())
         val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
@@ -277,6 +416,60 @@ class AssignItemsPresenterTest {
         val sheet = requireNotNull(state.splitSheet)
         assertEquals(listOf("2.00", "8.00"), sheet.rows.map { row -> row.amount })
         assertEquals("$0.00 remaining", sheet.statusLabel)
+        assertEquals(true, sheet.canSave)
+    }
+
+    @Test
+    fun `amount mode updates generated remainder but preserves edited values`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.CustomAmount))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitCustomAmountChanged("p1", "2.00"))
+
+        var sheet = requireNotNull(state.splitSheet)
+        assertEquals(listOf("2.00", "8.00"), sheet.rows.map { row -> row.amount })
+        assertEquals(listOf(false, true), sheet.rows.map { row -> row.amountGenerated })
+
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitCustomAmountChanged("p1", "3.00"))
+        sheet = requireNotNull(state.splitSheet)
+        assertEquals(listOf("3.00", "7.00"), sheet.rows.map { row -> row.amount })
+
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitCustomAmountChanged("p2", "6.00"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitCustomAmountChanged("p1", "4.00"))
+        sheet = requireNotNull(state.splitSheet)
+
+        assertEquals(listOf("4.00", "6.00"), sheet.rows.map { row -> row.amount })
+        assertEquals(listOf(true, true), sheet.rows.map { row -> row.amountEdited })
+        assertEquals(listOf(false, false), sheet.rows.map { row -> row.amountGenerated })
+        assertEquals(true, sheet.canSave)
+    }
+
+    @Test
+    fun `percentage mode updates generated remainder but preserves edited values`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemSplitClick("item-1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitModeSelected(AssignItemsSplitMode.Percentage))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitPercentageChanged("p1", "40"))
+
+        var sheet = requireNotNull(state.splitSheet)
+        assertEquals(listOf("40", "60"), sheet.rows.map { row -> row.percentage })
+        assertEquals(listOf(false, true), sheet.rows.map { row -> row.percentageGenerated })
+
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitPercentageChanged("p2", "55"))
+        state = presenter.reduce(state, AssignItemsUiEvent.SplitPercentageChanged("p1", "45"))
+        sheet = requireNotNull(state.splitSheet)
+
+        assertEquals(listOf("45", "55"), sheet.rows.map { row -> row.percentage })
+        assertEquals(listOf(true, true), sheet.rows.map { row -> row.percentageEdited })
+        assertEquals(listOf(false, false), sheet.rows.map { row -> row.percentageGenerated })
         assertEquals(true, sheet.canSave)
     }
 
@@ -311,6 +504,7 @@ class AssignItemsPresenterTest {
         assignments: List<ItemAssignment> = emptyList(),
         quantity: Int = 2,
         includeSecondItem: Boolean = false,
+        includeThirdParticipant: Boolean = false,
     ): ExpenseDraft = ExpenseDraft(
         id = ExpenseDraftId("draft-1"),
         receipt = run {
@@ -346,10 +540,52 @@ class AssignItemsPresenterTest {
         participants = listOf(
             Participant(ParticipantId("p1"), "John", 0),
             Participant(ParticipantId("p2"), "Amy", 1),
-        ),
+        ) + if (includeThirdParticipant) {
+            listOf(Participant(ParticipantId("p3"), "Max", 2))
+        } else {
+            emptyList()
+        },
         payerId = ParticipantId("p1"),
         itemAssignments = assignments,
         feeAllocations = emptyList<FeeAllocation>(),
+    )
+
+    private fun sharedEqualAssignment(
+        firstParticipantId: String,
+        secondParticipantId: String,
+    ): ItemAssignment = ItemAssignment(
+        receiptItemId = ReceiptItemId("item-1"),
+        mode = ItemAssignmentMode.SharedEqual,
+        shares = listOf(
+            ItemParticipantShare(ParticipantId(firstParticipantId), MoneyMinor(500)),
+            ItemParticipantShare(ParticipantId(secondParticipantId), MoneyMinor(500)),
+        ),
+    )
+
+    private fun byUnitsAssignment(
+        firstParticipantId: String,
+        secondParticipantId: String,
+    ): ItemAssignment = ItemAssignment(
+        receiptItemId = ReceiptItemId("item-1"),
+        mode = ItemAssignmentMode.ByUnits,
+        shares = listOf(
+            ItemParticipantShare(ParticipantId(firstParticipantId), MoneyMinor(500), quantity = Quantity(1)),
+            ItemParticipantShare(ParticipantId(secondParticipantId), MoneyMinor(500), quantity = Quantity(1)),
+        ),
+    )
+
+    private fun percentageAssignment(
+        vararg shares: Pair<String, Int>,
+    ): ItemAssignment = ItemAssignment(
+        receiptItemId = ReceiptItemId("item-1"),
+        mode = ItemAssignmentMode.Percentage,
+        shares = shares.map { (participantId, percentageBasisPoints) ->
+            ItemParticipantShare(
+                participantId = ParticipantId(participantId),
+                amount = MoneyMinor(1_000L * percentageBasisPoints / 10_000),
+                percentage = PercentageBasisPoints(percentageBasisPoints),
+            )
+        },
     )
 
     private class FakeExpenseDraftRepository(

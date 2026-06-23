@@ -49,7 +49,7 @@ internal fun ReceiptDatePickerField(
             .toEpochMilli()
     }
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = value.toEpochMillisOrNull(),
+        initialSelectedDateMillis = resolveDatePickerInitialSelectedMillis(value, todayMillis),
         selectableDates = object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= todayMillis
 
@@ -91,9 +91,7 @@ internal fun ReceiptDatePickerField(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            onDateSelected(millis.toIsoDate())
-                        }
+                        onDateSelected((datePickerState.selectedDateMillis ?: todayMillis).toIsoDate())
                         pickerVisible = false
                     },
                 ) {
@@ -163,6 +161,11 @@ internal fun DeleteReceiptRowButton(
         )
     }
 }
+
+internal fun resolveDatePickerInitialSelectedMillis(
+    value: String,
+    todayMillis: Long,
+): Long = value.toEpochMillisOrNull()?.coerceAtMost(todayMillis) ?: todayMillis
 
 private fun String.toEpochMillisOrNull(): Long? {
     return runCatching {

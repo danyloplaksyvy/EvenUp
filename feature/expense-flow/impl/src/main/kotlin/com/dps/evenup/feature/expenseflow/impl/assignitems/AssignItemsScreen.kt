@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpBottomSheet
@@ -457,12 +458,15 @@ private fun AssignmentSummary(
         horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        assignees.take(4).forEach { assignee ->
+        assignees.take(MAX_VISIBLE_ASSIGNEE_AVATARS).forEach { assignee ->
             EvenUpParticipantAvatar(
                 name = assignee.name,
                 colorIndex = assignee.colorIndex,
                 selected = assignmentState == AssignItemsItemState.Assigned,
             )
+        }
+        if (assignees.size > MAX_VISIBLE_ASSIGNEE_AVATARS) {
+            AssignmentOverflowBadge(count = assignees.size - MAX_VISIBLE_ASSIGNEE_AVATARS)
         }
         Crossfade(targetState = assignmentActionLabel, label = "AssignmentSummaryLabel") { animatedLabel ->
             Text(
@@ -474,6 +478,26 @@ private fun AssignmentSummary(
                     AssignItemsItemState.Assigned -> EvenUpTheme.colors.textSecondary
                 },
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AssignmentOverflowBadge(count: Int) {
+    Surface(
+        modifier = Modifier.size(40.dp),
+        shape = EvenUpTheme.shapes.avatar,
+        color = EvenUpTheme.colors.surfaceElevated,
+        contentColor = EvenUpTheme.colors.textPrimary,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.border),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = "+$count",
+                style = EvenUpTheme.typography.caption,
+                color = EvenUpTheme.colors.textPrimary,
             )
         }
     }
@@ -487,6 +511,8 @@ private fun AssignItemsUiState.assignmentProgressText(): String {
         "$assignedCount / ${items.size} assigned"
     }
 }
+
+private const val MAX_VISIBLE_ASSIGNEE_AVATARS = 3
 
 @Composable
 private fun AssignItemSplitSheet(

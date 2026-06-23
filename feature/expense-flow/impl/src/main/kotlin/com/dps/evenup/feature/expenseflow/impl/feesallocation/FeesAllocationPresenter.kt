@@ -73,6 +73,15 @@ class FeesAllocationPresenter(
                     participantPicker = state.participantPicker(title = "Assign ${fee.label.lowercase()} to:", feeId = fee.id),
                 )
             }
+            is FeesAllocationUiEvent.AssignThisFeeToParticipantClick -> {
+                val draft = draftRepository.getDraft()
+                    ?: return state.copy(missingDraft = true, submitError = "No expense draft was found.")
+                state.assignFeeToOneParticipant(
+                    feeId = event.feeId,
+                    participantId = event.participantId,
+                    draft = draft,
+                )
+            }
             FeesAllocationUiEvent.ParticipantPickerDismissed -> state.copy(participantPicker = null)
             is FeesAllocationUiEvent.ParticipantPicked -> {
                 val draft = draftRepository.getDraft()
@@ -386,6 +395,7 @@ class FeesAllocationPresenter(
     }
 
     private fun FeeAllocationCardUiState.toEditor(): FocusedFeeEditorUiState {
+        val selectedParticipantId = singleFullCoveringParticipantId()
         return FocusedFeeEditorUiState(
             feeId = id,
             title = "Edit ${label.lowercase()}",
@@ -393,8 +403,29 @@ class FeesAllocationPresenter(
             statusLabel = statusLabel,
             canSave = error == null,
             rows = participantRows,
+            participantChips = participantRows.map { row ->
+                FocusedFeeParticipantChipUiState(
+                    id = row.participantId,
+                    name = row.name,
+                    colorIndex = row.colorIndex,
+                    selected = row.participantId == selectedParticipantId,
+                )
+            },
             error = error,
         )
+    }
+
+    private fun FeeAllocationCardUiState.singleFullCoveringParticipantId(): String? {
+        val parsedRows = participantRows.map { row -> row to parseMoneyInput(row.customAmount) }
+        if (parsedRows.any { (_, amount) -> amount == null }) return null
+        return parsedRows.singleOrNull { (_, amount) -> amount == amountMinor }
+            ?.takeIf { selected ->
+                parsedRows
+                    .filterNot { (row, _) -> row.participantId == selected.first.participantId }
+                    .all { (_, amount) -> amount == 0L }
+            }
+            ?.first
+            ?.participantId
     }
 
     private fun FeesAllocationUiState.withFocusedFeeEditor(feeId: String): FeesAllocationUiState {
@@ -455,6 +486,47 @@ class FeesAllocationPresenter(
             submitError = null,
         ).validatedCustom(draft = draft)
             .copy(feedback = nextFeedback(feedbackMessage))
+    }
+
+    private fun FeesAllocationUiState.assignFeeToOneParticipant(
+        feeId: String,
+        participantId: String,
+        draft: ExpenseDraft,
+    ): FeesAllocationUiState {
+        val changedFee = feeCards.firstOrNull { card -> card.id == feeId } ?: return this
+        val pickedName = participants.firstOrNull { participant -> participant.id == participantId }?.name.orEmpty()
+        val nextCards = feeCards.map { card ->
+            if (card.id == feeId) {
+                card.assignedToParticipant(participantId)
+            } else {
+                card
+            }
+        }
+        return copy(
+            mode = FeesAllocationModeUiState.Custom,
+            feeCards = nextCards,
+            participantPicker = null,
+            undoSnapshot = automaticChangeUndoSnapshot(),
+            undoSnackbarId = undoSnackbarId + 1L,
+            fieldErrors = emptyMap(),
+            submitError = null,
+        ).validatedCustom(draft = draft, selectedFeeId = feeId)
+            .copy(feedback = nextFeedback("Assigned ${changedFee.label.lowercase()} to $pickedName"))
+    }
+
+    private fun FeeAllocationCardUiState.assignedToParticipant(participantId: String): FeeAllocationCardUiState {
+        return copy(
+            coveringParticipantId = participantId,
+            participantRows = participantRows.map { row ->
+                row.copy(
+                    customAmount = if (row.participantId == participantId) {
+                        formatMoneyInput(amountMinor)
+                    } else {
+                        formatMoneyInput(0L)
+                    },
+                )
+            },
+        )
     }
 
     private fun FeesAllocationUiState.restoreAutomaticChange(draft: ExpenseDraft): FeesAllocationUiState {

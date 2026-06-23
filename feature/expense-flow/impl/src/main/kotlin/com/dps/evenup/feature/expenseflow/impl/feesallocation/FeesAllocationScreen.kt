@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -48,6 +50,7 @@ import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
 import com.dps.evenup.core.designsystem.api.EvenUpMoneyField
 import com.dps.evenup.core.designsystem.api.EvenUpParticipantAvatar
+import com.dps.evenup.core.designsystem.api.EvenUpParticipantChip
 import com.dps.evenup.core.designsystem.api.EvenUpPrimaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpSecondaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpTextButton
@@ -256,31 +259,41 @@ private fun ModeSelector(
         FeesAllocationModeUiState.Proportional to "Fees follow each person's assigned item subtotal.",
         FeesAllocationModeUiState.Custom to "Set exact fee amounts manually.",
     )
-    Row(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+        shape = EvenUpTheme.shapes.input,
+        color = EvenUpTheme.colors.surface,
+        contentColor = EvenUpTheme.colors.textPrimary,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.border),
     ) {
-        ModeButton(
-            text = "Equal",
-            selected = selectedMode == FeesAllocationModeUiState.Equal,
-            accessibilityDescription = descriptions.getValue(FeesAllocationModeUiState.Equal),
-            onClick = { onEvent(FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Equal)) },
-            modifier = Modifier.weight(1f),
-        )
-        ModeButton(
-            text = "Proportional",
-            selected = selectedMode == FeesAllocationModeUiState.Proportional,
-            accessibilityDescription = descriptions.getValue(FeesAllocationModeUiState.Proportional),
-            onClick = { onEvent(FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Proportional)) },
-            modifier = Modifier.weight(1f),
-        )
-        ModeButton(
-            text = "Custom",
-            selected = selectedMode == FeesAllocationModeUiState.Custom,
-            accessibilityDescription = descriptions.getValue(FeesAllocationModeUiState.Custom),
-            onClick = { onEvent(FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Custom)) },
-            modifier = Modifier.weight(1f),
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(EvenUpTheme.spacing.space4),
+            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
+        ) {
+            ModeButton(
+                text = "Equal",
+                selected = selectedMode == FeesAllocationModeUiState.Equal,
+                accessibilityDescription = descriptions.getValue(FeesAllocationModeUiState.Equal),
+                onClick = { onEvent(FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Equal)) },
+                modifier = Modifier.weight(1f),
+            )
+            ModeButton(
+                text = "Proportional",
+                selected = selectedMode == FeesAllocationModeUiState.Proportional,
+                accessibilityDescription = descriptions.getValue(FeesAllocationModeUiState.Proportional),
+                onClick = { onEvent(FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Proportional)) },
+                modifier = Modifier.weight(1f),
+            )
+            ModeButton(
+                text = "Custom",
+                selected = selectedMode == FeesAllocationModeUiState.Custom,
+                accessibilityDescription = descriptions.getValue(FeesAllocationModeUiState.Custom),
+                onClick = { onEvent(FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Custom)) },
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
@@ -299,15 +312,15 @@ private fun ModeButton(
                 contentDescription = "$text ${if (selected) "selected" else "not selected"}. $accessibilityDescription"
             }
             .clickable(onClick = onClick),
-        shape = EvenUpTheme.shapes.chip,
+        shape = EvenUpTheme.shapes.input,
         color = if (selected) EvenUpTheme.colors.primary else EvenUpTheme.colors.surfaceElevated,
         contentColor = if (selected) EvenUpTheme.colors.onPrimary else EvenUpTheme.colors.textPrimary,
-        border = BorderStroke(1.dp, if (selected) EvenUpTheme.colors.primary else EvenUpTheme.colors.border),
     ) {
         Text(
             text = text,
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 44.dp)
                 .padding(vertical = EvenUpTheme.spacing.space12),
             style = EvenUpTheme.typography.button,
             textAlign = TextAlign.Center,
@@ -420,22 +433,12 @@ private fun FeeEditorTabs(
     onEvent: (FeesAllocationUiEvent) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
-        feeCards.chunked(2).forEach { rowFees ->
-            Row(
+        feeCards.forEach { fee ->
+            FeeEditorTab(
+                fee = fee,
+                onClick = { onEvent(FeesAllocationUiEvent.FeeEditorOpenClick(fee.id)) },
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
-            ) {
-                rowFees.forEach { fee ->
-                    FeeEditorTab(
-                        fee = fee,
-                        onClick = { onEvent(FeesAllocationUiEvent.FeeEditorOpenClick(fee.id)) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (rowFees.size == 1) {
-                    Column(modifier = Modifier.weight(1f)) {}
-                }
-            }
+            )
         }
     }
 }
@@ -450,26 +453,39 @@ private fun FeeEditorTab(
         modifier = modifier
             .semantics { contentDescription = fee.statusContentDescription() }
             .clickable(onClick = onClick),
-        shape = EvenUpTheme.shapes.chip,
+        shape = EvenUpTheme.shapes.input,
         color = EvenUpTheme.colors.surfaceElevated,
         contentColor = EvenUpTheme.colors.textPrimary,
         border = BorderStroke(1.dp, if (fee.error == null) EvenUpTheme.colors.border else EvenUpTheme.colors.error),
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = EvenUpTheme.spacing.space12, vertical = EvenUpTheme.spacing.space8),
-            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
+                .heightIn(min = 64.dp)
+                .padding(horizontal = EvenUpTheme.spacing.space16, vertical = EvenUpTheme.spacing.space12),
+            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
+            ) {
+                Text(
+                    text = fee.label,
+                    style = EvenUpTheme.typography.bodyStrong,
+                    color = EvenUpTheme.colors.textPrimary,
+                )
+                Text(
+                    text = fee.statusLabel,
+                    style = EvenUpTheme.typography.bodySmall,
+                    color = if (fee.error == null) EvenUpTheme.colors.textSecondary else EvenUpTheme.colors.error,
+                )
+            }
             Text(
-                text = fee.label,
-                style = EvenUpTheme.typography.bodySmall,
+                text = fee.amountLabel,
+                style = EvenUpTheme.typography.moneyValue,
                 color = EvenUpTheme.colors.textPrimary,
-            )
-            Text(
-                text = fee.statusLabel,
-                style = EvenUpTheme.typography.bodySmall,
-                color = if (fee.error == null) EvenUpTheme.colors.textSecondary else EvenUpTheme.colors.error,
+                textAlign = TextAlign.End,
             )
         }
     }
@@ -492,10 +508,7 @@ private fun FocusedFeeEditorSheet(
             style = EvenUpTheme.typography.body,
             color = EvenUpTheme.colors.textSecondary,
         )
-        EvenUpSecondaryButton(
-            text = "Assign this fee to one person",
-            onClick = { onEvent(FeesAllocationUiEvent.AssignThisFeeClick(visibleEditor.feeId)) },
-        )
+        FocusedFeeQuickAssignChips(editor = visibleEditor, onEvent = onEvent)
         Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
             val feeTitle = visibleEditor.title.removePrefix("Edit ")
             visibleEditor.rows.forEach { row ->
@@ -521,6 +534,39 @@ private fun FocusedFeeEditorSheet(
             onClick = { onEvent(FeesAllocationUiEvent.FeeEditorDoneClick) },
             enabled = visibleEditor.canSave,
         )
+    }
+}
+
+@Composable
+private fun FocusedFeeQuickAssignChips(
+    editor: FocusedFeeEditorUiState,
+    onEvent: (FeesAllocationUiEvent) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
+        Text(
+            text = "Assign to one person",
+            style = EvenUpTheme.typography.bodySmall,
+            color = EvenUpTheme.colors.textSecondary,
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
+        ) {
+            items(editor.participantChips, key = { chip -> chip.id }) { chip ->
+                EvenUpParticipantChip(
+                    name = chip.name,
+                    colorIndex = chip.colorIndex,
+                    selected = chip.selected,
+                    onClick = {
+                        onEvent(
+                            FeesAllocationUiEvent.AssignThisFeeToParticipantClick(
+                                feeId = editor.feeId,
+                                participantId = chip.id,
+                            ),
+                        )
+                    },
+                )
+            }
+        }
     }
 }
 

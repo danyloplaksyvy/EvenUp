@@ -3,6 +3,7 @@ package com.dps.evenup.data.receipt.impl
 import com.dps.evenup.core.network.api.WorkerApiClient
 import com.dps.evenup.core.network.api.WorkerApiResponse
 import com.dps.evenup.core.network.api.WorkerApiResult
+import com.dps.evenup.core.network.api.WorkerNetworkError
 import com.dps.evenup.data.receipt.api.ReceiptDataException
 import com.dps.evenup.data.receipt.api.ReceiptImageParseRequest
 import com.dps.evenup.domain.receipt.api.FeeType
@@ -94,6 +95,71 @@ class WorkerReceiptRepositoryTest {
         assertFalse(apiClient.lastPostBody.orEmpty().contains("local-request-id"))
         assertFalse(apiClient.lastPostBody.orEmpty().contains("requestId"))
         assertEquals("local-request-id", apiClient.lastPostHeaders["X-EvenUp-Request-Id"])
+    }
+
+    @Test
+    fun `retryable parse failures retry once and then return successful receipt`() = runBlocking {
+        val retryableFailures = listOf(
+            WorkerNetworkError.Timeout,
+            WorkerNetworkError.ConnectionFailed,
+            WorkerNetworkError.Unknown,
+            WorkerNetworkError.HttpFailure(429, """{"error":true}"""),
+            WorkerNetworkError.HttpFailure(500, """{"error":true}"""),
+            WorkerNetworkError.HttpFailure(503, """{"error":true}"""),
+        )
+
+        retryableFailures.forEach { retryableFailure ->
+            val apiClient = FakeWorkerApiClient(
+                WorkerApiResult.Failure(retryableFailure),
+                WorkerApiResult.Success(WorkerApiResponse(200, receiptJson())),
+            )
+            val repository = WorkerReceiptRepository(apiClient)
+
+            val receipt = repository.parseReceiptImage(
+                ReceiptImageParseRequest(
+                    imageBase64 = "abc",
+                    mimeType = "image/jpeg",
+                    requestId = "retry-request-id",
+                ),
+            )
+
+            assertEquals("Bella Roma", receipt.merchantName)
+            assertEquals(2, apiClient.postCount)
+            assertEquals(listOf("retry-request-id", "retry-request-id"), apiClient.postHeaders.map { it["X-EvenUp-Request-Id"] })
+            assertEquals(1, apiClient.postBodies.distinct().size)
+        }
+    }
+
+    @Test
+    fun `client parse failure is not retried`() {
+        val apiClient = FakeWorkerApiClient(
+            WorkerApiResult.Failure(WorkerNetworkError.HttpFailure(400, """{"error":true}""")),
+            WorkerApiResult.Success(WorkerApiResponse(200, receiptJson())),
+        )
+        val repository = WorkerReceiptRepository(apiClient)
+
+        assertThrows(ReceiptDataException::class.java) {
+            runBlocking {
+                repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+            }
+        }
+        assertEquals(1, apiClient.postCount)
+    }
+
+    @Test
+    fun `final retryable failure is returned after second attempt`() {
+        val apiClient = FakeWorkerApiClient(
+            WorkerApiResult.Failure(WorkerNetworkError.Timeout),
+            WorkerApiResult.Failure(WorkerNetworkError.Timeout),
+        )
+        val repository = WorkerReceiptRepository(apiClient)
+
+        assertThrows(ReceiptDataException::class.java) {
+            runBlocking {
+                repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+            }
+        }
+        assertEquals(2, apiClient.postCount)
     }
 
     @Test
@@ -272,13 +338,21 @@ class WorkerReceiptRepositoryTest {
         }
     """.trimIndent()
 
-    private class FakeWorkerApiClient(
-        private val responseBody: String,
+    private class FakeWorkerApiClient private constructor(
+        private val responses: MutableList<WorkerApiResult>,
     ) : WorkerApiClient {
+        constructor(responseBody: String) : this(mutableListOf(WorkerApiResult.Success(WorkerApiResponse(200, responseBody))))
+
+        constructor(vararg responses: WorkerApiResult) : this(responses.toMutableList())
+
         var lastPostBody: String? = null
             private set
         var lastPostHeaders: Map<String, String> = emptyMap()
             private set
+        val postBodies = mutableListOf<String>()
+        val postHeaders = mutableListOf<Map<String, String>>()
+        val postCount: Int
+            get() = postBodies.size
 
         override suspend fun get(path: String): WorkerApiResult = error("Not used.")
 
@@ -289,7 +363,9 @@ class WorkerReceiptRepositoryTest {
         ): WorkerApiResult {
             lastPostBody = body
             lastPostHeaders = headers
-            return WorkerApiResult.Success(WorkerApiResponse(200, responseBody))
+            postBodies += body
+            postHeaders += headers
+            return responses.removeAt(0)
         }
     }
 }

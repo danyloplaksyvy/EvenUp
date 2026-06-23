@@ -83,7 +83,15 @@ data class FocusedFeeEditorUiState(
     val statusLabel: String,
     val canSave: Boolean,
     val rows: List<FeeAllocationRowUiState>,
+    val participantChips: List<FocusedFeeParticipantChipUiState> = emptyList(),
     val error: String? = null,
+)
+
+data class FocusedFeeParticipantChipUiState(
+    val id: String,
+    val name: String,
+    val colorIndex: Int,
+    val selected: Boolean = false,
 )
 
 data class FeeParticipantPickerUiState(
