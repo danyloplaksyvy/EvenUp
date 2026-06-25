@@ -52,7 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
-import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
+import com.dps.evenup.core.designsystem.api.EvenUpPinnedTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpIconButton
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
@@ -68,7 +68,7 @@ fun ChoosePeopleScreen(
     onEvent: (ChoosePeopleUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    EvenUpCollapsingTopBarScaffold(
+    EvenUpPinnedTopBarScaffold(
         title = "Who was involved?",
         onNavigationClick = { onEvent(ChoosePeopleUiEvent.BackClick) },
         modifier = modifier.fillMaxSize(),

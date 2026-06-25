@@ -55,7 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpBottomSheet
 import com.dps.evenup.core.designsystem.api.EvenUpCard
-import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
+import com.dps.evenup.core.designsystem.api.EvenUpPinnedTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpIconButton
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
@@ -83,7 +83,7 @@ fun AssignItemsScreen(
         view.announceForAccessibility(feedback.message)
     }
 
-    EvenUpCollapsingTopBarScaffold(
+    EvenUpPinnedTopBarScaffold(
         title = "Assign items",
         onNavigationClick = { onEvent(AssignItemsUiEvent.BackClick) },
         modifier = modifier.fillMaxSize(),

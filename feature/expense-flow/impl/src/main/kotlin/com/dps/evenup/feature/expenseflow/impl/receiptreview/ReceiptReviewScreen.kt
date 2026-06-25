@@ -51,7 +51,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomSheet
 import com.dps.evenup.core.designsystem.api.EvenUpCard
-import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
+import com.dps.evenup.core.designsystem.api.EvenUpPinnedTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpIconButton
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
@@ -75,7 +75,7 @@ fun ReceiptReviewScreen(
     onEvent: (ReceiptReviewUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    EvenUpCollapsingTopBarScaffold(
+    EvenUpPinnedTopBarScaffold(
         title = "Receipt review",
         onNavigationClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
         modifier = modifier.fillMaxSize(),

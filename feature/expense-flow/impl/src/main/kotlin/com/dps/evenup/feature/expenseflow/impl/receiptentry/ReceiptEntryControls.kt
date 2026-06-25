@@ -114,12 +114,13 @@ internal fun CurrencySelector(
     selectedCurrencyCode: String,
     onCurrencySelected: (String) -> Unit,
     modifier: Modifier = Modifier,
+    currencyCodes: List<String> = SupportedCurrencyCodes,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
     ) {
-        SupportedCurrencyCodes.forEach { currencyCode ->
+        currencyCodes.distinct().forEach { currencyCode ->
             val selected = selectedCurrencyCode.equals(currencyCode, ignoreCase = true)
             Surface(
                 modifier = Modifier

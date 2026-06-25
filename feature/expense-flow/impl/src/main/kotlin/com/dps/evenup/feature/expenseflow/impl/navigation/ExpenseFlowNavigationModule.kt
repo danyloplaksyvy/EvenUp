@@ -86,7 +86,7 @@ object ExpenseFlowNavigationModule {
                     draftRepository = draftRepository,
                     validateReceipt = validateReceipt,
                     onBack = navigator::navigateBack,
-                    onContinue = { navigator.navigate(ReceiptReviewDestination) },
+                    onContinue = { navigator.navigate(ChoosePeopleDestination) },
                 )
             }
             entry<ReceiptReviewDestination> {
