@@ -45,24 +45,93 @@ data class ManualReceiptEntryUiState(
     val feesTotalLabel: String = formatManualCurrency(formatManualMoneyInput(feeTotalMinor), currencyCode)
     val calculatedTotalLabel: String = formatManualCurrency(formatManualMoneyInput(calculatedTotalMinor), currencyCode)
     val displayTotalLabel: String = calculatedTotalLabel
-    val canContinue: Boolean = !isSaving && continueBlockedMessage == null
-    val continueBlockedMessage: String?
-        get() = when {
-            items.isEmpty() -> "Add at least one item to continue."
-            items.any { item -> item.name.isBlank() } -> "Name each item before continuing."
-            items.any { item -> item.quantity.toIntOrNull()?.let { it in MIN_MANUAL_QUANTITY..MAX_MANUAL_QUANTITY } != true } -> {
-                "Use a valid quantity for every item."
-            }
-            items.any { item -> parseManualMoneyMinorValue(item.amount)?.let { it > 0L } != true } -> {
-                "Enter a positive amount for every item."
-            }
-            dateLabel.toManualLocalDateOrNull() == null -> "Choose a valid receipt date."
-            dateLabel.toManualLocalDateOrNull()?.isAfter(LocalDate.now()) == true -> "Date cannot be in the future."
-            !currencyCode.isManualCurrencyCode() -> "Choose a valid currency."
-            fees.any { fee -> fee.type == FeeType.Discount || !fee.hasValidAmount } -> "Review fee amounts."
-            else -> null
+    val footerState: ManualReceiptFooterState = buildFooterState()
+    val canContinue: Boolean = footerState.action == ManualReceiptFooterAction.Continue && footerState.enabled
+
+    private fun buildFooterState(): ManualReceiptFooterState {
+        if (isSaving) {
+            return ManualReceiptFooterState(
+                label = "Saving...",
+                action = ManualReceiptFooterAction.Disabled,
+                enabled = false,
+                accessibilityLabel = "Saving receipt",
+            )
         }
 
+        if (items.isEmpty()) {
+            return ManualReceiptFooterState(
+                label = "Add item",
+                action = ManualReceiptFooterAction.AddItem,
+                accessibilityLabel = "Add first receipt item",
+            )
+        }
+
+        firstInvalidItem()?.let { item ->
+            return ManualReceiptFooterState(
+                label = "Review item",
+                action = ManualReceiptFooterAction.EditTarget(ManualReceiptEditTarget.Item(item.id)),
+                accessibilityLabel = "Review invalid item",
+            )
+        }
+
+        val parsedDate = dateLabel.toManualLocalDateOrNull()
+        if (dateLabel.isBlank() || parsedDate == null || parsedDate.isAfter(LocalDate.now())) {
+            return ManualReceiptFooterState(
+                label = "Choose date",
+                action = ManualReceiptFooterAction.EditTarget(ManualReceiptEditTarget.Date),
+                accessibilityLabel = "Choose a valid receipt date",
+            )
+        }
+
+        if (!currencyCode.isManualCurrencyCode()) {
+            return ManualReceiptFooterState(
+                label = "Choose currency",
+                action = ManualReceiptFooterAction.EditTarget(ManualReceiptEditTarget.Currency),
+                accessibilityLabel = "Choose a valid currency",
+            )
+        }
+
+        firstInvalidFee()?.let { fee ->
+            return ManualReceiptFooterState(
+                label = "Review fee",
+                action = ManualReceiptFooterAction.EditTarget(ManualReceiptEditTarget.Fee(fee.id)),
+                accessibilityLabel = "Review invalid fee",
+            )
+        }
+
+        return ManualReceiptFooterState(
+            label = "Continue",
+            action = ManualReceiptFooterAction.Continue,
+            accessibilityLabel = "Continue to choose people",
+        )
+    }
+
+    private fun firstInvalidItem(): ManualReceiptItemUiState? {
+        return items.firstOrNull { item ->
+            item.name.isBlank() ||
+                item.quantity.toIntOrNull()?.let { it in MIN_MANUAL_QUANTITY..MAX_MANUAL_QUANTITY } != true ||
+                parseManualMoneyMinorValue(item.amount)?.let { it > 0L } != true
+        }
+    }
+
+    private fun firstInvalidFee(): ManualReceiptFeeUiState? {
+        return fees.firstOrNull { fee -> fee.type == FeeType.Discount || !fee.hasValidAmount }
+    }
+}
+
+data class ManualReceiptFooterState(
+    val label: String,
+    val action: ManualReceiptFooterAction,
+    val enabled: Boolean = true,
+    val helperText: String? = null,
+    val accessibilityLabel: String = label,
+)
+
+sealed interface ManualReceiptFooterAction {
+    data object Continue : ManualReceiptFooterAction
+    data object AddItem : ManualReceiptFooterAction
+    data class EditTarget(val target: ManualReceiptEditTarget) : ManualReceiptFooterAction
+    data object Disabled : ManualReceiptFooterAction
 }
 
 data class ManualReceiptItemUiState(

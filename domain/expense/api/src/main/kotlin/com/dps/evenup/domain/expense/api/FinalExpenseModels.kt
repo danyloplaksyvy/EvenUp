@@ -21,4 +21,5 @@ data class FinalizedExpensePayload(
     val itemAssignments: List<ItemAssignment>,
     val feeAllocations: List<FeeAllocation>,
     val summary: ExpenseSummary,
+    val guestPasscode: String? = null,
 )

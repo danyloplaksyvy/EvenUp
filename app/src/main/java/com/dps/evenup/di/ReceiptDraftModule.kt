@@ -38,6 +38,8 @@ import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.ValidateReceiptUseCase
 import com.dps.evenup.domain.receipt.impl.DefaultNormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.impl.DefaultValidateReceiptUseCase
+import com.dps.evenup.domain.sharing.api.GenerateGuestPasscodeUseCase
+import com.dps.evenup.domain.sharing.impl.DefaultGenerateGuestPasscodeUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -154,4 +156,7 @@ object ReceiptDraftModule {
 
     @Provides
     fun provideNormalizeReceiptUseCase(): NormalizeReceiptUseCase = DefaultNormalizeReceiptUseCase()
+
+    @Provides
+    fun provideGenerateGuestPasscodeUseCase(): GenerateGuestPasscodeUseCase = DefaultGenerateGuestPasscodeUseCase()
 }

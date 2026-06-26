@@ -30,4 +30,5 @@ data object ReviewExpenseDestination : NavKey
 @Serializable
 data class ExpenseSavedDestination(
     val shareUrl: String,
+    val guestPasscode: String,
 ) : NavKey

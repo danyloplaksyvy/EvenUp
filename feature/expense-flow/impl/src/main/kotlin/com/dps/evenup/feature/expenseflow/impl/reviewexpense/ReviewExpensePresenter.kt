@@ -12,6 +12,7 @@ import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
 import com.dps.evenup.domain.participant.api.Participant
 import com.dps.evenup.domain.receipt.api.CurrencyCode
 import com.dps.evenup.domain.receipt.api.MoneyMinor
+import com.dps.evenup.domain.sharing.api.GenerateGuestPasscodeUseCase
 import java.math.BigDecimal
 import java.util.Currency
 import java.util.Locale
@@ -21,6 +22,7 @@ class ReviewExpensePresenter(
     private val expenseRepository: ExpenseRepository,
     private val calculateSummary: CalculateExpenseSummaryUseCase,
     private val validateExpenseBeforeSave: ValidateExpenseBeforeSaveUseCase,
+    private val generateGuestPasscode: GenerateGuestPasscodeUseCase,
 ) {
     suspend fun load(): ReviewExpenseUiState {
         val draft = draftRepository.getDraft() ?: return ReviewExpenseUiState(
@@ -49,8 +51,14 @@ class ReviewExpensePresenter(
         val draft = draftRepository.getDraft() ?: return SaveReviewExpenseResult.MissingDraft
         return when (val result = validateExpenseBeforeSave.validateAndBuildPayload(draft)) {
             is FinalExpenseValidationResult.Valid -> {
-                val savedShareLink = expenseRepository.saveFinalizedExpense(result.payload)
-                SaveReviewExpenseResult.Saved(savedShareLink.shareLink.publicUrl)
+                val guestPasscode = generateGuestPasscode.generate()
+                val savedShareLink = expenseRepository.saveFinalizedExpense(
+                    result.payload.copy(guestPasscode = guestPasscode),
+                )
+                SaveReviewExpenseResult.Saved(
+                    shareUrl = savedShareLink.shareLink.publicUrl,
+                    guestPasscode = guestPasscode,
+                )
             }
             is FinalExpenseValidationResult.Invalid -> SaveReviewExpenseResult.Invalid(result.errors.toValidationMessage())
         }
@@ -389,7 +397,10 @@ class ReviewExpensePresenter(
 }
 
 sealed interface SaveReviewExpenseResult {
-    data class Saved(val shareUrl: String) : SaveReviewExpenseResult
+    data class Saved(
+        val shareUrl: String,
+        val guestPasscode: String,
+    ) : SaveReviewExpenseResult
 
     data object MissingDraft : SaveReviewExpenseResult
 

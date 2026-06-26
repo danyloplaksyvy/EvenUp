@@ -21,14 +21,19 @@ The Worker must:
 - parse receipt images through OpenAI
 - save finalized immutable expenses in D1
 - return finalized expenses by public share ID
-- render a simple public read-only guest page
+- verify guest passcodes for protected share links
+- render a simple passcode-gated read-only guest page
 
 ## Security rules
 
 Never expose the OpenAI API key to Android.
 Do not log receipt image payloads.
 Do not store receipt images unless explicitly requested.
-Guest links are public but must be unguessable.
+Guest links must be unguessable and passcode-gated for new shares.
+Legacy rows without passcode metadata remain public.
+Do not store plaintext guest passcodes; store salted hashes only.
+Rate-limit repeated guest passcode failures.
+Remember successful guest access with a secure cookie.
 Use random base62 share IDs, preferably 8-12 characters.
 Return safe error messages to clients.
 
@@ -41,6 +46,8 @@ For `GET /e/:shareId`, use the guest view reference:
 
 The guest page must be mobile-first, read-only, white/black, and visually consistent with the Android app. It does not need to use the Android design system, but it should preserve the same product hierarchy and tone.
 
+For protected shares, first render a simple four-letter passcode gate. After access is verified, render a person-first breakdown where expanding a participant shows their items, split methods, fee allocations, discounts, paid amount, total share, and settlement result.
+
 ## D1 MVP schema
 
 ```sql
@@ -49,11 +56,16 @@ CREATE TABLE expenses (
   share_id TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
   payload_json TEXT NOT NULL,
+  guest_passcode_hash TEXT,
+  guest_passcode_salt TEXT,
   created_at TEXT NOT NULL
 );
 
 CREATE INDEX idx_expenses_share_id ON expenses(share_id);
 ```
+
+Use nullable passcode columns so existing no-passcode rows remain public.
+Use a separate rate-limit table or equivalent Worker storage for failed guest passcode attempts.
 
 ## Required routes
 
@@ -62,6 +74,7 @@ GET /health
 POST /v1/receipts/parse
 POST /v1/expenses
 GET /v1/expenses/:shareId
+POST /e/:shareId/access
 GET /e/:shareId
 ```
 

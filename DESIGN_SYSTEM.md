@@ -126,6 +126,7 @@ Priorities:
 - Settlement rows must be scan-friendly.
 - Receipt rows should be compact but readable.
 - Labels should use secondary text color.
+- Four-letter passcodes should use clear, spaced, high-legibility text.
 
 ### Shape roles
 
@@ -223,6 +224,7 @@ Use cards for:
 - Fee allocation
 - Settlement summary
 - Share link
+- Guest passcode
 
 Cards should have light surface color, rounded corners, and subtle border/shadow.
 
@@ -386,9 +388,13 @@ Use:
 
 - Success state
 - Share link card
+- Four-letter passcode card or row near the share link
 - Share link CTA
 - Copy link CTA if available
+- Share message CTA that includes both the link and passcode
 - Add another expense CTA
+
+Keep the link and passcode visually separate. The share-sheet text may include both values in one message.
 
 ### Guest Web View
 
@@ -398,7 +404,23 @@ Reference:
 docs/design/stitch/guest_view_web/
 ```
 
-Use for backend-rendered public page.
+Use for backend-rendered guest page.
+
+Guest page states:
+
+- Passcode gate for new protected shares.
+- Legacy direct page for no-passcode rows.
+- Remembered-access page after a successful passcode entry.
+- Safe missing-link, wrong-passcode, and rate-limited states.
+
+Guest page content:
+
+- Person-level participant list is the primary interaction.
+- Participant rows expand to show item shares, fee shares, discount credits, paid amount, total share, and settlement result.
+- Full participant names are shown, not initials-only labels.
+- Item and fee rows include split/allocation method labels when available.
+- Payer's own share is shown separately from money others owe the payer.
+- Keep the page read-only and avoid payment affordances.
 
 ### Validation States
 

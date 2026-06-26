@@ -59,6 +59,24 @@ class WorkerExpenseRepositoryTest {
     }
 
     @Test
+    fun `save finalized expense includes guest passcode when present`() = runBlocking {
+        val worker = FakeWorkerApiClient(
+            responseBody = """
+                {
+                  "expenseId": "expense_123",
+                  "shareId": "A8xQ2Lm9",
+                  "shareUrl": "https://evenup.example/e/A8xQ2Lm9"
+                }
+            """.trimIndent(),
+        )
+        val repository = WorkerExpenseRepository(worker, DefaultShareLinkResponseMapper())
+
+        repository.saveFinalizedExpense(finalizedPayload().copy(guestPasscode = "KTRQ"))
+
+        assertTrue(worker.lastBody.contains(""""guestAccess":{"passcode":"KTRQ"}"""))
+    }
+
+    @Test
     fun `invalid share link response produces controlled error`() {
         val repository = WorkerExpenseRepository(
             FakeWorkerApiClient("""{"expenseId":"","shareId":"","shareUrl":""}"""),

@@ -344,6 +344,10 @@ class ReceiptReviewPresenterTest {
         assertEquals("Total differs by €1.00", state.statusLabel)
         assertEquals(ReceiptReviewReconciliationType.Mismatch, state.reconciliation.type)
         assertEquals("Total differs by €1.00", state.reconciliation.message)
+        assertEquals("Review total", state.footerState.label)
+        assertEquals(ReceiptReviewFooterAction.ReviewIssue("total_mismatch"), state.footerState.action)
+        assertEquals(null, state.footerState.helperText)
+        assertFalse(state.canContinue)
     }
 
     @Test
@@ -409,6 +413,8 @@ class ReceiptReviewPresenterTest {
         assertEquals("2 likely item errors found", state.statusLabel)
         assertEquals("Review 2 suggested corrections", state.suggestedCorrectionActionLabel)
         assertEquals("Total differs by €1.10", state.reconciliation.message)
+        assertEquals("Review item amounts", state.footerState.label)
+        assertEquals(ReceiptReviewFooterAction.ReviewIssue("total_mismatch"), state.footerState.action)
         assertEquals(
             listOf(
                 "Receipt likely says €5.60 · Difference €0.20",
@@ -791,6 +797,8 @@ class ReceiptReviewPresenterTest {
         assertTrue(nextState.issueNavigatorVisible)
         assertEquals(2, nextState.blockingIssues.size)
         assertEquals(listOf("Merchant is required", "Total differs by €1.00"), nextState.blockingIssues.map { it.title })
+        assertEquals("Review issues", state.footerState.label)
+        assertEquals(ReceiptReviewFooterAction.ReviewIssues, state.footerState.action)
     }
 
     @Test
@@ -943,13 +951,55 @@ class ReceiptReviewPresenterTest {
         var state = presenter.load()
 
         assertFalse(state.canContinue)
-        assertEquals("Fix: Dessert needs review", state.continueBlockedMessage)
+        assertEquals("Review item", state.footerState.label)
+        assertEquals(ReceiptReviewFooterAction.ReviewIssue("item_item-1"), state.footerState.action)
+        assertEquals(null, state.footerState.helperText)
 
         state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-1")))
         state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
 
         assertTrue(state.canContinue)
-        assertEquals(null, state.continueBlockedMessage)
+        assertEquals("Continue", state.footerState.label)
+        assertEquals(ReceiptReviewFooterAction.Continue, state.footerState.action)
+        assertEquals(null, state.footerState.helperText)
+    }
+
+    @Test
+    fun `valid and saving states map to compact footer actions`() = runBlocking {
+        val presenter = presenter()
+        val state = presenter.load()
+
+        assertTrue(state.canContinue)
+        assertEquals("Continue", state.footerState.label)
+        assertEquals(ReceiptReviewFooterAction.Continue, state.footerState.action)
+
+        val savingState = state.copy(isSaving = true)
+
+        assertFalse(savingState.canContinue)
+        assertEquals("Saving...", savingState.footerState.label)
+        assertEquals(ReceiptReviewFooterAction.Disabled, savingState.footerState.action)
+        assertFalse(savingState.footerState.enabled)
+    }
+
+    @Test
+    fun `invalid fee maps to review fee footer action`() = runBlocking {
+        val presenter = presenter(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    fees = listOf(ReceiptFee(FeeId("fee-1"), FeeType.Tip, "Tip", MoneyMinor(0))),
+                ),
+            ),
+        )
+        val state = presenter.load()
+
+        assertFalse(state.canContinue)
+        assertEquals("Review fee", state.footerState.label)
+        assertEquals(ReceiptReviewFooterAction.ReviewIssue("fee_fee-1"), state.footerState.action)
+
+        val nextState = presenter.reduce(state, ReceiptReviewUiEvent.IssueSelected("fee_fee-1"))
+
+        assertEquals(ReceiptReviewSection.Adjustments, nextState.firstBlockingSection)
+        assertTrue(nextState.editDraft is ReceiptReviewEditDraft.Fee)
     }
 
     private fun presenter(

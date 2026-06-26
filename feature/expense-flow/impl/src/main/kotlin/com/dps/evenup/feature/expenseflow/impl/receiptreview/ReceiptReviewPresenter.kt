@@ -315,6 +315,8 @@ class ReceiptReviewPresenter(
 
     private fun openFirstIssue(state: ReceiptReviewUiState): ReceiptReviewUiState {
         return when {
+            state.blockingIssues.size > 1 -> state.copy(issueNavigatorVisible = true)
+            state.blockingIssues.size == 1 -> selectIssue(state, state.blockingIssues.single().id)
             state.issues.size > 1 -> state.copy(issueNavigatorVisible = true)
             state.issues.size == 1 -> selectIssue(state, state.issues.single().id)
             else -> validateVisibleState(state)
@@ -345,10 +347,24 @@ class ReceiptReviewPresenter(
                 firstBlockingItemId = target.itemId,
                 validationRequestId = validationRequestId + 1,
             )
+            is ReceiptReviewIssueTarget.Fee -> copy(
+                issueNavigatorVisible = false,
+                editDraft = draftFor(ReceiptReviewEditTarget.Fee(target.feeId)),
+                firstBlockingSection = ReceiptReviewSection.Adjustments,
+                firstBlockingItemId = null,
+                validationRequestId = validationRequestId + 1,
+            )
             is ReceiptReviewIssueTarget.Summary -> copy(
                 issueNavigatorVisible = false,
                 editDraft = draftFor(target.editTarget),
                 firstBlockingSection = ReceiptReviewSection.Summary,
+                firstBlockingItemId = null,
+                validationRequestId = validationRequestId + 1,
+            )
+            ReceiptReviewIssueTarget.Items -> copy(
+                issueNavigatorVisible = false,
+                editDraft = null,
+                firstBlockingSection = ReceiptReviewSection.Items,
                 firstBlockingItemId = null,
                 validationRequestId = validationRequestId + 1,
             )

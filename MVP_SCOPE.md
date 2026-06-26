@@ -2,11 +2,11 @@
 
 ## Product definition
 
-EvenUp MVP is an Android app for creating one-off shared expenses from real receipts, assigning receipt items to people, allocating fees transparently, and sharing a read-only web result link.
+EvenUp MVP is an Android app for creating one-off shared expenses from real receipts, assigning receipt items to people, allocating fees transparently, and sharing a passcode-gated read-only web result link.
 
 ## Pitch narrative
 
-EvenUp reduces money conflicts by making shared expenses transparent: scan the receipt, assign what each person had, see exactly who owes whom, and share a clear breakdown.
+EvenUp reduces money conflicts by making shared expenses transparent: scan the receipt, assign what each person had, see exactly who owes whom, and share a clear passcode-gated breakdown.
 
 ## Must have
 
@@ -36,7 +36,13 @@ EvenUp reduces money conflicts by making shared expenses transparent: scan the r
 - Expandable calculation details
 - Save finalized immutable expense
 - Real share link
-- Public read-only guest web page
+- App-generated four-letter guest passcode for every new shared expense
+- Share message containing both the guest link and passcode as separate values
+- Passcode-gated read-only guest web page for new shares
+- Legacy no-passcode guest links remain public
+- Guest page remembers successful passcode entry
+- Guest page rate-limits repeated passcode failures
+- Person-level guest breakdown showing each participant's items, fees, discounts, paid amount, share, and settlement result
 - No login required for guest page
 
 ## Out of scope
@@ -79,7 +85,8 @@ New Expense
 -> Allocate Fees
 -> Review Settlement
 -> Save Expense
--> Share Link
+-> Share Link + Passcode
+-> Guest Enters Passcode
 -> Guest Web View
 ```
 

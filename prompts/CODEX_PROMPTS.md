@@ -173,7 +173,7 @@ Done when:
 Read AGENTS.md, backend/AGENTS.md, API_CONTRACT.md, DESIGN_SYSTEM.md, and docs/design/STITCH_REFERENCE.md.
 
 Task:
-Implement the guest web view for GET /e/:shareId.
+Implement the guest web view for GET /e/:shareId and POST /e/:shareId/access.
 
 Use these design references:
 - docs/design/stitch/guest_view_web/screen.png
@@ -189,12 +189,16 @@ Do not edit:
 - domain files
 
 Requirements:
-- Public and read-only.
+- Passcode-gated for new shares and read-only.
+- Legacy no-passcode rows remain public.
 - No login.
 - No payment UI.
 - Mobile-first.
 - White/black premium style.
-- Show settlement summary and transparent breakdown.
+- Show settlement summary and person-level transparent breakdown.
+- Expanding a participant shows their items, split methods, fee allocations, discounts, paid amount, total share, and settlement result.
+- Remember successful passcode entry with a secure cookie.
+- Rate-limit repeated passcode failures.
 - Safe 404/error states.
 
 Validation:
@@ -202,7 +206,9 @@ Run:
 - [backend command]
 
 Done when:
-- A saved share ID opens a readable mobile web page.
+- A saved share ID with a passcode opens a gate before expense details.
+- A valid passcode opens a readable mobile web page.
+- A legacy no-passcode share opens directly.
 - Missing share ID returns a safe styled error page.
 ```
 

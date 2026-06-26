@@ -145,6 +145,96 @@ class ManualReceiptEntryPresenterTest {
     }
 
     @Test
+    fun `footer maps no items to add item action`() {
+        val state = ManualReceiptEntryUiState(currencyCode = "USD")
+
+        assertFalse(state.canContinue)
+        assertEquals("Add item", state.footerState.label)
+        assertEquals(ManualReceiptFooterAction.AddItem, state.footerState.action)
+        assertEquals(null, state.footerState.helperText)
+    }
+
+    @Test
+    fun `footer maps invalid item to review item action`() {
+        val state = ManualReceiptEntryUiState(
+            currencyCode = "USD",
+            items = listOf(
+                ManualReceiptItemUiState(
+                    id = "item-1",
+                    name = "",
+                    quantity = "1",
+                    amount = "10.00",
+                ),
+            ),
+        )
+
+        assertFalse(state.canContinue)
+        assertEquals("Review item", state.footerState.label)
+        assertEquals(
+            ManualReceiptFooterAction.EditTarget(ManualReceiptEditTarget.Item("item-1")),
+            state.footerState.action,
+        )
+    }
+
+    @Test
+    fun `footer maps invalid date and currency to direct detail actions`() {
+        val presenter = presenter()
+        val invalidDateState = ManualReceiptEntryUiState(
+            currencyCode = "USD",
+            dateLabel = LocalDate.now().plusDays(1).toString(),
+        ).withItem(presenter)
+
+        assertEquals("Choose date", invalidDateState.footerState.label)
+        assertEquals(
+            ManualReceiptFooterAction.EditTarget(ManualReceiptEditTarget.Date),
+            invalidDateState.footerState.action,
+        )
+
+        val invalidCurrencyState = ManualReceiptEntryUiState(
+            currencyCode = "US",
+        ).withItem(presenter)
+
+        assertEquals("Choose currency", invalidCurrencyState.footerState.label)
+        assertEquals(
+            ManualReceiptFooterAction.EditTarget(ManualReceiptEditTarget.Currency),
+            invalidCurrencyState.footerState.action,
+        )
+    }
+
+    @Test
+    fun `footer maps invalid fee to review fee action`() {
+        val presenter = presenter()
+        val state = ManualReceiptEntryUiState(
+            currencyCode = "USD",
+            fees = listOf(ManualReceiptFeeUiState(id = "fee-1", type = FeeType.Tip, label = "Tip", amount = "")),
+        ).withItem(presenter)
+
+        assertFalse(state.canContinue)
+        assertEquals("Review fee", state.footerState.label)
+        assertEquals(
+            ManualReceiptFooterAction.EditTarget(ManualReceiptEditTarget.Fee("fee-1")),
+            state.footerState.action,
+        )
+    }
+
+    @Test
+    fun `footer maps valid and saving states`() {
+        val presenter = presenter()
+        val state = ManualReceiptEntryUiState(currencyCode = "USD").withItem(presenter)
+
+        assertTrue(state.canContinue)
+        assertEquals("Continue", state.footerState.label)
+        assertEquals(ManualReceiptFooterAction.Continue, state.footerState.action)
+
+        val savingState = state.copy(isSaving = true)
+
+        assertFalse(savingState.canContinue)
+        assertEquals("Saving...", savingState.footerState.label)
+        assertEquals(ManualReceiptFooterAction.Disabled, savingState.footerState.action)
+        assertFalse(savingState.footerState.enabled)
+    }
+
+    @Test
     fun `save uses manual receipt fallback merchant and calculated total`() = runBlocking {
         val repository = FakeExpenseDraftRepository()
         val presenter = presenter(repository = repository)

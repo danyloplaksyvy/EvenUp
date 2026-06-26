@@ -27,7 +27,57 @@ test("POST /v1/expenses stores payload and returns generated share link", async 
   assert.equal(database.rows[0].share_id, body.shareId);
   assert.equal(database.rows[0].title, payload.title);
   assert.deepEqual(JSON.parse(database.rows[0].payload_json), payload);
+  assert.equal(database.rows[0].guest_passcode_hash, null);
+  assert.equal(database.rows[0].guest_passcode_salt, null);
   assert.match(database.rows[0].created_at, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test("POST /v1/expenses stores passcode metadata without plaintext payload", async () => {
+  const database = new FakeD1Database();
+  const payload = validExpensePayload({
+    guestAccess: {
+      passcode: "KTRQ"
+    }
+  });
+
+  const response = await handleRequest(
+    jsonRequest("http://localhost:8787/v1/expenses", payload),
+    {
+      EXPENSES_DB: database,
+      PUBLIC_BASE_URL: "https://evenup.example"
+    }
+  );
+
+  assert.equal(response.status, 201);
+  assert.equal(database.rows.length, 1);
+  const storedPayload = JSON.parse(database.rows[0].payload_json);
+  assert.equal(storedPayload.guestAccess, undefined);
+  assert.match(database.rows[0].guest_passcode_hash, /^[0-9A-Za-z_-]+$/);
+  assert.match(database.rows[0].guest_passcode_salt, /^[0-9A-Za-z_-]+$/);
+});
+
+test("POST /v1/expenses rejects invalid guest passcode", async () => {
+  const response = await handleRequest(
+    jsonRequest(
+      "http://localhost:8787/v1/expenses",
+      validExpensePayload({
+        guestAccess: {
+          passcode: "12"
+        }
+      })
+    ),
+    {
+      EXPENSES_DB: new FakeD1Database()
+    }
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: {
+      code: "INVALID_EXPENSE_PAYLOAD",
+      message: "guestAccess.passcode must be exactly four letters."
+    }
+  });
 });
 
 test("POST /v1/expenses rejects invalid finalized payload", async () => {
