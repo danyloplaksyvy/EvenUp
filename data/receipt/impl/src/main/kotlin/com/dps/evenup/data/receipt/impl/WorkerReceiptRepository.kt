@@ -44,26 +44,14 @@ class WorkerReceiptRepository(
         ) {
             json.encodeToString(request.toDto())
         }
-        val response = timedStage(
+        val requestBodyBytes = requestBody.toByteArray(Charsets.UTF_8).size
+        val response = postJsonWithRetry(
             requestId = requestId,
-            stage = "network_post",
-            metadata = listOf("requestBodyBytes=${requestBody.toByteArray(Charsets.UTF_8).size}"),
-        ) {
-            workerApiClient.postJson(
-                path = "/v1/receipts/parse",
-                body = requestBody,
-                headers = mapOf(REQUEST_ID_HEADER to requestId),
-            )
-        }
+            requestBody = requestBody,
+            requestBodyBytes = requestBodyBytes,
+        )
         return when (response) {
             is WorkerApiResult.Failure -> {
-                logTiming(
-                    requestId = requestId,
-                    stage = "network_post_result",
-                    durationMs = 0L,
-                    metadata = response.error.safeMetadata(),
-                    warning = true,
-                )
                 throw ReceiptDataException(
                     message = "Receipt parse request failed.",
                     reason = response.error.toReceiptFailureReason(),
@@ -96,6 +84,70 @@ class WorkerReceiptRepository(
                             ),
                         )
                     }
+                }
+            }
+        }
+    }
+
+    private suspend fun postJsonWithRetry(
+        requestId: String,
+        requestBody: String,
+        requestBodyBytes: Int,
+    ): WorkerApiResult {
+        var attempt = 1
+        while (true) {
+            val response = timedStage(
+                requestId = requestId,
+                stage = "network_post",
+                metadata = listOf(
+                    "attempt=$attempt",
+                    "requestBodyBytes=$requestBodyBytes",
+                ),
+            ) {
+                workerApiClient.postJson(
+                    path = "/v1/receipts/parse",
+                    body = requestBody,
+                    headers = mapOf(REQUEST_ID_HEADER to requestId),
+                )
+            }
+
+            when (response) {
+                is WorkerApiResult.Success -> {
+                    logTiming(
+                        requestId = requestId,
+                        stage = "network_post_result",
+                        durationMs = 0L,
+                        metadata = listOf(
+                            "attempt=$attempt",
+                            "status=${response.response.statusCode}",
+                            "responseBodyBytes=${response.response.body.toByteArray(Charsets.UTF_8).size}",
+                        ),
+                    )
+                    return response
+                }
+                is WorkerApiResult.Failure -> {
+                    val retryable = response.error.isRetryableReceiptParseFailure()
+                    logTiming(
+                        requestId = requestId,
+                        stage = "network_post_result",
+                        durationMs = 0L,
+                        metadata = response.error.safeMetadata() + listOf(
+                            "attempt=$attempt",
+                            "retryable=$retryable",
+                        ),
+                        warning = true,
+                    )
+                    if (!retryable || attempt >= MAX_PARSE_ATTEMPTS) {
+                        return response
+                    }
+                    logTiming(
+                        requestId = requestId,
+                        stage = "network_post_retry",
+                        durationMs = 0L,
+                        metadata = response.error.safeMetadata() + listOf("nextAttempt=${attempt + 1}"),
+                        warning = true,
+                    )
+                    attempt += 1
                 }
             }
         }
@@ -176,6 +228,7 @@ class WorkerReceiptRepository(
         const val TAG = "WorkerReceiptRepository"
         const val UNKNOWN_REQUEST_ID = "unknown"
         const val REQUEST_ID_HEADER = "X-EvenUp-Request-Id"
+        const val MAX_PARSE_ATTEMPTS = 2
     }
 }
 
@@ -197,6 +250,17 @@ private fun WorkerNetworkError.toReceiptFailureReason(): ReceiptDataFailureReaso
     WorkerNetworkError.Timeout -> ReceiptDataFailureReason.Timeout
     is WorkerNetworkError.HttpFailure -> ReceiptDataFailureReason.ParseRejected
     WorkerNetworkError.Unknown -> ReceiptDataFailureReason.Unknown
+}
+
+private fun WorkerNetworkError.isRetryableReceiptParseFailure(): Boolean = when (this) {
+    WorkerNetworkError.ConnectionFailed,
+    WorkerNetworkError.Timeout,
+    WorkerNetworkError.Unknown,
+    -> true
+    is WorkerNetworkError.HttpFailure -> statusCode == 429 || statusCode in 500..599
+    WorkerNetworkError.InvalidBaseUrl,
+    WorkerNetworkError.InvalidPath,
+    -> false
 }
 
 private fun WorkerNetworkError.safeMetadata(): List<String> = when (this) {

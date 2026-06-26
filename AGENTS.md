@@ -4,7 +4,7 @@
 
 EvenUp is an Android-only shared expense MVP.
 
-The app lets a user scan or manually enter a receipt, review receipt data, add temporary participants, choose a payer, assign receipt items to people, allocate tax/tip/fees, review who owes whom, save the finalized expense, and create a public read-only share link.
+The app lets a user scan or manually enter a receipt, review receipt data, add temporary participants, choose a payer, assign receipt items to people, allocate tax/tip/fees, review who owes whom, save the finalized expense, and create a passcode-gated read-only share link.
 
 ## Current MVP goal
 
@@ -21,7 +21,8 @@ Primary demo flow:
 7. Allocate fees.
 8. Review settlement.
 9. Save expense.
-10. Open/share public guest link.
+10. Review/share guest link and four-letter passcode.
+11. Open passcode-gated guest link.
 
 ## Read these project references before implementation
 
@@ -104,6 +105,7 @@ GET /health
 POST /v1/receipts/parse
 POST /v1/expenses
 GET /v1/expenses/:shareId
+POST /e/:shareId/access
 GET /e/:shareId
 ```
 
@@ -155,6 +157,9 @@ Use bottom sheets for complex item split configuration.
 Keep screens focused on one task.
 
 The generated Stitch export is a reference, not production source. Use it to match layout, hierarchy, spacing, tone, and screen states. Implement the UI in native Compose.
+
+Saved/share UI must show the generated four-letter guest passcode near the share link and use share text that includes both values separately.
+Guest web UI must be read-only, passcode-gated for new shares, and person-first: selecting or expanding a participant shows their item shares, fee shares, discount credits, paid amount, total share, and settlement result.
 
 ## Domain rules
 

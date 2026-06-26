@@ -161,7 +161,7 @@ class AssignItemsPresenter(
             items = items.map { item ->
                 val assignment = assignments.firstOrNull { it.receiptItemId == item.id }
                 item.toUiState(assignment, participantsById, currencyCode).let { itemState ->
-                    itemState.copy(assignmentActionLabel = itemState.assignmentActionLabel(selectedIds, participantUiStates))
+                    itemState.copy(assignmentActionLabel = itemState.assignmentActionLabel())
                 }
             },
             subtotalLabel = formatMoney(MoneyMinor(items.sumOf { item -> item.totalPrice.value }), currencyCode),
@@ -551,7 +551,16 @@ class AssignItemsPresenter(
     ): AssignItemsUiState {
         val sheet = state.splitSheet ?: return state
         val changedRows = sheet.rows.map { row ->
-            if (row.participantId == participantId) row.copy(amount = value) else row
+            if (row.participantId == participantId) {
+                row.copy(
+                    amount = value,
+                    amountGenerated = false,
+                    amountEdited = true,
+                    included = row.included || value.isNotBlank(),
+                )
+            } else {
+                row
+            }
         }
         val rows = changedRows.autoFillSingleRemainingAmount(sheet.totalMinor)
         return state.copy(splitSheet = sheet.copy(rows = rows).validated())
@@ -565,7 +574,12 @@ class AssignItemsPresenter(
         val sheet = state.splitSheet ?: return state
         val changedRows = sheet.rows.map { row ->
             if (row.participantId == participantId) {
-                row.copy(percentage = value, included = true)
+                row.copy(
+                    percentage = value,
+                    percentageGenerated = false,
+                    percentageEdited = true,
+                    included = true,
+                )
             } else {
                 row
             }
@@ -603,10 +617,7 @@ class AssignItemsPresenter(
                     assignees = assignees,
                 ).let { updatedItem ->
                     updatedItem.copy(
-                        assignmentActionLabel = updatedItem.assignmentActionLabel(
-                            state.selectedParticipantIds,
-                            state.participants,
-                        ),
+                        assignmentActionLabel = updatedItem.assignmentActionLabel(),
                     )
                 }
             } else {
@@ -636,11 +647,10 @@ class AssignItemsPresenter(
         }
         val existingShareIds = shares.map { share -> share.participantId }.toSet()
         val prefillIds = when {
-            modeOverride != null && selectedIds.isNotEmpty() -> selectedIds
-            assignmentState == AssignItemsItemState.Unassigned && selectedIds.isNotEmpty() -> selectedIds
             existingShareIds.isNotEmpty() -> participants.map { participant -> participant.id }.filter { participantId ->
                 participantId in existingShareIds
             }
+            assignmentState == AssignItemsItemState.Unassigned && selectedIds.isNotEmpty() -> selectedIds
             selectedIds.isNotEmpty() -> selectedIds
             else -> emptyList()
         }
@@ -653,6 +663,16 @@ class AssignItemsPresenter(
         val percentagePrefill = prefillIds.toEqualPercentages()
         val rows = participants.map { participant ->
             val share = shares.firstOrNull { existingShare -> existingShare.participantId == participant.id }
+            val prefilledAmount = if (prefillIds.size == 1 && participant.id in prefillIds) {
+                totalMinor
+            } else {
+                0L
+            }
+            val shareAmountMinor = share?.amountMinor?.takeIf { it > 0 }
+            val generatedAmountMinor = prefilledAmount.takeIf { it > 0 && shareAmountMinor == null }
+            val sharePercentageBasisPoints = share?.percentageBasisPoints?.takeIf { it > 0 }
+            val generatedPercentageBasisPoints = percentagePrefill[participant.id]
+                ?.takeIf { sharePercentageBasisPoints == null }
             AssignItemsSplitRowUiState(
                 participantId = participant.id,
                 name = participant.name,
@@ -662,26 +682,21 @@ class AssignItemsPresenter(
                     else -> 0
                 },
                 amount = when (targetMode) {
-                    AssignItemsSplitMode.CustomAmount -> {
-                        val prefilledAmount = if (prefillIds.size == 1 && participant.id in prefillIds) {
-                            totalMinor
-                        } else {
-                            0L
-                        }
-                        share?.amountMinor?.takeIf { it > 0 }?.let(::formatMoneyInput)
-                            ?: prefilledAmount.takeIf { it > 0 }?.let(::formatMoneyInput)
-                            ?: ""
-                    }
+                    AssignItemsSplitMode.CustomAmount -> shareAmountMinor?.let(::formatMoneyInput)
+                        ?: generatedAmountMinor?.let(::formatMoneyInput)
+                        ?: ""
                     else -> ""
                 },
+                amountGenerated = targetMode == AssignItemsSplitMode.CustomAmount && generatedAmountMinor != null,
+                amountEdited = targetMode == AssignItemsSplitMode.CustomAmount && shareAmountMinor != null,
                 percentage = when (targetMode) {
-                    AssignItemsSplitMode.Percentage -> {
-                        val basisPoints = share?.percentageBasisPoints?.takeIf { it > 0 }
-                            ?: percentagePrefill[participant.id]
-                        basisPoints?.let(::formatBasisPointsInput).orEmpty()
-                    }
+                    AssignItemsSplitMode.Percentage -> (sharePercentageBasisPoints ?: generatedPercentageBasisPoints)
+                        ?.let(::formatBasisPointsInput)
+                        .orEmpty()
                     else -> ""
                 },
+                percentageGenerated = targetMode == AssignItemsSplitMode.Percentage && generatedPercentageBasisPoints != null,
+                percentageEdited = targetMode == AssignItemsSplitMode.Percentage && sharePercentageBasisPoints != null,
                 included = when (targetMode) {
                     AssignItemsSplitMode.SharedEqual -> share != null || participant.id in prefillIds
                     AssignItemsSplitMode.CustomAmount,
@@ -935,17 +950,24 @@ class AssignItemsPresenter(
         totalMinor: Long,
     ): List<AssignItemsSplitRowUiState> {
         val activeRows = filter { row -> row.included || row.amount.isNotBlank() }
-        val blankRows = activeRows.filter { row -> row.amount.isBlank() }
-        if (blankRows.size != 1) return this
+        val targetRows = activeRows.filter { row ->
+            !row.amountEdited && (row.amount.isBlank() || row.amountGenerated)
+        }
+        if (targetRows.size != 1) return this
         val assignedMinor = activeRows
-            .filterNot { row -> row.participantId == blankRows.single().participantId }
+            .filterNot { row -> row.participantId == targetRows.single().participantId }
             .sumOf { row -> parseMoneyInput(row.amount) ?: return this }
         val remainingMinor = totalMinor - assignedMinor
         if (remainingMinor < 0) return this
-        val targetParticipantId = blankRows.single().participantId
+        val targetParticipantId = targetRows.single().participantId
         return map { row ->
             if (row.participantId == targetParticipantId) {
-                row.copy(amount = formatMoneyInput(remainingMinor))
+                row.copy(
+                    amount = formatMoneyInput(remainingMinor),
+                    amountGenerated = true,
+                    amountEdited = false,
+                    included = true,
+                )
             } else {
                 row
             }
@@ -954,17 +976,24 @@ class AssignItemsPresenter(
 
     private fun List<AssignItemsSplitRowUiState>.autoFillSingleRemainingPercentage(): List<AssignItemsSplitRowUiState> {
         val activeRows = filter { row -> row.included || row.percentage.isNotBlank() }
-        val blankRows = activeRows.filter { row -> row.percentage.isBlank() }
-        if (blankRows.size != 1) return this
+        val targetRows = activeRows.filter { row ->
+            !row.percentageEdited && (row.percentage.isBlank() || row.percentageGenerated)
+        }
+        if (targetRows.size != 1) return this
         val assignedBasisPoints = activeRows
-            .filterNot { row -> row.participantId == blankRows.single().participantId }
+            .filterNot { row -> row.participantId == targetRows.single().participantId }
             .sumOf { row -> parsePercentageBasisPoints(row.percentage) ?: return this }
         val remainingBasisPoints = PercentageBasisPoints.MAX_BASIS_POINTS - assignedBasisPoints
         if (remainingBasisPoints < 0) return this
-        val targetParticipantId = blankRows.single().participantId
+        val targetParticipantId = targetRows.single().participantId
         return map { row ->
             if (row.participantId == targetParticipantId) {
-                row.copy(percentage = formatBasisPointsInput(remainingBasisPoints), included = true)
+                row.copy(
+                    percentage = formatBasisPointsInput(remainingBasisPoints),
+                    percentageGenerated = true,
+                    percentageEdited = false,
+                    included = true,
+                )
             } else {
                 row
             }
@@ -1024,7 +1053,7 @@ class AssignItemsPresenter(
             },
             helperText = nextSelectedIds.assignmentContextLabelFromUi(participants),
             items = items.map { item ->
-                item.copy(assignmentActionLabel = item.assignmentActionLabel(nextSelectedIds, participants))
+                item.copy(assignmentActionLabel = item.assignmentActionLabel())
             },
             fieldErrors = emptyMap(),
             submitError = null,
@@ -1114,12 +1143,13 @@ class AssignItemsPresenter(
         }
     }
 
-    private fun AssignItemsReceiptItemUiState.assignmentActionLabel(
-        selectedParticipantIds: List<String>,
-        participants: List<AssignItemsParticipantUiState>,
-    ): String {
+    private fun AssignItemsReceiptItemUiState.assignmentActionLabel(): String {
         if (assignmentState != AssignItemsItemState.Unassigned) {
             return when {
+                assignees.size >= 3 && splitMode == AssignItemsSplitMode.Units -> "${assignees.size} people · Units"
+                assignees.size >= 3 && splitMode == AssignItemsSplitMode.SharedEqual -> "${assignees.size} people · Equal"
+                assignees.size >= 3 && splitMode == AssignItemsSplitMode.CustomAmount -> "Custom split · ${assignees.size} people"
+                assignees.size >= 3 && splitMode == AssignItemsSplitMode.Percentage -> "Percent split · ${assignees.size} people"
                 splitMode == AssignItemsSplitMode.Units && assignees.size > 1 -> {
                     assignees.joinToString(" · ") { assignee -> "${assignee.name} ${assignee.quantity}x" }
                 }
@@ -1132,16 +1162,7 @@ class AssignItemsPresenter(
                 else -> "Split ${assignees.size} people"
             }
         }
-
-        val selectedNames = selectedParticipantIds.mapNotNull { participantId ->
-            participants.firstOrNull { participant -> participant.id == participantId }?.name
-        }
-        return when (selectedNames.size) {
-            0 -> "Select people, then tap items"
-            1 -> "Tap to assign to ${selectedNames.single()}"
-            2 -> "Tap to split between ${selectedNames[0]} and ${selectedNames[1]}"
-            else -> "Tap to split between ${selectedNames.size} people"
-        }
+        return "Unassigned"
     }
 
     private fun formatMoney(

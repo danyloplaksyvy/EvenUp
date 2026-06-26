@@ -64,6 +64,7 @@ fun ReceiptScanRoute(
         }
     }
     var uiState by remember { mutableStateOf(ReceiptScanUiState()) }
+    var lastFailedParseTarget by remember { mutableStateOf<ReceiptScanRetryTarget?>(null) }
 
     DisposableEffect(cameraController, lifecycleOwner, uiState.cameraPermissionGranted) {
         if (uiState.cameraPermissionGranted) {
@@ -78,20 +79,26 @@ fun ReceiptScanRoute(
             uiState = try {
                 when (val result = presenter.parseImage(uri = uri, source = source)) {
                     ReceiptScanParseResult.Saved -> {
+                        lastFailedParseTarget = null
                         onContinue()
                         uiState.copy(isParsing = false)
                     }
-                    is ReceiptScanParseResult.Invalid -> uiState.copy(
-                        isParsing = false,
-                        errorMessage = result.message,
-                    )
+                    is ReceiptScanParseResult.Invalid -> {
+                        lastFailedParseTarget = ReceiptScanRetryTarget(uri = uri, source = source)
+                        uiState.copy(
+                            isParsing = false,
+                            errorMessage = result.message,
+                        )
+                    }
                 }
             } catch (error: ReceiptDataException) {
+                lastFailedParseTarget = ReceiptScanRetryTarget(uri = uri, source = source)
                 uiState.copy(
                     isParsing = false,
                     errorMessage = error.toUserMessage(),
                 )
             } catch (_: RuntimeException) {
+                lastFailedParseTarget = ReceiptScanRetryTarget(uri = uri, source = source)
                 uiState.copy(
                     isParsing = false,
                     errorMessage = "We couldn't read this receipt. Try again or enter it manually.",
@@ -171,13 +178,25 @@ fun ReceiptScanRoute(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
-                ReceiptScanUiEvent.TryAgainClick -> uiState = uiState.copy(errorMessage = null)
+                ReceiptScanUiEvent.TryAgainClick -> {
+                    val retryTarget = lastFailedParseTarget
+                    if (retryTarget != null) {
+                        parseImage(uri = retryTarget.uri, source = retryTarget.source)
+                    } else {
+                        uiState = uiState.copy(errorMessage = null)
+                    }
+                }
                 ReceiptScanUiEvent.ManualFallbackClick -> onManualEntry()
             }
         },
         modifier = modifier,
     )
 }
+
+private data class ReceiptScanRetryTarget(
+    val uri: Uri,
+    val source: ReceiptImageSource,
+)
 
 private fun ReceiptDataException.toUserMessage(): String = when (reason) {
     ReceiptDataFailureReason.Connection -> "No internet connection. Check your connection and try again."

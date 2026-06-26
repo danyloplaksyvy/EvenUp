@@ -7,6 +7,10 @@ export default {
 const SHARE_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const SHARE_ID_LENGTH = 10;
 const MAX_SHARE_ID_ATTEMPTS = 5;
+const GUEST_ACCESS_COOKIE = "evenup_guest_access";
+const GUEST_ACCESS_TTL_SECONDS = 7 * 24 * 60 * 60;
+const GUEST_ACCESS_MAX_FAILURES = 5;
+const GUEST_ACCESS_LOCKOUT_MS = 10 * 60 * 1000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_MODEL = "gpt-4.1-mini";
 const MAX_RECEIPT_IMAGE_BYTES = 7 * 1024 * 1024;
@@ -127,7 +131,7 @@ export async function handleRequest(request, env = {}) {
   if (url.pathname.startsWith("/v1/expenses/")) {
     return methodGuard(request, "GET", () => {
       const shareId = decodeURIComponent(url.pathname.slice("/v1/expenses/".length));
-      return fetchExpenseResponse(shareId, env);
+      return fetchExpenseResponse(shareId, request, env);
     });
   }
 
@@ -136,12 +140,20 @@ export async function handleRequest(request, env = {}) {
   }
 
   if (url.pathname.startsWith("/e/")) {
+    const pathRemainder = url.pathname.slice("/e/".length);
+    const isAccessPost = pathRemainder.endsWith("/access");
+    const shareIdSegment = isAccessPost ? pathRemainder.slice(0, -"/access".length) : pathRemainder;
+    const shareId = decodeURIComponent(shareIdSegment);
+
+    if (isAccessPost) {
+      return methodGuard(request, "POST", () => verifyGuestAccessResponse(shareId, request, env));
+    }
+
     if (request.method !== "GET") {
       return htmlResponse(renderGuestErrorPage("Link unavailable", "This link cannot be opened."), 405);
     }
 
-    const shareId = decodeURIComponent(url.pathname.slice("/e/".length));
-    return renderGuestExpenseResponse(shareId, env);
+    return renderGuestExpenseResponse(shareId, request, env);
   }
 
   return jsonResponse(
@@ -199,6 +211,9 @@ async function saveExpense(request, env) {
     return validationError(validationMessage);
   }
 
+  const guestPasscode = normalizeGuestPasscode(payload.guestAccess?.passcode);
+  const passcodeMaterial = guestPasscode ? await createGuestPasscodeMaterial(guestPasscode) : null;
+  const storedPayload = stripGuestAccess(payload);
   const expenseId = `expense_${crypto.randomUUID()}`;
   const createdAt = new Date().toISOString();
   const publicBaseUrl = env.PUBLIC_BASE_URL || new URL(request.url).origin;
@@ -211,11 +226,19 @@ async function saveExpense(request, env) {
         .prepare(
           [
             "INSERT INTO expenses",
-            "(id, share_id, title, payload_json, created_at)",
-            "VALUES (?, ?, ?, ?, ?)"
+            "(id, share_id, title, payload_json, guest_passcode_hash, guest_passcode_salt, created_at)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
           ].join(" ")
         )
-        .bind(expenseId, shareId, payload.title.trim(), JSON.stringify(payload), createdAt)
+        .bind(
+          expenseId,
+          shareId,
+          payload.title.trim(),
+          JSON.stringify(storedPayload),
+          passcodeMaterial?.hash ?? null,
+          passcodeMaterial?.salt ?? null,
+          createdAt
+        )
         .run();
 
       return jsonResponse(
@@ -252,7 +275,7 @@ async function saveExpense(request, env) {
   );
 }
 
-async function fetchExpenseResponse(shareId, env) {
+async function fetchExpenseResponse(shareId, request, env) {
   const row = await findExpenseByShareId(shareId, env);
   if (!row) {
     return jsonResponse(
@@ -266,6 +289,18 @@ async function fetchExpenseResponse(shareId, env) {
     );
   }
 
+  if (isPasscodeProtected(row) && !(await hasGuestAccess(row, request, env))) {
+    return jsonResponse(
+      {
+        error: {
+          code: "GUEST_ACCESS_REQUIRED",
+          message: "Enter the guest passcode to view this expense."
+        }
+      },
+      401
+    );
+  }
+
   return jsonResponse(expenseApiResponse(row));
 }
 
@@ -275,7 +310,13 @@ async function findExpenseByShareId(shareId, env) {
   }
 
   return env.EXPENSES_DB
-    .prepare("SELECT id, share_id, title, payload_json, created_at FROM expenses WHERE share_id = ?")
+    .prepare(
+      [
+        "SELECT id, share_id, title, payload_json,",
+        "guest_passcode_hash, guest_passcode_salt, created_at",
+        "FROM expenses WHERE share_id = ?"
+      ].join(" ")
+    )
     .bind(shareId)
     .first();
 }
@@ -331,7 +372,22 @@ function validateExpensePayload(payload) {
     return "summary is required.";
   }
 
+  if (payload.guestAccess !== undefined) {
+    if (!payload.guestAccess || typeof payload.guestAccess !== "object" || Array.isArray(payload.guestAccess)) {
+      return "guestAccess must be an object.";
+    }
+
+    if (!normalizeGuestPasscode(payload.guestAccess.passcode)) {
+      return "guestAccess.passcode must be exactly four letters.";
+    }
+  }
+
   return null;
+}
+
+function stripGuestAccess(payload) {
+  const { guestAccess, ...storedPayload } = payload;
+  return storedPayload;
 }
 
 function validationError(message) {
@@ -1137,7 +1193,7 @@ function isValidParsedCorrection(correction) {
   );
 }
 
-async function renderGuestExpenseResponse(shareId, env) {
+async function renderGuestExpenseResponse(shareId, request, env) {
   const row = await findExpenseByShareId(shareId, env);
   if (!row) {
     return htmlResponse(
@@ -1149,7 +1205,56 @@ async function renderGuestExpenseResponse(shareId, env) {
     );
   }
 
+  if (isPasscodeProtected(row) && !(await hasGuestAccess(row, request, env))) {
+    return htmlResponse(renderGuestPasscodePage(shareId));
+  }
+
   return htmlResponse(renderGuestExpensePage(expenseApiResponse(row)));
+}
+
+async function verifyGuestAccessResponse(shareId, request, env) {
+  const row = await findExpenseByShareId(shareId, env);
+  if (!row) {
+    return htmlResponse(
+      renderGuestErrorPage(
+        "Link unavailable",
+        "This share link is missing, expired, or was typed incorrectly."
+      ),
+      404
+    );
+  }
+
+  if (!isPasscodeProtected(row)) {
+    return redirectToGuestExpense(shareId);
+  }
+
+  const rateLimit = await checkGuestAccessRateLimit(shareId, request, env);
+  if (rateLimit.limited) {
+    return htmlResponse(
+      renderGuestPasscodePage(
+        shareId,
+        "Too many incorrect attempts. Please wait a few minutes and try again."
+      ),
+      429
+    );
+  }
+
+  const formData = await request.formData();
+  const passcode = normalizeGuestPasscode(formData.get("passcode"));
+  const isValid = Boolean(passcode) && (await verifyGuestPasscode(passcode, row));
+
+  if (!isValid) {
+    await recordGuestAccessFailure(shareId, rateLimit.clientKeyHash, env);
+    return htmlResponse(
+      renderGuestPasscodePage(shareId, "That code does not match. Check the share message and try again."),
+      401
+    );
+  }
+
+  await clearGuestAccessFailures(shareId, rateLimit.clientKeyHash, env);
+  return redirectToGuestExpense(shareId, {
+    "Set-Cookie": await createGuestAccessCookie(shareId, request, env)
+  });
 }
 
 function renderGuestExpensePage(expense) {
@@ -1162,8 +1267,21 @@ function renderGuestExpensePage(expense) {
     : [];
   const items = Array.isArray(receipt.items) ? receipt.items : [];
   const fees = Array.isArray(receipt.fees) ? receipt.fees : [];
+  const itemAssignments = Array.isArray(expense.itemAssignments) ? expense.itemAssignments : [];
+  const feeAllocations = Array.isArray(expense.feeAllocations) ? expense.feeAllocations : [];
   const currency = receipt.currency || expense.currency || "USD";
   const totalMinor = firstNumber(receipt.totalMinor, summary.totalMinor, summary.receiptTotalMinor);
+  const participantDetails = buildParticipantDetails({
+    participants,
+    payerParticipantId: expense.payerParticipantId,
+    participantSummaries,
+    settlementRows,
+    items,
+    fees,
+    itemAssignments,
+    feeAllocations,
+    currency
+  });
 
   return `<!doctype html>
 <html lang="en">
@@ -1188,15 +1306,41 @@ function renderGuestExpensePage(expense) {
       ${renderSettlementRows(settlementRows, participants, currency)}
     </section>
     <section class="panel">
-      <h2>Participant Breakdown</h2>
-      ${renderParticipantSummaries(participantSummaries, participants, currency)}
-    </section>
-    <section class="panel">
-      <h2>Item Breakdown</h2>
-      ${renderItems(items, currency)}
-      ${renderFees(fees, currency)}
+      <h2>Who pays for what</h2>
+      ${renderParticipantDetails(participantDetails, currency)}
     </section>
     <section class="notice">This is a read-only guest view.</section>
+  </main>
+  <footer>Powered by <strong>EvenUp</strong></footer>
+</body>
+</html>`;
+}
+
+function renderGuestPasscodePage(shareId, errorMessage = "") {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enter passcode - EvenUp</title>
+  <style>${guestCss()}</style>
+</head>
+<body>
+  <header class="topbar"><span>EvenUp</span></header>
+  <main>
+    <section class="hero compact">
+      <div class="eyebrow">Shared Expense</div>
+      <h1>Enter guest code</h1>
+      <p class="muted">Use the four-letter code from the share message to view this expense.</p>
+    </section>
+    <section class="panel">
+      <form class="passcode-form" method="post" action="/e/${encodeURIComponent(shareId)}/access">
+        <label for="passcode">Guest code</label>
+        <input id="passcode" name="passcode" type="text" inputmode="text" autocomplete="one-time-code" maxlength="4" pattern="[A-Za-z]{4}" required>
+        ${errorMessage ? `<p class="error-text">${escapeHtml(errorMessage)}</p>` : ""}
+        <button type="submit">Unlock expense</button>
+      </form>
+    </section>
   </main>
   <footer>Powered by <strong>EvenUp</strong></footer>
 </body>
@@ -1262,50 +1406,418 @@ function renderParticipantSummaries(summaries, participants, currency) {
     .join("");
 }
 
-function renderItems(items, currency) {
-  if (items.length === 0) {
-    return `<p class="muted">Item details are unavailable.</p>`;
+function renderParticipantDetails(details, currency) {
+  if (details.length === 0) {
+    return `<p class="muted">Participant details are unavailable.</p>`;
   }
 
-  return items
-    .map((item) => {
-      const quantity = item.quantity && item.quantity !== 1 ? ` x ${escapeHtml(String(item.quantity))}` : "";
-      const amount = firstNumber(item.totalPriceMinor, item.amountMinor, item.totalMinor);
-      return `<div class="row"><span>${escapeHtml(item.name || "Receipt item")}${quantity}</span><span>${formatMoney(
-        amount,
-        currency
-      )}</span></div>`;
+  return details
+    .map((detail, index) => {
+      const settlement = detail.settlementLines.length
+        ? detail.settlementLines.map((line) => `<div class="mini-row">${escapeHtml(line)}</div>`).join("")
+        : `<div class="mini-row muted">No payment action needed.</div>`;
+      return `<details class="person" ${index === 0 ? "open" : ""}>
+        <summary>
+          <span>
+            <strong>${escapeHtml(detail.name)}</strong>
+            ${detail.isPayer ? `<small>Payer</small>` : ""}
+          </span>
+          <b>${formatMoney(detail.shareMinor, currency)}</b>
+        </summary>
+        <div class="person-body">
+          <div class="totals-grid">
+            <div><span>Items</span><b>${formatMoney(detail.itemTotalMinor, currency)}</b></div>
+            <div><span>Fees</span><b>${formatMoney(detail.feeTotalMinor, currency)}</b></div>
+            <div><span>Discounts</span><b>${formatMoney(detail.discountCreditMinor, currency)}</b></div>
+            <div><span>Paid</span><b>${formatMoney(detail.paidMinor, currency)}</b></div>
+          </div>
+          ${renderDetailRows("Items", detail.items, currency, "No assigned items.")}
+          ${renderDetailRows("Fees", detail.fees, currency, "No allocated fees.")}
+          ${renderDetailRows("Discounts", detail.discounts, currency, "No discount credits.")}
+          <div class="subsection">
+            <h3>Settlement</h3>
+            ${settlement}
+          </div>
+        </div>
+      </details>`;
     })
     .join("");
 }
 
-function renderFees(fees, currency) {
-  if (fees.length === 0) {
-    return "";
+function renderDetailRows(title, rows, currency, emptyMessage) {
+  if (!rows.length) {
+    return `<div class="subsection"><h3>${escapeHtml(title)}</h3><p class="muted">${escapeHtml(emptyMessage)}</p></div>`;
   }
 
-  const additiveFees = fees.filter((fee) => !isDiscountFee(fee) && firstNumber(fee.amountMinor) > 0);
-  const discounts = fees.filter(isDiscountFee);
-  const feeRows = additiveFees
-    .map(
-      (fee) =>
-        `<div class="row muted"><span>${escapeHtml(fee.label || fee.type || "Fee")}</span><span>${formatMoney(
-          firstNumber(fee.amountMinor),
-          currency
-        )}</span></div>`
-    )
-    .join("");
-  const discountRows = discounts
-    .map((fee) => {
-      const amount = Math.abs(firstNumber(fee.amountMinor));
-      return `<div class="row muted"><span>${escapeHtml(fee.label || "Discount")}</span><span>-${formatMoney(
-        amount,
-        currency
-      )}</span></div>`;
-    })
-    .join("");
+  return `<div class="subsection">
+    <h3>${escapeHtml(title)}</h3>
+    ${rows
+      .map(
+        (row) =>
+          `<div class="detail-row"><span>${escapeHtml(row.label)}<small>${escapeHtml(row.meta)}</small></span><b>${formatMoney(
+            row.amountMinor,
+            currency
+          )}</b></div>`
+      )
+      .join("")}
+  </div>`;
+}
 
-  return `<div class="fees">${feeRows}${discountRows}</div>`;
+function buildParticipantDetails({
+  participants,
+  payerParticipantId,
+  participantSummaries,
+  settlementRows,
+  items,
+  fees,
+  itemAssignments,
+  feeAllocations,
+  currency
+}) {
+  const participantIds = new Set([
+    ...participants.map((participant) => participant.id),
+    ...participantSummaries.map((summary) => summary.participantId)
+  ]);
+
+  return Array.from(participantIds)
+    .map((participantId) => {
+      const summary = participantSummaries.find((candidate) => candidate.participantId === participantId) || {};
+      const itemRows = itemAssignments.flatMap((assignment) => {
+        const item = items.find((candidate) => candidate.id === assignment.receiptItemId) || {};
+        return assignmentSharesForParticipant(assignment, participantId).map((share) => ({
+          label: item.name || assignment.receiptItemId || "Receipt item",
+          meta: itemShareMeta(assignment, share),
+          amountMinor: firstNumber(share.amountMinor, share.amount)
+        }));
+      });
+      const feeRows = [];
+      const discountRows = [];
+      feeAllocations.forEach((allocation) => {
+        const fee = fees.find((candidate) => candidate.id === allocation.feeId) || {};
+        assignmentSharesForParticipant(allocation, participantId).forEach((share) => {
+          const row = {
+            label: fee.label || fee.type || allocation.feeId || "Fee",
+            meta: feeAllocationMeta(allocation),
+            amountMinor: firstNumber(share.amountMinor, share.amount)
+          };
+          if (isDiscountFee(fee) || row.amountMinor < 0) {
+            discountRows.push({ ...row, amountMinor: -Math.abs(row.amountMinor) });
+          } else {
+            feeRows.push(row);
+          }
+        });
+      });
+
+      const settlementLines = settlementRows
+        .filter((row) => row.fromParticipantId === participantId || row.toParticipantId === participantId)
+        .map((row) => {
+          const amount = formatMoney(firstNumber(row.amountMinor, row.amount), currency);
+          if (row.fromParticipantId === participantId) {
+            return `Owes ${participantName(row.toParticipantId, participants)} ${amount}`;
+          }
+          return `Receives ${amount} from ${participantName(row.fromParticipantId, participants)}`;
+        });
+
+      return {
+        participantId,
+        name: participantName(participantId, participants),
+        isPayer: participantId === payerParticipantId,
+        itemTotalMinor: firstNumber(summary.assignedItemTotalMinor, summary.assignedItemTotal),
+        feeTotalMinor: firstNumber(summary.allocatedFeeTotalMinor, summary.allocatedFeeTotal),
+        discountCreditMinor: firstNumber(summary.discountCreditTotalMinor, summary.discountCreditTotal),
+        shareMinor: firstNumber(summary.shareMinor, summary.personShareMinor, summary.personShare),
+        paidMinor: firstNumber(summary.paidMinor, summary.amountPaidMinor, summary.amountPaid),
+        netBalanceMinor: firstNumber(summary.netBalanceMinor, summary.netBalance),
+        items: itemRows,
+        fees: feeRows,
+        discounts: discountRows,
+        settlementLines
+      };
+    })
+    .sort((left, right) => {
+      if (left.participantId === payerParticipantId) return -1;
+      if (right.participantId === payerParticipantId) return 1;
+      const leftOrder = participants.find((participant) => participant.id === left.participantId)?.creationOrder ?? 0;
+      const rightOrder = participants.find((participant) => participant.id === right.participantId)?.creationOrder ?? 0;
+      return leftOrder - rightOrder;
+    });
+}
+
+function assignmentSharesForParticipant(assignment, participantId) {
+  return Array.isArray(assignment.shares)
+    ? assignment.shares.filter((share) => share.participantId === participantId)
+    : [];
+}
+
+function itemShareMeta(assignment, share) {
+  const mode = formatModeLabel(assignment.mode);
+  const extras = [];
+  if (Number.isFinite(share.quantity)) {
+    extras.push(`${share.quantity} unit${share.quantity === 1 ? "" : "s"}`);
+  }
+  if (Number.isFinite(share.percentageBasisPoints)) {
+    extras.push(`${formatBasisPoints(share.percentageBasisPoints)}`);
+  }
+  return [mode, ...extras].filter(Boolean).join(" · ");
+}
+
+function feeAllocationMeta(allocation) {
+  return formatModeLabel(allocation.mode);
+}
+
+function formatModeLabel(value) {
+  return String(value || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (character) => character.toUpperCase()) || "Assigned";
+}
+
+function formatBasisPoints(value) {
+  return `${(value / 100).toLocaleString("en", { maximumFractionDigits: 2 })}%`;
+}
+
+function redirectToGuestExpense(shareId, headers = {}) {
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: `/e/${encodeURIComponent(shareId)}`,
+      ...headers
+    }
+  });
+}
+
+function isPasscodeProtected(row) {
+  return Boolean(row?.guest_passcode_hash && row?.guest_passcode_salt);
+}
+
+async function hasGuestAccess(row, request, env) {
+  const headerPasscode = normalizeGuestPasscode(request.headers.get("X-EvenUp-Guest-Passcode"));
+  if (headerPasscode && (await verifyGuestPasscode(headerPasscode, row))) {
+    return true;
+  }
+
+  return verifyGuestAccessCookie(request, row.share_id, env);
+}
+
+function normalizeGuestPasscode(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toUpperCase();
+  return /^[A-Z]{4}$/.test(normalized) ? normalized : null;
+}
+
+async function createGuestPasscodeMaterial(passcode) {
+  const saltBytes = new Uint8Array(16);
+  crypto.getRandomValues(saltBytes);
+  const salt = base64UrlEncode(saltBytes);
+  return {
+    salt,
+    hash: await hashGuestPasscode(passcode, salt)
+  };
+}
+
+async function verifyGuestPasscode(passcode, row) {
+  const expected = row.guest_passcode_hash;
+  const actual = await hashGuestPasscode(passcode, row.guest_passcode_salt);
+  return constantTimeEqual(actual, expected);
+}
+
+async function hashGuestPasscode(passcode, salt) {
+  const input = new TextEncoder().encode(`${salt}:${passcode}`);
+  const digest = await crypto.subtle.digest("SHA-256", input);
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
+async function createGuestAccessCookie(shareId, request, env) {
+  const expiresAt = Math.floor(Date.now() / 1000) + GUEST_ACCESS_TTL_SECONDS;
+  const payload = base64UrlEncode(
+    new TextEncoder().encode(
+      JSON.stringify({
+        shareId,
+        exp: expiresAt
+      })
+    )
+  );
+  const signature = await signGuestAccessValue(payload, env);
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${GUEST_ACCESS_COOKIE}=${payload}.${signature}; Max-Age=${GUEST_ACCESS_TTL_SECONDS}; Path=/; HttpOnly; SameSite=Lax${secure}`;
+}
+
+async function verifyGuestAccessCookie(request, shareId, env) {
+  const cookieValue = parseCookie(request.headers.get("Cookie"))[GUEST_ACCESS_COOKIE];
+  if (!cookieValue) {
+    return false;
+  }
+
+  const [payload, signature] = cookieValue.split(".");
+  if (!payload || !signature) {
+    return false;
+  }
+
+  const expectedSignature = await signGuestAccessValue(payload, env);
+  if (!constantTimeEqual(signature, expectedSignature)) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload)));
+    return parsed.shareId === shareId && Number.isFinite(parsed.exp) && parsed.exp > Math.floor(Date.now() / 1000);
+  } catch {
+    return false;
+  }
+}
+
+async function signGuestAccessValue(value, env) {
+  const secret = env.GUEST_ACCESS_COOKIE_SECRET || "evenup-local-guest-access-secret";
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return base64UrlEncode(new Uint8Array(signature));
+}
+
+async function checkGuestAccessRateLimit(shareId, request, env) {
+  const clientKeyHash = await guestAccessClientKeyHash(request, env);
+  const attempt = await findGuestAccessAttempt(shareId, clientKeyHash, env);
+  if (attempt?.locked_until && new Date(attempt.locked_until).getTime() > Date.now()) {
+    return {
+      clientKeyHash,
+      limited: true
+    };
+  }
+
+  return {
+    clientKeyHash,
+    limited: false
+  };
+}
+
+async function recordGuestAccessFailure(shareId, clientKeyHash, env) {
+  if (!env.EXPENSES_DB) {
+    return;
+  }
+
+  const current = await findGuestAccessAttempt(shareId, clientKeyHash, env);
+  const updatedAt = new Date().toISOString();
+  const previousUpdatedAt = current?.updated_at ? new Date(current.updated_at).getTime() : 0;
+  const countBase = Date.now() - previousUpdatedAt > GUEST_ACCESS_LOCKOUT_MS ? 0 : Number(current?.failed_count || 0);
+  const failedCount = countBase + 1;
+  const lockedUntil =
+    failedCount >= GUEST_ACCESS_MAX_FAILURES
+      ? new Date(Date.now() + GUEST_ACCESS_LOCKOUT_MS).toISOString()
+      : null;
+
+  await env.EXPENSES_DB
+    .prepare(
+      [
+        "INSERT INTO guest_access_attempts",
+        "(share_id, client_key_hash, failed_count, locked_until, updated_at)",
+        "VALUES (?, ?, ?, ?, ?)",
+        "ON CONFLICT(share_id, client_key_hash) DO UPDATE SET",
+        "failed_count = excluded.failed_count,",
+        "locked_until = excluded.locked_until,",
+        "updated_at = excluded.updated_at"
+      ].join(" ")
+    )
+    .bind(shareId, clientKeyHash, failedCount, lockedUntil, updatedAt)
+    .run();
+}
+
+async function clearGuestAccessFailures(shareId, clientKeyHash, env) {
+  if (!env.EXPENSES_DB) {
+    return;
+  }
+
+  await env.EXPENSES_DB
+    .prepare(
+      [
+        "INSERT INTO guest_access_attempts",
+        "(share_id, client_key_hash, failed_count, locked_until, updated_at)",
+        "VALUES (?, ?, 0, NULL, ?)",
+        "ON CONFLICT(share_id, client_key_hash) DO UPDATE SET",
+        "failed_count = 0, locked_until = NULL, updated_at = excluded.updated_at"
+      ].join(" ")
+    )
+    .bind(shareId, clientKeyHash, new Date().toISOString())
+    .run();
+}
+
+async function findGuestAccessAttempt(shareId, clientKeyHash, env) {
+  if (!env.EXPENSES_DB) {
+    return null;
+  }
+
+  return env.EXPENSES_DB
+    .prepare(
+      [
+        "SELECT failed_count, locked_until, updated_at",
+        "FROM guest_access_attempts",
+        "WHERE share_id = ? AND client_key_hash = ?"
+      ].join(" ")
+    )
+    .bind(shareId, clientKeyHash)
+    .first();
+}
+
+async function guestAccessClientKeyHash(request, env) {
+  const ip =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For") ||
+    request.headers.get("Fastly-Client-IP") ||
+    "unknown";
+  const userAgent = request.headers.get("User-Agent") || "unknown";
+  const secret = env.GUEST_ACCESS_COOKIE_SECRET || "evenup-local-guest-access-secret";
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${secret}:${ip}:${userAgent}`)
+  );
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
+function parseCookie(header) {
+  if (!header) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    header.split(";").map((cookie) => {
+      const [name, ...valueParts] = cookie.trim().split("=");
+      return [name, valueParts.join("=")];
+    })
+  );
+}
+
+function base64UrlEncode(bytes) {
+  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlDecode(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function constantTimeEqual(left, right) {
+  if (typeof left !== "string" || typeof right !== "string") {
+    return false;
+  }
+
+  let diff = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    diff |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+
+  return diff === 0;
 }
 
 function isDiscountFee(fee) {
@@ -1374,6 +1886,7 @@ function guestCss() {
     .eyebrow { display: inline-flex; border: 1px solid #e2e2e2; border-radius: 999px; padding: 6px 12px; color: #5f5e5e; font-size: 12px; font-weight: 700; text-transform: uppercase; }
     h1 { margin: 14px 0 8px; font-size: 32px; line-height: 40px; }
     h2 { margin: 0 0 12px; font-size: 16px; line-height: 22px; }
+    h3 { margin: 0 0 8px; font-size: 13px; line-height: 18px; text-transform: uppercase; letter-spacing: 0.04em; color: #5f5e5e; }
     .total { font-size: 42px; line-height: 48px; font-weight: 900; }
     .paid { display: inline-flex; margin-top: 16px; padding: 9px 14px; border: 1px solid #e2e2e2; border-radius: 999px; background: #fff; }
     .panel, .error-card { margin-top: 24px; border: 1px solid #e2e2e2; border-radius: 18px; background: #fff; padding: 18px; box-shadow: 0 12px 30px rgba(0,0,0,0.04); }
@@ -1381,7 +1894,27 @@ function guestCss() {
     .row:first-of-type { border-top: 0; }
     .strong { font-size: 18px; font-weight: 700; }
     .muted { color: #5f5e5e; }
+    .compact { padding-top: 36px; }
     .fees { margin-top: 12px; border-top: 1px solid #000; }
+    .passcode-form { display: grid; gap: 12px; }
+    .passcode-form label { color: #5f5e5e; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .passcode-form input { width: 100%; border: 1px solid #cfcfcf; border-radius: 14px; padding: 14px 16px; font-size: 28px; line-height: 36px; font-weight: 800; letter-spacing: 0.32em; text-align: center; text-transform: uppercase; }
+    .passcode-form button { border: 0; border-radius: 999px; padding: 14px 18px; background: #111; color: #fff; font-weight: 800; font-size: 15px; }
+    .error-text { margin: 0; color: #93000a; font-weight: 700; font-size: 14px; }
+    .person { border-top: 1px solid #eeeeee; }
+    .person:first-of-type { border-top: 0; }
+    .person summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 0; }
+    .person summary::-webkit-details-marker { display: none; }
+    .person summary span { display: grid; gap: 3px; }
+    .person summary small { color: #5f5e5e; font-weight: 700; font-size: 12px; }
+    .person-body { padding: 0 0 16px; }
+    .totals-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+    .totals-grid div { border: 1px solid #eeeeee; border-radius: 12px; padding: 10px; background: #f9f9f9; display: grid; gap: 3px; }
+    .totals-grid span { color: #5f5e5e; font-size: 12px; font-weight: 700; }
+    .subsection { margin-top: 16px; }
+    .detail-row, .mini-row { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0; border-top: 1px solid #eeeeee; }
+    .detail-row span { display: grid; gap: 2px; }
+    .detail-row small { color: #5f5e5e; font-size: 12px; }
     .notice { margin-top: 24px; text-align: center; border: 1px solid #e2e2e2; border-radius: 10px; padding: 12px; color: #5f5e5e; background: #f3f3f3; font-size: 13px; }
     .error-card { text-align: center; padding: 32px 22px; }
     .icon { width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 999px; display: grid; place-items: center; background: #ffdad6; color: #93000a; font-weight: 900; }

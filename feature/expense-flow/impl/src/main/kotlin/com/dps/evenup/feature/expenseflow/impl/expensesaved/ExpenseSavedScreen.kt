@@ -56,7 +56,7 @@ fun ExpenseSavedScreen(
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = "Share the breakdown so everyone sees the same numbers.",
+                text = "Share the breakdown and code so everyone sees the same numbers.",
                 style = EvenUpTheme.typography.body,
                 color = EvenUpTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
@@ -74,11 +74,11 @@ fun ExpenseSavedScreen(
             verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
         ) {
             EvenUpPrimaryButton(
-                text = "Share link",
+                text = "Share details",
                 onClick = { onEvent(ExpenseSavedUiEvent.ShareClick) },
             )
             EvenUpSecondaryButton(
-                text = "Copy link",
+                text = "Copy details",
                 onClick = { onEvent(ExpenseSavedUiEvent.CopyClick) },
             )
             EvenUpTextButton(
@@ -115,30 +115,55 @@ private fun LinkCard(
     onEvent: (ExpenseSavedUiEvent) -> Unit,
 ) {
     EvenUpCard {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space16),
         ) {
-            Text(
-                text = uiState.shareUrl,
-                modifier = Modifier.weight(1f),
-                style = EvenUpTheme.typography.body,
-                color = EvenUpTheme.colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            EvenUpIconButton(
-                contentDescription = "Copy share link",
-                onClick = { onEvent(ExpenseSavedUiEvent.CopyClick) },
-            ) {
-                Icon(imageVector = Icons.Filled.ContentCopy, contentDescription = null)
+            Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4)) {
+                Text(
+                    text = "Share link",
+                    style = EvenUpTheme.typography.caption,
+                    color = EvenUpTheme.colors.textSecondary,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = uiState.shareUrl,
+                        modifier = Modifier.weight(1f),
+                        style = EvenUpTheme.typography.body,
+                        color = EvenUpTheme.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    EvenUpIconButton(
+                        contentDescription = "Copy share details",
+                        onClick = { onEvent(ExpenseSavedUiEvent.CopyClick) },
+                    ) {
+                        Icon(imageVector = Icons.Filled.ContentCopy, contentDescription = null)
+                    }
+                    EvenUpIconButton(
+                        contentDescription = "Share details",
+                        onClick = { onEvent(ExpenseSavedUiEvent.ShareClick) },
+                    ) {
+                        Icon(imageVector = Icons.Filled.IosShare, contentDescription = null)
+                    }
+                }
             }
-            EvenUpIconButton(
-                contentDescription = "Share link",
-                onClick = { onEvent(ExpenseSavedUiEvent.ShareClick) },
-            ) {
-                Icon(imageVector = Icons.Filled.IosShare, contentDescription = null)
+            Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4)) {
+                Text(
+                    text = "Guest code",
+                    style = EvenUpTheme.typography.caption,
+                    color = EvenUpTheme.colors.textSecondary,
+                )
+                Text(
+                    text = uiState.guestPasscode,
+                    style = EvenUpTheme.typography.screenTitle,
+                    color = EvenUpTheme.colors.textPrimary,
+                    maxLines = 1,
+                )
             }
         }
     }

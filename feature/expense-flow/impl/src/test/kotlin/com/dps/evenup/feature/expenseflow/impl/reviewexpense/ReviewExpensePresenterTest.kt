@@ -19,6 +19,7 @@ import com.dps.evenup.domain.participant.api.ParticipantId
 import com.dps.evenup.domain.receipt.api.CurrencyCode
 import com.dps.evenup.domain.receipt.api.MoneyMinor
 import com.dps.evenup.domain.receipt.api.Receipt
+import com.dps.evenup.domain.sharing.api.GenerateGuestPasscodeUseCase
 import com.dps.evenup.domain.sharing.api.ShareLink
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -291,17 +292,34 @@ class ReviewExpensePresenterTest {
         assertEquals("Kehn is settled" to "Settled", state.payerSummary.rows.last().let { it.label to it.valueLabel })
     }
 
+    @Test
+    fun `save generates guest passcode and returns it with share link`() = runBlocking {
+        val expenseRepository = FakeExpenseRepository()
+        val presenter = presenter(
+            expenseRepository = expenseRepository,
+            generateGuestPasscode = FakeGenerateGuestPasscodeUseCase("KTRQ"),
+        )
+
+        val result = presenter.saveDraft()
+
+        assertEquals(SaveReviewExpenseResult.Saved("https://example.test/e/share-1", "KTRQ"), result)
+        assertEquals("KTRQ", expenseRepository.savedPayload?.guestPasscode)
+    }
+
     private fun presenter(
         currencyCode: String = "USD",
         draft: ExpenseDraft = reviewExpenseDraft(currencyCode = currencyCode),
         summary: ExpenseSummary = reviewExpenseSummary(),
         validationErrors: Set<FinalExpenseValidationError> = emptySet(),
+        expenseRepository: FakeExpenseRepository = FakeExpenseRepository(),
+        generateGuestPasscode: GenerateGuestPasscodeUseCase = FakeGenerateGuestPasscodeUseCase("KTRQ"),
     ): ReviewExpensePresenter {
         return ReviewExpensePresenter(
             draftRepository = FakeExpenseDraftRepository(draft),
-            expenseRepository = FakeExpenseRepository,
+            expenseRepository = expenseRepository,
             calculateSummary = FakeCalculateExpenseSummaryUseCase(summary),
             validateExpenseBeforeSave = FakeValidateExpenseBeforeSaveUseCase(summary, validationErrors),
+            generateGuestPasscode = generateGuestPasscode,
         )
     }
 
@@ -319,13 +337,22 @@ class ReviewExpensePresenterTest {
         }
     }
 
-    private object FakeExpenseRepository : ExpenseRepository {
+    private class FakeExpenseRepository : ExpenseRepository {
+        var savedPayload: FinalizedExpensePayload? = null
+
         override suspend fun saveFinalizedExpense(payload: FinalizedExpensePayload): SavedShareLink {
+            savedPayload = payload
             return SavedShareLink(
                 expenseId = ExpenseId("expense-1"),
                 shareLink = ShareLink(shareId = "share-1", publicUrl = "https://example.test/e/share-1"),
             )
         }
+    }
+
+    private class FakeGenerateGuestPasscodeUseCase(
+        private val passcode: String,
+    ) : GenerateGuestPasscodeUseCase {
+        override fun generate(): String = passcode
     }
 
     private class FakeCalculateExpenseSummaryUseCase(

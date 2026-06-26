@@ -278,16 +278,23 @@ docs/design/stitch/guest_view_web/code.html
 
 Implements:
 
-- Public read-only expense page
+- Passcode-gated read-only expense page for new shares
+- Legacy public read-only expense page for no-passcode rows
+- Four-letter passcode gate
 - Settlement summary
-- Participant breakdown
-- Item and fee breakdown
+- Person-first participant breakdown
+- Expandable per-participant item and fee details
+- Split/allocation method labels
+- Discount credits and payer's own share
 - Powered by EvenUp footer
 
 Related tasks:
 
 - `T061 - Implement guest web page`
 - `T062 - Implement guest web error states`
+- `T063 - Add guest passcode generation and save contract`
+- `T064 - Add guest passcode verification, remembered access, and rate limiting`
+- `T065 - Add person-level guest breakdown`
 
 ### Validation States
 

@@ -15,6 +15,7 @@ import com.dps.evenup.domain.expense.api.ValidateItemAssignmentsUseCase
 import com.dps.evenup.domain.participant.api.ValidateParticipantsUseCase
 import com.dps.evenup.domain.receipt.api.NormalizeReceiptUseCase
 import com.dps.evenup.domain.receipt.api.ValidateReceiptUseCase
+import com.dps.evenup.domain.sharing.api.GenerateGuestPasscodeUseCase
 import com.dps.evenup.feature.expenseflow.api.AssignItemsDestination
 import com.dps.evenup.feature.expenseflow.api.ChoosePeopleDestination
 import com.dps.evenup.feature.expenseflow.api.ExpenseSavedDestination
@@ -60,6 +61,7 @@ object ExpenseFlowNavigationModule {
         validateParticipants: ValidateParticipantsUseCase,
         normalizeReceipt: NormalizeReceiptUseCase,
         validateReceipt: ValidateReceiptUseCase,
+        generateGuestPasscode: GenerateGuestPasscodeUseCase,
     ): EvenUpEntryProviderInstaller = EvenUpEntryProviderInstaller { scope ->
         with(scope) {
             entry<NewExpenseDestination> {
@@ -86,7 +88,7 @@ object ExpenseFlowNavigationModule {
                     draftRepository = draftRepository,
                     validateReceipt = validateReceipt,
                     onBack = navigator::navigateBack,
-                    onContinue = { navigator.navigate(ReceiptReviewDestination) },
+                    onContinue = { navigator.navigate(ChoosePeopleDestination) },
                 )
             }
             entry<ReceiptReviewDestination> {
@@ -136,13 +138,22 @@ object ExpenseFlowNavigationModule {
                     expenseRepository = expenseRepository,
                     calculateSummary = calculateSummary,
                     validateExpenseBeforeSave = validateExpenseBeforeSave,
+                    generateGuestPasscode = generateGuestPasscode,
                     onBack = navigator::navigateBack,
-                    onSaved = { shareUrl -> navigator.navigate(ExpenseSavedDestination(shareUrl = shareUrl)) },
+                    onSaved = { shareUrl, guestPasscode ->
+                        navigator.navigate(
+                            ExpenseSavedDestination(
+                                shareUrl = shareUrl,
+                                guestPasscode = guestPasscode,
+                            ),
+                        )
+                    },
                 )
             }
             entry<ExpenseSavedDestination> { destination ->
                 ExpenseSavedRoute(
                     shareUrl = destination.shareUrl,
+                    guestPasscode = destination.guestPasscode,
                     draftRepository = draftRepository,
                     onAddAnother = { navigator.replaceAll(NewExpenseDestination) },
                 )

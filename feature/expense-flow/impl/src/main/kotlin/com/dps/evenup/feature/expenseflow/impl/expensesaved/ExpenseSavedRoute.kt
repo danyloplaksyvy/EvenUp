@@ -18,22 +18,30 @@ import kotlinx.coroutines.launch
 @Composable
 fun ExpenseSavedRoute(
     shareUrl: String,
+    guestPasscode: String,
     draftRepository: ExpenseDraftRepository,
     onAddAnother: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var uiState by remember(shareUrl) { mutableStateOf(ExpenseSavedUiState(shareUrl = shareUrl)) }
+    var uiState by remember(shareUrl, guestPasscode) {
+        mutableStateOf(
+            ExpenseSavedUiState(
+                shareUrl = shareUrl,
+                guestPasscode = guestPasscode,
+            ),
+        )
+    }
 
     ExpenseSavedScreen(
         uiState = uiState,
         onEvent = { event ->
             when (event) {
-                ExpenseSavedUiEvent.ShareClick -> shareLink(context, uiState.shareUrl)
+                ExpenseSavedUiEvent.ShareClick -> shareLink(context, uiState.shareMessage)
                 ExpenseSavedUiEvent.CopyClick -> {
-                    copyLink(context, uiState.shareUrl)
-                    uiState = uiState.copy(message = "Link copied.")
+                    copyShareDetails(context, uiState.shareMessage)
+                    uiState = uiState.copy(message = "Share details copied.")
                 }
                 ExpenseSavedUiEvent.AddAnotherClick -> {
                     coroutineScope.launch {
@@ -57,19 +65,19 @@ fun ExpenseSavedRoute(
 
 private fun shareLink(
     context: Context,
-    shareUrl: String,
+    shareMessage: String,
 ) {
     val sendIntent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, shareUrl)
+        putExtra(Intent.EXTRA_TEXT, shareMessage)
     }
-    context.startActivity(Intent.createChooser(sendIntent, "Share EvenUp link"))
+    context.startActivity(Intent.createChooser(sendIntent, "Share EvenUp details"))
 }
 
-private fun copyLink(
+private fun copyShareDetails(
     context: Context,
-    shareUrl: String,
+    shareMessage: String,
 ) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("EvenUp share link", shareUrl))
+    clipboard.setPrimaryClip(ClipData.newPlainText("EvenUp share details", shareMessage))
 }

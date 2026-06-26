@@ -87,6 +87,7 @@ private fun FinalizedExpensePayload.toDto(): SaveExpenseRequestDto = SaveExpense
     itemAssignments = itemAssignments.map { assignment -> assignment.toDto() },
     feeAllocations = feeAllocations.map { allocation -> allocation.toDto() },
     summary = summary.toDto(),
+    guestAccess = guestPasscode?.let { passcode -> GuestAccessDto(passcode) },
 )
 
 private fun Receipt.toDto(): ReceiptDto = ReceiptDto(
@@ -185,6 +186,12 @@ private data class SaveExpenseRequestDto(
     val itemAssignments: List<ItemAssignmentDto>,
     val feeAllocations: List<FeeAllocationDto>,
     val summary: ExpenseSummaryDto,
+    val guestAccess: GuestAccessDto?,
+)
+
+@Serializable
+private data class GuestAccessDto(
+    val passcode: String,
 )
 
 @Serializable

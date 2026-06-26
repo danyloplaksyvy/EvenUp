@@ -91,6 +91,7 @@ Domain impl modules contain:
 - calculation
 - allocation
 - settlement logic
+- guest passcode generation and validation rules when they are Android-side business rules
 
 Domain modules must not depend on Android UI, Compose, DTOs, or database entities.
 
@@ -179,7 +180,30 @@ CalculateExpenseSummaryUseCase
 ValidateExpenseBeforeSaveUseCase
 SaveFinalizedExpenseUseCase
 CreateShareLinkUseCase
+GenerateGuestPasscodeUseCase
+ValidateGuestPasscodeUseCase
 ```
+
+Guest passcode rules:
+
+- Android generates a four-letter passcode before saving a finalized expense.
+- Passcode generation and local format validation belong in `:domain:sharing`.
+- The save/share feature keeps the generated passcode in UI state so it can be shown and included in share-sheet text.
+- Data repositories may send the passcode to the Worker, but DTOs must not leak into domain models.
+- The Worker stores only salted passcode hashes and owns guest access verification, failure rate limiting, and remembered access cookies.
+
+## Guest web rendering
+
+The backend-rendered guest page derives display rows from the immutable saved payload:
+
+```text
+payload.receipt.items + payload.itemAssignments -> person item rows
+payload.receipt.fees + payload.feeAllocations -> person fee rows
+payload.summary.participantSummaries -> totals, paid amounts, net balances
+payload.summary.settlementRows -> who owes whom
+```
+
+The guest page should be person-first. A participant row expands to show the exact items, split modes, fee allocations, discount credits, paid amount, total share, and settlement result for that participant.
 
 ## Post-pitch feature split
 

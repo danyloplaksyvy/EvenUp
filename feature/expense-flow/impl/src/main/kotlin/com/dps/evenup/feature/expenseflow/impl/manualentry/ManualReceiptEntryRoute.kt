@@ -35,7 +35,14 @@ fun ManualReceiptEntryRoute(
                 ManualReceiptEntryUiEvent.BackClick -> onBack()
                 ManualReceiptEntryUiEvent.ContinueClick -> {
                     coroutineScope.launch {
-                        uiState = uiState.copy(isSaving = true, fieldErrors = emptyMap(), submitError = null)
+                        val validatedState = presenter.validateVisibleState(
+                            uiState.copy(fieldErrors = emptyMap(), submitError = null),
+                        )
+                        if (validatedState.fieldErrors.isNotEmpty()) {
+                            uiState = validatedState
+                            return@launch
+                        }
+                        uiState = validatedState.copy(isSaving = true)
                         uiState = try {
                             when (val result = presenter.saveDraft(uiState)) {
                                 SaveManualReceiptDraftResult.Saved -> {
@@ -43,7 +50,13 @@ fun ManualReceiptEntryRoute(
                                     uiState.copy(isSaving = false)
                                 }
                                 is SaveManualReceiptDraftResult.Invalid -> {
-                                    uiState.copy(isSaving = false, fieldErrors = result.fieldErrors)
+                                    uiState.copy(
+                                        isSaving = false,
+                                        fieldErrors = result.fieldErrors,
+                                        firstBlockingSection = result.firstBlockingSection,
+                                        firstBlockingItemId = result.firstBlockingItemId,
+                                        validationRequestId = uiState.validationRequestId + 1,
+                                    )
                                 }
                             }
                         } catch (_: RuntimeException) {

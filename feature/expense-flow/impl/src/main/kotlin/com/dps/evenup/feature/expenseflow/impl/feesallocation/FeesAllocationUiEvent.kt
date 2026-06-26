@@ -19,6 +19,11 @@ sealed interface FeesAllocationUiEvent {
 
     data class AssignThisFeeClick(val feeId: String) : FeesAllocationUiEvent
 
+    data class AssignThisFeeToParticipantClick(
+        val feeId: String,
+        val participantId: String,
+    ) : FeesAllocationUiEvent
+
     data object ParticipantPickerDismissed : FeesAllocationUiEvent
 
     data class ParticipantPicked(val participantId: String) : FeesAllocationUiEvent

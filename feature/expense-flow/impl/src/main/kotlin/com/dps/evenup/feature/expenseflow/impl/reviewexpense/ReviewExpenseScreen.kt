@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomActionBar
 import com.dps.evenup.core.designsystem.api.EvenUpBottomSheet
 import com.dps.evenup.core.designsystem.api.EvenUpCard
-import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
+import com.dps.evenup.core.designsystem.api.EvenUpPinnedTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
 import com.dps.evenup.core.designsystem.api.EvenUpParticipantAvatar
@@ -48,11 +48,10 @@ fun ReviewExpenseScreen(
     onEvent: (ReviewExpenseUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    EvenUpCollapsingTopBarScaffold(
+    EvenUpPinnedTopBarScaffold(
         title = "Review expense",
         onNavigationClick = { onEvent(ReviewExpenseUiEvent.BackClick) },
         modifier = modifier.fillMaxSize(),
-        showStickyNavigationButton = false,
         bottomBar = {
             if (!uiState.isLoading && !uiState.missingDraft) {
                 EvenUpBottomActionBar(

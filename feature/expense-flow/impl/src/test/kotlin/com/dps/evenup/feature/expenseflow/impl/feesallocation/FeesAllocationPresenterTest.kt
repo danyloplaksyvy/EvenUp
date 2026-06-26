@@ -292,7 +292,7 @@ class FeesAllocationPresenterTest {
     }
 
     @Test
-    fun `assign this fee to one person changes only selected fee`() = runBlocking {
+    fun `direct focused fee assignment changes only selected fee and keeps editor open`() = runBlocking {
         val presenter = presenter(
             draft = feesAllocationDraft(
                 fees = listOf(
@@ -305,11 +305,17 @@ class FeesAllocationPresenterTest {
         state = presenter.reduce(state, FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Custom))
         val originalServiceRows = state.feeCards.first { card -> card.id == "service" }.participantRows.map { row -> row.customAmount }
 
-        state = presenter.reduce(state, FeesAllocationUiEvent.AssignThisFeeClick("tax"))
-        state = presenter.reduce(state, FeesAllocationUiEvent.ParticipantPicked("p2"))
+        state = presenter.reduce(state, FeesAllocationUiEvent.FeeEditorOpenClick("tax"))
+        state = presenter.reduce(state, FeesAllocationUiEvent.AssignThisFeeToParticipantClick(feeId = "tax", participantId = "p2"))
 
         assertEquals(listOf("0.00", "4.00"), state.feeCards.first { card -> card.id == "tax" }.participantRows.map { row -> row.customAmount })
         assertEquals(originalServiceRows, state.feeCards.first { card -> card.id == "service" }.participantRows.map { row -> row.customAmount })
+        assertNull(state.participantPicker)
+        val editor = requireNotNull(state.selectedFeeEditor)
+        assertEquals("tax", editor.feeId)
+        assertEquals(listOf("0.00", "4.00"), editor.rows.map { row -> row.customAmount })
+        assertEquals(listOf(false, true), editor.participantChips.map { chip -> chip.selected })
+        assertTrue(editor.canSave)
     }
 
     @Test
@@ -317,8 +323,8 @@ class FeesAllocationPresenterTest {
         val presenter = presenter(draft = feesAllocationDraft())
         var state = presenter.load()
         state = presenter.reduce(state, FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Custom))
-        state = presenter.reduce(state, FeesAllocationUiEvent.AssignThisFeeClick("fee-1"))
-        state = presenter.reduce(state, FeesAllocationUiEvent.ParticipantPicked("p1"))
+        state = presenter.reduce(state, FeesAllocationUiEvent.FeeEditorOpenClick("fee-1"))
+        state = presenter.reduce(state, FeesAllocationUiEvent.AssignThisFeeToParticipantClick(feeId = "fee-1", participantId = "p1"))
 
         state = presenter.reduce(state, FeesAllocationUiEvent.CustomAmountChanged("fee-1", "p2", "1.50"))
 
@@ -333,8 +339,8 @@ class FeesAllocationPresenterTest {
         val presenter = presenter(draft = feesAllocationDraft())
         var state = presenter.load()
         state = presenter.reduce(state, FeesAllocationUiEvent.ModeSelected(FeesAllocationModeUiState.Custom))
-        state = presenter.reduce(state, FeesAllocationUiEvent.AssignThisFeeClick("fee-1"))
-        state = presenter.reduce(state, FeesAllocationUiEvent.ParticipantPicked("p1"))
+        state = presenter.reduce(state, FeesAllocationUiEvent.FeeEditorOpenClick("fee-1"))
+        state = presenter.reduce(state, FeesAllocationUiEvent.AssignThisFeeToParticipantClick(feeId = "fee-1", participantId = "p1"))
 
         state = presenter.reduce(state, FeesAllocationUiEvent.CustomAmountChanged("fee-1", "p2", "5.00"))
 

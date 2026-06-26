@@ -142,8 +142,8 @@ For the Receipt Scan screen, use:
 4. T003 - Wire baseline dependency graph.
 5. T005 - Implement design tokens and app theme.
 6. T010 to T018 - Domain and calculation engine.
-7. T050 to T061 - Backend save/fetch/guest page.
-8. T060 to T064 - Android data layer.
+7. T050 to T065 - Backend save/fetch/guest page, passcode access, and person-level breakdown.
+8. T067 to T068 - Android save/share passcode flow.
 9. T070 onward - Manual app flow.
 10. T110 onward - Scanner integration.
 11. T120 onward - Demo hardening.

@@ -16,6 +16,7 @@ import com.dps.evenup.data.expense.api.ExpenseDataFailureReason
 import com.dps.evenup.data.expense.api.ExpenseRepository
 import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
+import com.dps.evenup.domain.sharing.api.GenerateGuestPasscodeUseCase
 import kotlinx.coroutines.launch
 
 @Composable
@@ -24,16 +25,24 @@ fun ReviewExpenseRoute(
     expenseRepository: ExpenseRepository,
     calculateSummary: CalculateExpenseSummaryUseCase,
     validateExpenseBeforeSave: ValidateExpenseBeforeSaveUseCase,
+    generateGuestPasscode: GenerateGuestPasscodeUseCase,
     onBack: () -> Boolean,
-    onSaved: (shareUrl: String) -> Unit,
+    onSaved: (shareUrl: String, guestPasscode: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val presenter = remember(draftRepository, expenseRepository, calculateSummary, validateExpenseBeforeSave) {
+    val presenter = remember(
+        draftRepository,
+        expenseRepository,
+        calculateSummary,
+        validateExpenseBeforeSave,
+        generateGuestPasscode,
+    ) {
         ReviewExpensePresenter(
             draftRepository = draftRepository,
             expenseRepository = expenseRepository,
             calculateSummary = calculateSummary,
             validateExpenseBeforeSave = validateExpenseBeforeSave,
+            generateGuestPasscode = generateGuestPasscode,
         )
     }
     val coroutineScope = rememberCoroutineScope()
@@ -47,7 +56,7 @@ fun ReviewExpenseRoute(
                 when (val result = presenter.saveDraft()) {
                     is SaveReviewExpenseResult.Saved -> {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onSaved(result.shareUrl)
+                        onSaved(result.shareUrl, result.guestPasscode)
                         uiState.copy(isSaving = false)
                     }
                     SaveReviewExpenseResult.MissingDraft -> uiState.copy(

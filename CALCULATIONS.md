@@ -233,6 +233,34 @@ Ben owes Anna 4000
 Chris owes Anna 4550
 ```
 
+## Guest transparency breakdown
+
+The guest web view must explain each participant's share from the saved immutable expense payload.
+
+Display must be person-first:
+
+```text
+participant
+-> assigned item shares
+-> allocated fee shares
+-> discount credits
+-> total share
+-> amount paid
+-> net balance
+-> settlement action
+```
+
+Rules:
+
+- Do not recalculate money in the guest renderer with a different algorithm.
+- Use saved `itemAssignments` to show which receipt items belong to each participant.
+- Use saved `feeAllocations` to show each participant's tax, tip, service fee, and other fee shares.
+- Show the assignment or allocation mode when available, such as full, units, shared equally, custom amount, percentage, equal fee, proportional fee, or custom fee.
+- Show discounts or negative fees as credits, not as positive charges.
+- Show the payer's own consumed share separately from what others owe the payer.
+- Preserve exact totals from saved minor-unit amounts.
+- If an older saved payload lacks assignment details, show a safe unavailable state instead of inventing rows.
+
 ## Required tests
 
 Calculation engine must test:

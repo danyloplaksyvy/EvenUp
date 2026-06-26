@@ -87,12 +87,17 @@ data class ReceiptReviewUiState(
         else -> "AI found ${items.size} ${if (items.size == 1) "item" else "items"} · Ready"
     }
     val statusAccessibilityLabel: String = firstIssue?.accessibilityLabel ?: statusLabel
+    val statusActionLabel: String? = when {
+        blockingIssues.size > 1 -> "Review issues"
+        blockingIssues.size == 1 -> blockingIssues.single().footerActionLabel
+        issues.size > 1 -> "Review notes"
+        issues.size == 1 -> issues.single().footerActionLabel
+        else -> null
+    }
     val hasActiveWarningStatus: Boolean = issues.isNotEmpty() || fieldErrors.isNotEmpty() || submitError != null
     val hasWarningStatus: Boolean = hasActiveWarningStatus
-    val canContinue: Boolean = !isSaving && blockingIssues.isEmpty()
-    val continueBlockedMessage: String? = blockingIssues.firstOrNull()?.let { issue ->
-        "Fix: ${issue.title}"
-    }
+    val footerState: ReceiptReviewFooterState = buildFooterState()
+    val canContinue: Boolean = footerState.action == ReceiptReviewFooterAction.Continue && footerState.enabled
 
     val itemSubtotalMinor: Long
         get() = items.sumOf { item -> parseMoneyMinorValue(item.amount) ?: 0L }
@@ -156,6 +161,38 @@ data class ReceiptReviewUiState(
 
     private fun firstSuggestedCorrectionItemId(): String? {
         return items.firstOrNull { item -> item.suggestedCorrection != null }?.id
+    }
+
+    private fun buildFooterState(): ReceiptReviewFooterState {
+        if (isSaving) {
+            return ReceiptReviewFooterState(
+                label = "Saving...",
+                action = ReceiptReviewFooterAction.Disabled,
+                enabled = false,
+                accessibilityLabel = "Saving receipt",
+            )
+        }
+
+        return when {
+            blockingIssues.isEmpty() -> ReceiptReviewFooterState(
+                label = "Continue",
+                action = ReceiptReviewFooterAction.Continue,
+                accessibilityLabel = "Continue to choose people",
+            )
+            blockingIssues.size > 1 -> ReceiptReviewFooterState(
+                label = "Review issues",
+                action = ReceiptReviewFooterAction.ReviewIssues,
+                accessibilityLabel = "Review ${blockingIssues.size} receipt issues",
+            )
+            else -> {
+                val issue = blockingIssues.single()
+                ReceiptReviewFooterState(
+                    label = issue.footerActionLabel,
+                    action = ReceiptReviewFooterAction.ReviewIssue(issue.id),
+                    accessibilityLabel = issue.accessibilityLabel,
+                )
+            }
+        }
     }
 
     private fun buildReconciliation(): ReceiptReviewReconciliationUiState {
@@ -312,6 +349,21 @@ data class ReceiptReviewUiState(
             else -> Unit
         }
 
+        if (items.isEmpty()) {
+            add(
+                ReceiptReviewIssueUiState(
+                    id = "items_empty",
+                    kind = ReceiptReviewIssueKind.NoItems,
+                    severity = ReceiptReviewIssueSeverity.Blocking,
+                    target = ReceiptReviewIssueTarget.Items,
+                    title = "Add at least one item",
+                    message = "Add an item from the receipt before continuing.",
+                    actionLabel = "Review items",
+                    accessibilityLabel = "Add at least one item. Review items.",
+                ),
+            )
+        }
+
         items.forEach { item ->
             if (item.needsReview) {
                 val note = item.reviewNote ?: "Check price from receipt"
@@ -372,7 +424,41 @@ data class ReceiptReviewUiState(
                 )
             }
         }
+
+        fees.forEach { fee ->
+            if (!fee.hasValidAmount) {
+                val componentName = fee.issueComponentName()
+                val lowerComponentName = componentName.lowercase(Locale.US)
+                add(
+                    ReceiptReviewIssueUiState(
+                        id = "fee_${fee.id}",
+                        kind = ReceiptReviewIssueKind.InvalidFee,
+                        severity = ReceiptReviewIssueSeverity.Blocking,
+                        target = ReceiptReviewIssueTarget.Fee(fee.id),
+                        title = "${fee.displayLabel.ifBlank { "Fee" }} needs review",
+                        message = "Enter a positive $lowerComponentName amount.",
+                        actionLabel = "Review $lowerComponentName",
+                        accessibilityLabel = "${fee.displayLabel.ifBlank { "Fee" }} needs review. Review $lowerComponentName.",
+                    ),
+                )
+            }
+        }
     }
+}
+
+data class ReceiptReviewFooterState(
+    val label: String,
+    val action: ReceiptReviewFooterAction,
+    val enabled: Boolean = true,
+    val helperText: String? = null,
+    val accessibilityLabel: String = label,
+)
+
+sealed interface ReceiptReviewFooterAction {
+    data object Continue : ReceiptReviewFooterAction
+    data class ReviewIssue(val issueId: String) : ReceiptReviewFooterAction
+    data object ReviewIssues : ReceiptReviewFooterAction
+    data object Disabled : ReceiptReviewFooterAction
 }
 
 data class ReceiptReviewIssueUiState(
@@ -386,6 +472,14 @@ data class ReceiptReviewIssueUiState(
     val accessibilityLabel: String,
 )
 
+private val ReceiptReviewIssueUiState.footerActionLabel: String
+    get() = when (kind) {
+        ReceiptReviewIssueKind.ItemAmountReview,
+        ReceiptReviewIssueKind.InvalidItem,
+        -> "Review item"
+        else -> actionLabel
+    }
+
 enum class ReceiptReviewIssueKind {
     TotalMismatch,
     MissingDate,
@@ -397,6 +491,8 @@ enum class ReceiptReviewIssueKind {
     InvalidTotal,
     ItemAmountReview,
     InvalidItem,
+    InvalidFee,
+    NoItems,
 }
 
 enum class ReceiptReviewIssueSeverity {
@@ -407,7 +503,9 @@ enum class ReceiptReviewIssueSeverity {
 sealed interface ReceiptReviewIssueTarget {
     data class Details(val editTarget: ReceiptReviewEditTarget) : ReceiptReviewIssueTarget
     data class Item(val itemId: String) : ReceiptReviewIssueTarget
+    data class Fee(val feeId: String) : ReceiptReviewIssueTarget
     data class Summary(val editTarget: ReceiptReviewEditTarget) : ReceiptReviewIssueTarget
+    data object Items : ReceiptReviewIssueTarget
     data object Adjustments : ReceiptReviewIssueTarget
 }
 
@@ -460,6 +558,10 @@ data class ReceiptReviewFeeUiState(
         val label = formatCurrency(amount, currencyCode)
         return if (isDiscount) "-$label" else label
     }
+}
+
+private fun ReceiptReviewFeeUiState.issueComponentName(): String {
+    return if (type == FeeType.Discount) "Discount" else "Fee"
 }
 
 data class ReceiptReviewReconciliationUiState(

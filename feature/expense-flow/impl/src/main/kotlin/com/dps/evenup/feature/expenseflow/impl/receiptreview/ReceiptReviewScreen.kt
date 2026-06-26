@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -51,7 +50,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import com.dps.evenup.core.designsystem.api.EvenUpBottomSheet
 import com.dps.evenup.core.designsystem.api.EvenUpCard
-import com.dps.evenup.core.designsystem.api.EvenUpCollapsingTopBarScaffold
+import com.dps.evenup.core.designsystem.api.EvenUpPinnedTopBarScaffold
 import com.dps.evenup.core.designsystem.api.EvenUpErrorState
 import com.dps.evenup.core.designsystem.api.EvenUpIconButton
 import com.dps.evenup.core.designsystem.api.EvenUpLoadingState
@@ -66,6 +65,7 @@ import com.dps.evenup.core.designsystem.api.EvenUpValidationSeverity
 import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.CurrencySelector
 import com.dps.evenup.feature.expenseflow.impl.receiptentry.ReceiptDatePickerField
+import com.dps.evenup.feature.expenseflow.impl.receiptentry.SmartStickyActionBar
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -75,7 +75,7 @@ fun ReceiptReviewScreen(
     onEvent: (ReceiptReviewUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    EvenUpCollapsingTopBarScaffold(
+    EvenUpPinnedTopBarScaffold(
         title = "Receipt review",
         onNavigationClick = { onEvent(ReceiptReviewUiEvent.BackClick) },
         modifier = modifier.fillMaxSize(),
@@ -178,33 +178,21 @@ private fun ReceiptReviewBottomBar(
     uiState: ReceiptReviewUiState,
     onEvent: (ReceiptReviewUiEvent) -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = EvenUpTheme.colors.background,
-        contentColor = EvenUpTheme.colors.textPrimary,
-        border = BorderStroke(1.dp, EvenUpTheme.colors.divider),
-    ) {
-        Column(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .padding(EvenUpTheme.spacing.space16),
-            verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
-        ) {
-            if (!uiState.isSaving && !uiState.canContinue) {
-                uiState.continueBlockedMessage?.let { message ->
-                    EvenUpValidationMessage(
-                        message = message,
-                        severity = EvenUpValidationSeverity.Warning,
-                    )
-                }
+    val footerState = uiState.footerState
+    SmartStickyActionBar(
+        primaryText = footerState.label,
+        onPrimaryClick = {
+            when (val action = footerState.action) {
+                ReceiptReviewFooterAction.Continue -> onEvent(ReceiptReviewUiEvent.ContinueClick)
+                is ReceiptReviewFooterAction.ReviewIssue -> onEvent(ReceiptReviewUiEvent.IssueSelected(action.issueId))
+                ReceiptReviewFooterAction.ReviewIssues -> onEvent(ReceiptReviewUiEvent.StatusClick)
+                ReceiptReviewFooterAction.Disabled -> Unit
             }
-            EvenUpPrimaryButton(
-                text = if (uiState.isSaving) "Saving..." else "Continue",
-                onClick = { onEvent(ReceiptReviewUiEvent.ContinueClick) },
-                enabled = uiState.canContinue,
-            )
-        }
-    }
+        },
+        primaryEnabled = footerState.enabled,
+        helperText = footerState.helperText,
+        primaryContentDescription = footerState.accessibilityLabel,
+    )
 }
 
 @Composable
@@ -238,17 +226,18 @@ private fun ReceiptReviewStatusMessage(
     val isWarning = uiState.hasWarningStatus
     val containerColor = if (isWarning) EvenUpTheme.colors.warningContainer else EvenUpTheme.colors.successContainer
     val contentColor = if (isWarning) EvenUpTheme.colors.warning else EvenUpTheme.colors.success
+    val warningContentDescription = if (isWarning) {
+        "Warning: ${uiState.statusAccessibilityLabel}. ${uiState.statusActionLabel.orEmpty()}".trim()
+    } else {
+        uiState.statusLabel
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = isWarning, onClick = onClick)
             .semantics {
                 if (isWarning) role = Role.Button
-                contentDescription = if (isWarning) {
-                    "Warning: ${uiState.statusAccessibilityLabel}"
-                } else {
-                    uiState.statusLabel
-                }
+                contentDescription = warningContentDescription
             },
         shape = EvenUpTheme.shapes.input,
         color = containerColor,
@@ -270,11 +259,20 @@ private fun ReceiptReviewStatusMessage(
             )
             Text(
                 text = uiState.statusLabel,
+                modifier = Modifier.weight(1f),
                 style = EvenUpTheme.typography.bodySmall,
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (isWarning) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }

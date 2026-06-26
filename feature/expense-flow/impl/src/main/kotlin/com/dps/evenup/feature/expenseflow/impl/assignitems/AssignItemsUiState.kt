@@ -110,7 +110,11 @@ data class AssignItemsSplitRowUiState(
     val colorIndex: Int,
     val quantity: Int = 0,
     val amount: String = "",
+    val amountGenerated: Boolean = false,
+    val amountEdited: Boolean = false,
     val percentage: String = "",
+    val percentageGenerated: Boolean = false,
+    val percentageEdited: Boolean = false,
     val amountLabel: String = "",
     val included: Boolean = false,
 )
