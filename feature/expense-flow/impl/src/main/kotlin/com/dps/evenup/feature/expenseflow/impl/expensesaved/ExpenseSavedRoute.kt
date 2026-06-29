@@ -38,10 +38,36 @@ fun ExpenseSavedRoute(
         uiState = uiState,
         onEvent = { event ->
             when (event) {
-                ExpenseSavedUiEvent.ShareClick -> shareLink(context, uiState.shareMessage)
-                ExpenseSavedUiEvent.CopyClick -> {
-                    copyShareDetails(context, uiState.shareMessage)
-                    uiState = uiState.copy(message = "Share details copied.")
+                ExpenseSavedUiEvent.ShareInviteClick -> {
+                    if (uiState.canShareInvite) {
+                        shareInvite(context, uiState.fullInviteMessage)
+                    } else {
+                        uiState = uiState.copy(message = "Share invite is not ready yet.")
+                    }
+                }
+                ExpenseSavedUiEvent.CopyLinkClick -> {
+                    if (uiState.canCopyLink) {
+                        copyText(context, "EvenUp share link", uiState.copyLinkPayload)
+                        uiState = uiState.copy(message = "Link copied.")
+                    } else {
+                        uiState = uiState.copy(message = "Share link is not ready yet.")
+                    }
+                }
+                ExpenseSavedUiEvent.CopyCodeClick -> {
+                    if (uiState.canCopyCode) {
+                        copyText(context, "EvenUp guest code", uiState.copyCodePayload)
+                        uiState = uiState.copy(message = "Guest code copied.")
+                    } else {
+                        uiState = uiState.copy(message = "Guest code is not ready yet.")
+                    }
+                }
+                ExpenseSavedUiEvent.CopyInviteClick -> {
+                    if (uiState.canShareInvite) {
+                        copyText(context, "EvenUp invite", uiState.copyInvitePayload)
+                        uiState = uiState.copy(message = "Invite copied.")
+                    } else {
+                        uiState = uiState.copy(message = "Share invite is not ready yet.")
+                    }
                 }
                 ExpenseSavedUiEvent.AddAnotherClick -> {
                     coroutineScope.launch {
@@ -63,21 +89,22 @@ fun ExpenseSavedRoute(
     )
 }
 
-private fun shareLink(
+private fun shareInvite(
     context: Context,
-    shareMessage: String,
+    inviteMessage: String,
 ) {
     val sendIntent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, shareMessage)
+        putExtra(Intent.EXTRA_TEXT, inviteMessage)
     }
-    context.startActivity(Intent.createChooser(sendIntent, "Share EvenUp details"))
+    context.startActivity(Intent.createChooser(sendIntent, "Share EvenUp invite"))
 }
 
-private fun copyShareDetails(
+private fun copyText(
     context: Context,
-    shareMessage: String,
+    label: String,
+    value: String,
 ) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("EvenUp share details", shareMessage))
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
 }

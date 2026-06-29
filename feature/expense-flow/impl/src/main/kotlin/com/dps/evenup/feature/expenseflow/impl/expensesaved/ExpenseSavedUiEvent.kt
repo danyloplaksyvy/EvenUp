@@ -1,9 +1,13 @@
 package com.dps.evenup.feature.expenseflow.impl.expensesaved
 
 sealed interface ExpenseSavedUiEvent {
-    data object ShareClick : ExpenseSavedUiEvent
+    data object ShareInviteClick : ExpenseSavedUiEvent
 
-    data object CopyClick : ExpenseSavedUiEvent
+    data object CopyLinkClick : ExpenseSavedUiEvent
+
+    data object CopyCodeClick : ExpenseSavedUiEvent
+
+    data object CopyInviteClick : ExpenseSavedUiEvent
 
     data object AddAnotherClick : ExpenseSavedUiEvent
 }

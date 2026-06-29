@@ -24,5 +24,7 @@ enum class ReceiptDataFailureReason {
     Connection,
     Timeout,
     ParseRejected,
+    UnsupportedImage,
+    ImageTooLarge,
     Unknown,
 }

@@ -44,3 +44,15 @@ interface ReceiptImageReader {
         source: ReceiptImageSource,
     ): ReceiptImage
 }
+
+class ReceiptImageReadException(
+    message: String,
+    val reason: ReceiptImageReadFailureReason,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+
+enum class ReceiptImageReadFailureReason {
+    CannotOpenImage,
+    UnsupportedImage,
+    ImageTooLarge,
+}

@@ -14,6 +14,13 @@ const GUEST_ACCESS_LOCKOUT_MS = 10 * 60 * 1000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_MODEL = "gpt-4.1-mini";
 const MAX_RECEIPT_IMAGE_BYTES = 7 * 1024 * 1024;
+const SUPPORTED_RECEIPT_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif"
+]);
 const VISUALLY_SIMILAR_DIGITS = {
   "0": ["6", "8"],
   "3": ["8"],
@@ -26,6 +33,18 @@ const RECEIPT_PARSE_ERROR = {
   error: {
     code: "RECEIPT_PARSE_FAILED",
     message: "Could not read this receipt. Please try again or enter it manually."
+  }
+};
+const RECEIPT_IMAGE_UNSUPPORTED_ERROR = {
+  error: {
+    code: "RECEIPT_IMAGE_UNSUPPORTED",
+    message: "Unsupported receipt image format. Please choose a JPEG, PNG, WEBP, or non-animated GIF image."
+  }
+};
+const RECEIPT_IMAGE_TOO_LARGE_ERROR = {
+  error: {
+    code: "RECEIPT_IMAGE_TOO_LARGE",
+    message: "Receipt image is too large. Please choose a smaller image."
   }
 };
 
@@ -453,13 +472,15 @@ async function parseReceipt(request, env) {
   });
 
   const validationStart = Date.now();
-  if (!isValidReceiptParseRequest(payload)) {
+  const validationFailure = receiptParseRequestValidationFailure(payload);
+  if (validationFailure) {
     logReceiptParseTiming(env, requestId, "request_validation", validationStart, {
       ...receiptParseRequestMetadata(payload),
-      valid: false
+      valid: false,
+      reason: validationFailure.result
     }, true);
-    return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 400, totalStart, {
-      result: "invalid_request"
+    return receiptParseJsonResponse(env, requestId, validationFailure.body, validationFailure.status, totalStart, {
+      result: validationFailure.result
     });
   }
   logReceiptParseTiming(env, requestId, "request_validation", validationStart, {
@@ -529,7 +550,13 @@ async function parseReceipt(request, env) {
     const reconciledReceipt = reconcileReceiptSubtotal(receipt);
     const isReconciled = isReceiptSubtotalReconciled(reconciledReceipt);
     const auditEnabled = isReceiptParseAuditEnabled(env);
-    const auditEligible = !isReconciled;
+    const domainValidation = validateAndroidCompatibleReceipt(reconciledReceipt);
+    logReceiptParseTiming(env, requestId, "receipt_domain_validation", reconciliationStart, {
+      ...receiptSummaryMetadata(reconciledReceipt),
+      ...domainValidationLogMetadata(domainValidation),
+      phase: "first"
+    }, !domainValidation.valid);
+    const auditEligible = !isReconciled || !domainValidation.valid;
     const auditInvoked = auditEligible && auditEnabled;
     logReceiptParseTiming(env, requestId, "deterministic_reconciliation", reconciliationStart, {
       ...receiptSummaryMetadata(reconciledReceipt),
@@ -539,6 +566,14 @@ async function parseReceipt(request, env) {
       reconciled: isReconciled
     });
     if (!auditInvoked) {
+      if (!domainValidation.valid) {
+        return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 502, totalStart, {
+          result: "invalid_receipt_domain",
+          auditInvoked,
+          ...domainValidationErrorMetadata(domainValidation),
+          ...receiptSummaryMetadata(reconciledReceipt)
+        });
+      }
       return receiptParseJsonResponse(env, requestId, reconciledReceipt, 200, totalStart, {
         result: "success",
         auditInvoked,
@@ -547,6 +582,20 @@ async function parseReceipt(request, env) {
     }
 
     const auditedReceipt = await auditReceiptIfNeeded(payload, reconciledReceipt, env, fetcher, requestId);
+    const auditedDomainValidation = validateAndroidCompatibleReceipt(auditedReceipt);
+    logReceiptParseTiming(env, requestId, "receipt_domain_validation", Date.now(), {
+      ...receiptSummaryMetadata(auditedReceipt),
+      ...domainValidationLogMetadata(auditedDomainValidation),
+      phase: "audit"
+    }, !auditedDomainValidation.valid);
+    if (!auditedDomainValidation.valid) {
+      return receiptParseJsonResponse(env, requestId, RECEIPT_PARSE_ERROR, 502, totalStart, {
+        result: "invalid_receipt_domain",
+        auditInvoked: true,
+        ...domainValidationErrorMetadata(auditedDomainValidation),
+        ...receiptSummaryMetadata(auditedReceipt)
+      });
+    }
     return receiptParseJsonResponse(env, requestId, auditedReceipt, 200, totalStart, {
       result: "success",
       auditInvoked: true,
@@ -593,6 +642,27 @@ function receiptSummaryMetadata(receipt) {
   };
 }
 
+function domainValidationLogMetadata(validation) {
+  if (validation.valid) {
+    return { valid: true };
+  }
+
+  return {
+    valid: false,
+    reason: validation.reason,
+    fieldPath: validation.fieldPath
+  };
+}
+
+function domainValidationErrorMetadata(validation) {
+  if (validation.valid) return {};
+
+  return {
+    reason: validation.reason,
+    fieldPath: validation.fieldPath
+  };
+}
+
 function receiptParseJsonResponse(env, requestId, body, status, totalStart, metadata = {}) {
   const responseStart = Date.now();
   const response = jsonResponse(body, status);
@@ -630,20 +700,116 @@ function logReceiptParseTiming(env, requestId, stage, startMs, metadata = {}, wa
   }
 }
 
-function isValidReceiptParseRequest(payload) {
+function receiptParseRequestValidationFailure(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return false;
+    return {
+      body: RECEIPT_PARSE_ERROR,
+      status: 400,
+      result: "invalid_request"
+    };
   }
 
   if (typeof payload.imageBase64 !== "string" || payload.imageBase64.trim().length === 0) {
+    return {
+      body: RECEIPT_PARSE_ERROR,
+      status: 400,
+      result: "invalid_request"
+    };
+  }
+
+  const mimeType = normalizedReceiptImageMimeType(payload.mimeType);
+  if (!mimeType || !SUPPORTED_RECEIPT_IMAGE_MIME_TYPES.has(mimeType)) {
+    return {
+      body: RECEIPT_IMAGE_UNSUPPORTED_ERROR,
+      status: 400,
+      result: "unsupported_image_type"
+    };
+  }
+
+  if (estimateBase64ByteLength(payload.imageBase64) > MAX_RECEIPT_IMAGE_BYTES) {
+    return {
+      body: RECEIPT_IMAGE_TOO_LARGE_ERROR,
+      status: 413,
+      result: "image_too_large"
+    };
+  }
+
+  if (mimeType === "image/gif" && isAnimatedGif(payload.imageBase64)) {
+    return {
+      body: RECEIPT_IMAGE_UNSUPPORTED_ERROR,
+      status: 400,
+      result: "unsupported_animated_gif"
+    };
+  }
+
+  return null;
+}
+
+function normalizedReceiptImageMimeType(value) {
+  if (typeof value !== "string") return null;
+  const mimeType = value.split(";")[0].trim().toLowerCase();
+  if (mimeType === "image/jpg") return "image/jpeg";
+  return mimeType;
+}
+
+function isAnimatedGif(imageBase64) {
+  let binary;
+  try {
+    binary = atob(imageBase64.replace(/\s/g, ""));
+  } catch {
     return false;
   }
 
-  if (typeof payload.mimeType !== "string" || !payload.mimeType.startsWith("image/")) {
-    return false;
+  if (!binary.startsWith("GIF87a") && !binary.startsWith("GIF89a")) return false;
+  if (binary.length < 13) return false;
+
+  const byteAt = (index) => binary.charCodeAt(index) & 0xff;
+  const packed = byteAt(10);
+  let index = 13;
+  if ((packed & 0x80) !== 0) {
+    index += 3 * (2 ** ((packed & 0x07) + 1));
   }
 
-  return estimateBase64ByteLength(payload.imageBase64) <= MAX_RECEIPT_IMAGE_BYTES;
+  let imageDescriptorCount = 0;
+  while (index < binary.length) {
+    const blockType = byteAt(index);
+    index += 1;
+
+    if (blockType === 0x3b) return false;
+
+    if (blockType === 0x21) {
+      index += 1;
+      index = skipGifSubBlocks(binary, index);
+      continue;
+    }
+
+    if (blockType !== 0x2c) return false;
+
+    imageDescriptorCount += 1;
+    if (imageDescriptorCount > 1) return true;
+
+    if (index + 9 > binary.length) return false;
+    const imagePacked = byteAt(index + 8);
+    index += 9;
+    if ((imagePacked & 0x80) !== 0) {
+      index += 3 * (2 ** ((imagePacked & 0x07) + 1));
+    }
+    index += 1;
+    index = skipGifSubBlocks(binary, index);
+  }
+
+  return false;
+}
+
+function skipGifSubBlocks(binary, index) {
+  while (index < binary.length) {
+    const blockSize = binary.charCodeAt(index) & 0xff;
+    index += 1;
+    if (blockSize === 0) return index;
+    index += blockSize;
+  }
+
+  return index;
 }
 
 function estimateBase64ByteLength(value) {
@@ -692,7 +858,8 @@ function openAiReceiptRequest(payload, env) {
           },
           {
             type: "input_image",
-            image_url: `data:${payload.mimeType};base64,${payload.imageBase64}`
+            image_url: `data:${normalizedReceiptImageMimeType(payload.mimeType)};base64,${payload.imageBase64}`,
+            detail: "high"
           }
         ]
       }
@@ -727,6 +894,9 @@ function openAiReceiptAuditRequest(payload, extractedReceipt, env) {
               "If there is a mismatch, identify likely OCR price mistakes from the image.",
               "Remove VAT, IVA, GST, or tax rows that are already included in the printed total instead of treating them as additive fees.",
               "For rows with quantity greater than 1, check whether the extracted line total incorrectly used the unit price.",
+              "Receipt quantities must be positive whole numbers. Do not return fractional quantities.",
+              "Merchant, item, and fee labels must be non-empty. Currency must be a three-letter ISO code.",
+              "Item unitPriceMinor and totalPriceMinor must be positive. Discount fees must be negative and other fees must be positive.",
               "Do not invent items. Prefer corrections where digits are visually similar.",
               "Return corrected JSON, corrections, and reviewWarnings."
             ].join(" ")
@@ -746,7 +916,8 @@ function openAiReceiptAuditRequest(payload, extractedReceipt, env) {
           },
           {
             type: "input_image",
-            image_url: `data:${payload.mimeType};base64,${payload.imageBase64}`
+            image_url: `data:${normalizedReceiptImageMimeType(payload.mimeType)};base64,${payload.imageBase64}`,
+            detail: "high"
           }
         ]
       }
@@ -770,20 +941,33 @@ function normalizeParsedReceipt(receipt) {
   const items = Array.isArray(receipt.items)
     ? receipt.items.map((item) => {
         const totalPriceMinor = Number.isInteger(item?.totalPriceMinor) ? item.totalPriceMinor : 0;
-        const candidates = Array.isArray(item?.candidatesMinor) ? item.candidatesMinor.filter(Number.isInteger) : [];
+        const candidates = Array.isArray(item?.candidatesMinor)
+          ? item.candidatesMinor.filter((candidate) => Number.isInteger(candidate) && candidate > 0)
+          : [];
+        const candidateValues = totalPriceMinor > 0 ? [totalPriceMinor, ...candidates] : candidates;
         return {
           ...item,
+          name: typeof item?.name === "string" ? item.name.trim() : item?.name,
           confidence: typeof item?.confidence === "number" ? item.confidence : receipt.confidence || 0,
-          candidatesMinor: uniqueIntegers([totalPriceMinor, ...candidates]),
+          candidatesMinor: uniqueIntegers(candidateValues),
           needsReview: Boolean(item?.needsReview)
         };
       })
     : [];
+  const fees = Array.isArray(receipt.fees)
+    ? receipt.fees.map((fee) => ({
+        ...fee,
+        type: typeof fee?.type === "string" ? fee.type.trim().toUpperCase() : fee?.type,
+        label: typeof fee?.label === "string" ? fee.label.trim() : fee?.label
+      }))
+    : [];
 
   return {
     ...receipt,
+    merchantName: typeof receipt.merchantName === "string" ? receipt.merchantName.trim() : receipt.merchantName,
+    currency: normalizeReceiptCurrency(receipt.currency),
     items,
-    fees: Array.isArray(receipt.fees) ? receipt.fees : [],
+    fees,
     corrections: Array.isArray(receipt.corrections) ? receipt.corrections : [],
     reviewWarnings: Array.isArray(receipt.reviewWarnings) ? receipt.reviewWarnings : []
   };
@@ -791,6 +975,95 @@ function normalizeParsedReceipt(receipt) {
 
 function uniqueIntegers(values) {
   return Array.from(new Set(values.filter(Number.isInteger)));
+}
+
+function normalizeReceiptCurrency(currency) {
+  if (typeof currency !== "string") return currency;
+  const trimmed = currency.trim();
+  const uppercase = trimmed.toUpperCase();
+  return /^[A-Z]{3}$/.test(uppercase) ? uppercase : trimmed;
+}
+
+function validateAndroidCompatibleReceipt(receipt) {
+  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
+    return invalidReceiptDomain("not_object", "receipt");
+  }
+
+  if (typeof receipt.merchantName !== "string" || receipt.merchantName.trim().length === 0) {
+    return invalidReceiptDomain("blank_merchant_name", "merchantName");
+  }
+
+  if (typeof receipt.currency !== "string" || !/^[A-Z]{3}$/.test(receipt.currency)) {
+    return invalidReceiptDomain("invalid_currency", "currency");
+  }
+
+  if (!Array.isArray(receipt.items) || receipt.items.length === 0) {
+    return invalidReceiptDomain("no_items", "items");
+  }
+
+  for (const [index, item] of receipt.items.entries()) {
+    const itemPath = `items[${index}]`;
+    if (!item || typeof item !== "object") {
+      return invalidReceiptDomain("invalid_item", itemPath);
+    }
+    if (typeof item.name !== "string" || item.name.trim().length === 0) {
+      return invalidReceiptDomain("blank_item_name", `${itemPath}.name`);
+    }
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      return invalidReceiptDomain("invalid_item_quantity", `${itemPath}.quantity`);
+    }
+    if (!Number.isInteger(item.unitPriceMinor) || item.unitPriceMinor <= 0) {
+      return invalidReceiptDomain("non_positive_unit_price", `${itemPath}.unitPriceMinor`);
+    }
+    if (!Number.isInteger(item.totalPriceMinor) || item.totalPriceMinor <= 0) {
+      return invalidReceiptDomain("non_positive_total_price", `${itemPath}.totalPriceMinor`);
+    }
+    if (!Array.isArray(item.candidatesMinor) || !item.candidatesMinor.every((candidate) => Number.isInteger(candidate) && candidate > 0)) {
+      return invalidReceiptDomain("invalid_item_candidates", `${itemPath}.candidatesMinor`);
+    }
+  }
+
+  if (!Array.isArray(receipt.fees)) {
+    return invalidReceiptDomain("invalid_fees", "fees");
+  }
+
+  for (const [index, fee] of receipt.fees.entries()) {
+    const feePath = `fees[${index}]`;
+    if (!fee || typeof fee !== "object") {
+      return invalidReceiptDomain("invalid_fee", feePath);
+    }
+    if (typeof fee.label !== "string" || fee.label.trim().length === 0) {
+      return invalidReceiptDomain("blank_fee_label", `${feePath}.label`);
+    }
+    if (!Number.isInteger(fee.amountMinor)) {
+      return invalidReceiptDomain("invalid_fee_amount", `${feePath}.amountMinor`);
+    }
+    if (String(fee.type || "").toUpperCase() === "DISCOUNT") {
+      if (fee.amountMinor >= 0) {
+        return invalidReceiptDomain("invalid_discount_amount", `${feePath}.amountMinor`);
+      }
+    } else if (fee.amountMinor <= 0) {
+      return invalidReceiptDomain("non_positive_fee_amount", `${feePath}.amountMinor`);
+    }
+  }
+
+  if (!Number.isInteger(receipt.totalMinor) || receipt.totalMinor < 0) {
+    return invalidReceiptDomain("invalid_total", "totalMinor");
+  }
+
+  if (receipt.subtotalMinor !== null && receipt.subtotalMinor !== undefined && !Number.isInteger(receipt.subtotalMinor)) {
+    return invalidReceiptDomain("invalid_subtotal", "subtotalMinor");
+  }
+
+  return { valid: true };
+}
+
+function invalidReceiptDomain(reason, fieldPath) {
+  return {
+    valid: false,
+    reason,
+    fieldPath
+  };
 }
 
 function reconcileReceiptSubtotal(receipt) {
@@ -824,7 +1097,7 @@ function reconcileReceiptSubtotal(receipt) {
       totalPriceMinor: replacement.toMinor,
       unitPriceMinor: correctedUnitPrice(item, replacement.toMinor),
       needsReview: true,
-      candidatesMinor: uniqueIntegers([replacement.toMinor, item.totalPriceMinor, ...item.candidatesMinor])
+      candidatesMinor: uniquePositiveIntegers([replacement.toMinor, item.totalPriceMinor, ...item.candidatesMinor])
     };
   });
 
@@ -988,6 +1261,10 @@ function quantityLineTotalCandidates(item) {
     item.totalPriceMinor * item.quantity,
     item.unitPriceMinor * item.quantity
   ]);
+}
+
+function uniquePositiveIntegers(values) {
+  return uniqueIntegers(values).filter((value) => value > 0);
 }
 
 function visuallySimilarSingleDigitTotals(value) {
@@ -1206,10 +1483,48 @@ async function renderGuestExpenseResponse(shareId, request, env) {
   }
 
   if (isPasscodeProtected(row) && !(await hasGuestAccess(row, request, env))) {
+    const queryAccessResponse = await verifyGuestAccessQueryResponse(row, request, env);
+    if (queryAccessResponse) {
+      return queryAccessResponse;
+    }
     return htmlResponse(renderGuestPasscodePage(shareId));
   }
 
   return htmlResponse(renderGuestExpensePage(expenseApiResponse(row)));
+}
+
+async function verifyGuestAccessQueryResponse(row, request, env) {
+  const url = new URL(request.url);
+  if (!url.searchParams.has("code")) {
+    return null;
+  }
+
+  const rateLimit = await checkGuestAccessRateLimit(row.share_id, request, env);
+  if (rateLimit.limited) {
+    return htmlResponse(
+      renderGuestPasscodePage(
+        row.share_id,
+        "Too many incorrect attempts. Please wait a few minutes and try again."
+      ),
+      429
+    );
+  }
+
+  const passcode = normalizeGuestPasscode(url.searchParams.get("code"));
+  const isValid = Boolean(passcode) && (await verifyGuestPasscode(passcode, row));
+
+  if (!isValid) {
+    await recordGuestAccessFailure(row.share_id, rateLimit.clientKeyHash, env);
+    return htmlResponse(
+      renderGuestPasscodePage(row.share_id, "That code does not match. Check the share message and try again."),
+      401
+    );
+  }
+
+  await clearGuestAccessFailures(row.share_id, rateLimit.clientKeyHash, env);
+  return redirectToGuestExpense(row.share_id, {
+    "Set-Cookie": await createGuestAccessCookie(row.share_id, request, env)
+  });
 }
 
 async function verifyGuestAccessResponse(shareId, request, env) {
