@@ -76,6 +76,7 @@ fun ReceiptScanScreen(
             uiState.errorMessage?.let { message ->
                 ReceiptScanErrorOverlay(
                     message = message,
+                    primaryActionLabel = uiState.errorPrimaryActionLabel,
                     onTryAgain = { onEvent(ReceiptScanUiEvent.TryAgainClick) },
                     onManualFallback = { onEvent(ReceiptScanUiEvent.ManualFallbackClick) },
                     modifier = Modifier
@@ -245,6 +246,7 @@ private fun ReceiptScanLoadingOverlay(
 @Composable
 private fun ReceiptScanErrorOverlay(
     message: String,
+    primaryActionLabel: String,
     onTryAgain: () -> Unit,
     onManualFallback: () -> Unit,
     modifier: Modifier = Modifier,
@@ -257,7 +259,7 @@ private fun ReceiptScanErrorOverlay(
         )
         EvenUpValidationMessage(message = message)
         Spacer(modifier = Modifier.height(EvenUpTheme.spacing.space4))
-        EvenUpPrimaryButton(text = "Try again", onClick = onTryAgain)
+        EvenUpPrimaryButton(text = primaryActionLabel, onClick = onTryAgain)
         EvenUpTextButton(
             text = "Enter manually",
             onClick = onManualFallback,

@@ -50,6 +50,11 @@ data class ReceiptReviewUiState(
         1 -> "1 discount"
         else -> "${discounts.size} discounts"
     }
+    val adjustmentCountLabel: String = when (fees.size) {
+        0 -> "No adjustments"
+        1 -> "1 adjustment"
+        else -> "${fees.size} adjustments"
+    }
     val derivedSubtotalAmount: String = formatMoneyInput(itemSubtotalMinor)
     val derivedFeesAmount: String = formatMoneyInput(feeTotalMinor)
     val derivedDiscountsAmount: String = formatMoneyInput(discountTotalMinor)
@@ -75,8 +80,7 @@ data class ReceiptReviewUiState(
         reconciliation.type == ReceiptReviewReconciliationType.Mismatch -> "Total differs"
         unresolvedReviewItemCount > 0 -> "Items need review"
         hasInvalidRequiredFields -> "Needs review"
-        receiptTotalConfirmedByUser -> "Confirmed"
-        else -> "Ready"
+        else -> ""
     }
     val statusLabel: String = when {
         blockingIssues.size > 1 -> "${blockingIssues.size} issues need review"
@@ -84,7 +88,7 @@ data class ReceiptReviewUiState(
         issues.size > 1 -> "${issues.size} receipt notes to review"
         issues.size == 1 -> issues.single().title
         receiptTotalConfirmedByUser -> "Receipt total confirmed"
-        else -> "AI found ${items.size} ${if (items.size == 1) "item" else "items"} · Ready"
+        else -> "AI found ${items.size} ${if (items.size == 1) "item" else "items"}"
     }
     val statusAccessibilityLabel: String = firstIssue?.accessibilityLabel ?: statusLabel
     val statusActionLabel: String? = when {

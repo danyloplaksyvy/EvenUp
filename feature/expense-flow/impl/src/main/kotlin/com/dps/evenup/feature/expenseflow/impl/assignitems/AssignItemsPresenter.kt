@@ -56,11 +56,14 @@ class AssignItemsPresenter(
         return when (event) {
             is AssignItemsUiEvent.ParticipantSelected -> state.toggleParticipant(event.participantId)
             is AssignItemsUiEvent.ItemTapped -> assignItemToSelectedParticipant(state, event.itemId)
+            is AssignItemsUiEvent.ItemActionClick -> handleItemAction(state, event.itemId)
             is AssignItemsUiEvent.ItemSplitClick -> openSplitSheet(state, event.itemId)
             AssignItemsUiEvent.ApplyEqualSplitClick -> requestEqualSplit(state)
             AssignItemsUiEvent.ApplyEqualSplitDismissed -> state.copy(showEqualSplitConfirmation = false)
             AssignItemsUiEvent.ApplyEqualSplitConfirmed -> applyEqualSplitToAllItems(state)
-            AssignItemsUiEvent.ClearAssignmentsClick -> state.copy(showClearAssignmentsConfirmation = true)
+            AssignItemsUiEvent.ClearAssignmentsClick -> {
+                if (state.canClearAssignments) state.copy(showClearAssignmentsConfirmation = true) else state
+            }
             AssignItemsUiEvent.ClearAssignmentsDismissed -> state.copy(showClearAssignmentsConfirmation = false)
             AssignItemsUiEvent.ClearAssignmentsConfirmed -> clearAssignments(state)
             AssignItemsUiEvent.ClearAssignmentsUndoClick -> undoClearAssignments(state)
@@ -100,7 +103,7 @@ class AssignItemsPresenter(
     ): AssignItemsUiState {
         val selectedParticipantIds = state.selectedParticipantIds
         if (selectedParticipantIds.isEmpty()) {
-            return state.copy(fieldErrors = mapOf("assignment" to "Select people, then tap items."))
+            return state.copy(fieldErrors = mapOf("assignment" to "Select people, then assign items."))
         }
         val draft = draftRepository.getDraft()
             ?: return state.copy(missingDraft = true, submitError = "No expense draft was found.")
@@ -161,7 +164,7 @@ class AssignItemsPresenter(
             items = items.map { item ->
                 val assignment = assignments.firstOrNull { it.receiptItemId == item.id }
                 item.toUiState(assignment, participantsById, currencyCode).let { itemState ->
-                    itemState.copy(assignmentActionLabel = itemState.assignmentActionLabel())
+                    itemState.withAssignmentLabels(selectedIds)
                 }
             },
             subtotalLabel = formatMoney(MoneyMinor(items.sumOf { item -> item.totalPrice.value }), currencyCode),
@@ -360,7 +363,9 @@ class AssignItemsPresenter(
             quantityLabel = "${quantity.value}x",
             unitPriceLabel = "${formatMoney(unitPrice, currencyCode)} each",
             totalLabel = formatMoney(totalPrice, currencyCode),
-            assignmentActionLabel = "",
+            assignmentSummaryLabel = "",
+            itemActionLabel = "",
+            itemActionContentDescription = "",
             assignmentState = assignmentState,
             splitMode = assignment.toSplitMode(),
             directFullAssignment = assignment?.mode == ItemAssignmentMode.Full,
@@ -615,11 +620,7 @@ class AssignItemsPresenter(
                     directFullAssignment = false,
                     shares = shares,
                     assignees = assignees,
-                ).let { updatedItem ->
-                    updatedItem.copy(
-                        assignmentActionLabel = updatedItem.assignmentActionLabel(),
-                    )
-                }
+                ).withAssignmentLabels(state.selectedParticipantIds)
             } else {
                 item
             }
@@ -1053,7 +1054,7 @@ class AssignItemsPresenter(
             },
             helperText = nextSelectedIds.assignmentContextLabelFromUi(participants),
             items = items.map { item ->
-                item.copy(assignmentActionLabel = item.assignmentActionLabel())
+                item.withAssignmentLabels(nextSelectedIds)
             },
             fieldErrors = emptyMap(),
             submitError = null,
@@ -1136,30 +1137,58 @@ class AssignItemsPresenter(
 
     private fun List<String>.assignmentContextLabel(): String {
         return when (size) {
-            0 -> "Select people, then tap items"
-            1 -> "Assigning to ${single()}"
-            2 -> "Splitting between ${this[0]} and ${this[1]}"
-            else -> "Splitting between $size people"
+            0 -> "Select people, then assign items"
+            1 -> "Tap items to assign to ${single()}"
+            2 -> "Assigning to ${this[0]} and ${this[1]}"
+            else -> "Assigning to $size people"
         }
     }
 
-    private fun AssignItemsReceiptItemUiState.assignmentActionLabel(): String {
+    private suspend fun handleItemAction(
+        state: AssignItemsUiState,
+        itemId: String,
+    ): AssignItemsUiState {
+        val item = state.items.firstOrNull { receiptItem -> receiptItem.id == itemId } ?: return state
+        return if (item.assignmentState == AssignItemsItemState.Unassigned) {
+            assignItemToSelectedParticipant(state, itemId)
+        } else {
+            openSplitSheet(state, itemId)
+        }
+    }
+
+    private fun AssignItemsReceiptItemUiState.withAssignmentLabels(
+        selectedParticipantIds: List<String>,
+    ): AssignItemsReceiptItemUiState {
+        val summaryLabel = assignmentSummaryLabel()
+        val actionLabel = if (assignmentState == AssignItemsItemState.Unassigned) "Assign" else "Edit"
+        return copy(
+            assignmentSummaryLabel = summaryLabel,
+            itemActionLabel = actionLabel,
+            itemActionContentDescription = when {
+                assignmentState != AssignItemsItemState.Unassigned -> "Edit assignment for $name"
+                selectedParticipantIds.isEmpty() -> "Select people before assigning $name"
+                else -> "Assign $name"
+            },
+        )
+    }
+
+    private fun AssignItemsReceiptItemUiState.assignmentSummaryLabel(): String {
         if (assignmentState != AssignItemsItemState.Unassigned) {
             return when {
                 assignees.size >= 3 && splitMode == AssignItemsSplitMode.Units -> "${assignees.size} people · Units"
                 assignees.size >= 3 && splitMode == AssignItemsSplitMode.SharedEqual -> "${assignees.size} people · Equal"
-                assignees.size >= 3 && splitMode == AssignItemsSplitMode.CustomAmount -> "Custom split · ${assignees.size} people"
-                assignees.size >= 3 && splitMode == AssignItemsSplitMode.Percentage -> "Percent split · ${assignees.size} people"
+                assignees.size >= 3 && splitMode == AssignItemsSplitMode.CustomAmount -> "${assignees.size} people · Custom"
+                assignees.size >= 3 && splitMode == AssignItemsSplitMode.Percentage -> "${assignees.size} people · Percent"
                 splitMode == AssignItemsSplitMode.Units && assignees.size > 1 -> {
                     assignees.joinToString(" · ") { assignee -> "${assignee.name} ${assignee.quantity}x" }
                 }
                 splitMode == AssignItemsSplitMode.SharedEqual && assignees.size > 1 -> {
-                    "${assignees.joinToString(" + ") { assignee -> assignee.name }} · Equal"
+                    "${assignees.size} people · Equal"
                 }
-                splitMode == AssignItemsSplitMode.CustomAmount -> "Custom split · ${assignees.size} people"
-                splitMode == AssignItemsSplitMode.Percentage -> "Percent split · ${assignees.size} people"
+                splitMode == AssignItemsSplitMode.CustomAmount -> "${assignees.size} ${if (assignees.size == 1) "person" else "people"} · Custom"
+                splitMode == AssignItemsSplitMode.Percentage -> "${assignees.size} ${if (assignees.size == 1) "person" else "people"} · Percent"
                 assignees.size == 1 -> assignees.single().name
-                else -> "Split ${assignees.size} people"
+                else -> "${assignees.size} people"
             }
         }
         return "Unassigned"

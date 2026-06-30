@@ -5,6 +5,8 @@ sealed interface AssignItemsUiEvent {
 
     data class ItemTapped(val itemId: String) : AssignItemsUiEvent
 
+    data class ItemActionClick(val itemId: String) : AssignItemsUiEvent
+
     data class ItemSplitClick(val itemId: String) : AssignItemsUiEvent
 
     data object ApplyEqualSplitClick : AssignItemsUiEvent

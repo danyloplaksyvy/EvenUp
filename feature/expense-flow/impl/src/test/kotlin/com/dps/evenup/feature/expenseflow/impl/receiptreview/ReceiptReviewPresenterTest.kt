@@ -249,13 +249,81 @@ class ReceiptReviewPresenterTest {
         assertEquals("1.00", state.derivedDiscountsAmount)
         assertEquals("-€1.00", state.discountsTotalLabel)
         assertEquals("9.00", state.calculatedTotalAmount)
+        assertEquals("1 adjustment", state.adjustmentCountLabel)
         assertEquals("Promo", state.discounts.single().displayLabel)
 
         val result = presenter.saveDraft(state)
 
         assertEquals(SaveReceiptReviewResult.Saved, result)
         assertEquals(FeeType.Discount, repository.draft?.receipt?.fees?.single()?.type)
+        assertEquals("Promo", repository.draft?.receipt?.fees?.single()?.label)
         assertEquals(MoneyMinor(-100), repository.draft?.receipt?.fees?.single()?.amount)
+    }
+
+    @Test
+    fun `adjustment count includes fees and discounts`() = runBlocking {
+        val presenter = presenter(
+            draft = draft().copy(
+                receipt = draft().receipt.copy(
+                    fees = listOf(
+                        ReceiptFee(FeeId("tip"), FeeType.Tip, "Tip", MoneyMinor(200)),
+                        ReceiptFee(FeeId("discount"), FeeType.Discount, "Promo", MoneyMinor(-100)),
+                    ),
+                    total = MoneyMinor(1_100),
+                ),
+            ),
+        )
+
+        val state = presenter.load()
+
+        assertEquals("2 adjustments", state.adjustmentCountLabel)
+        assertEquals("2.00", state.derivedFeesAmount)
+        assertEquals("1.00", state.derivedDiscountsAmount)
+        assertEquals(listOf("Tip", "Promo"), state.fees.map { fee -> fee.displayLabel })
+    }
+
+    @Test
+    fun `editing discount preserves custom label when saved`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(
+            draft().copy(
+                receipt = draft().receipt.copy(
+                    fees = listOf(ReceiptFee(FeeId("discount"), FeeType.Discount, "Promo", MoneyMinor(-100))),
+                    total = MoneyMinor(900),
+                ),
+            ),
+        )
+        val presenter = presenter(repository = repository)
+        var state = presenter.load()
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Fee("discount")))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.FeeAmountChanged("1.50"))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+
+        assertEquals("Promo", state.fees.single().displayLabel)
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.KeepCalculatedTotalClick)
+
+        assertEquals(SaveReceiptReviewResult.Saved, presenter.saveDraft(state))
+        assertEquals("Promo", repository.draft?.receipt?.fees?.single()?.label)
+        assertEquals(MoneyMinor(-150), repository.draft?.receipt?.fees?.single()?.amount)
+    }
+
+    @Test
+    fun `new adjustment can be created as discount`() = runBlocking {
+        val presenter = presenter()
+        var state = presenter.load()
+
+        state = presenter.reduce(state, ReceiptReviewUiEvent.AddFeeClick)
+        state = presenter.reduce(state, ReceiptReviewUiEvent.FeeTypeChanged(FeeType.Discount))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.FeeLabelChanged("Promo"))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.FeeAmountChanged("2.00"))
+        state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
+
+        val adjustment = state.fees.single()
+        assertEquals(FeeType.Discount, adjustment.type)
+        assertEquals("Promo", adjustment.displayLabel)
+        assertEquals("-€2.00", adjustment.amountLabel(state.currencyCode))
+        assertEquals("1 adjustment", state.adjustmentCountLabel)
     }
 
     @Test
@@ -286,7 +354,7 @@ class ReceiptReviewPresenterTest {
 
         assertEquals(listOf("Portal Reserva 30%"), state.fees.map { fee -> fee.displayLabel })
         assertEquals("61.95", state.calculatedTotalAmount)
-        assertEquals("AI found 6 items · Ready", state.statusLabel)
+        assertEquals("AI found 6 items", state.statusLabel)
         assertTrue(state.canContinue)
         assertFalse(state.hasWarningStatus)
     }
@@ -322,7 +390,8 @@ class ReceiptReviewPresenterTest {
         val state = presenter.load()
 
         assertEquals("€10.00", state.summaryTotalLabel)
-        assertEquals("Ready", state.summaryStatusLabel)
+        assertEquals("", state.summaryStatusLabel)
+        assertEquals("AI found 1 item", state.statusLabel)
         assertEquals("Matches scanned receipt", state.reconciliation.message)
         assertEquals(ReceiptReviewReconciliationType.Matched, state.reconciliation.type)
         assertFalse(state.reconciliation.isIssue)
@@ -456,7 +525,7 @@ class ReceiptReviewPresenterTest {
 
         assertEquals("65.25", state.calculatedTotalAmount)
         assertEquals("65.25", state.scannedReceiptTotalAmount)
-        assertEquals("Ready", state.summaryStatusLabel)
+        assertEquals("", state.summaryStatusLabel)
         assertFalse(state.hasWarningStatus)
         assertEquals(listOf(null, null, null), state.items.map { item -> item.suggestedCorrection })
     }
@@ -722,7 +791,7 @@ class ReceiptReviewPresenterTest {
         state = presenter.reduce(state, ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Item("item-1")))
         state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
 
-        assertEquals("Ready", state.summaryStatusLabel)
+        assertEquals("", state.summaryStatusLabel)
         assertFalse(state.hasWarningStatus)
         assertTrue(state.canContinue)
         assertEquals(SaveReceiptReviewResult.Saved, presenter.saveDraft(state))
@@ -780,7 +849,7 @@ class ReceiptReviewPresenterTest {
         state = presenter.reduce(state, ReceiptReviewUiEvent.EditCommitClick)
 
         assertTrue(state.canContinue)
-        assertEquals("Ready", state.summaryStatusLabel)
+        assertEquals("", state.summaryStatusLabel)
         assertFalse(state.hasWarningStatus)
     }
 

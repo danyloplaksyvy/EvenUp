@@ -54,7 +54,7 @@ class WorkerReceiptRepository(
             is WorkerApiResult.Failure -> {
                 throw ReceiptDataException(
                     message = "Receipt parse request failed.",
-                    reason = response.error.toReceiptFailureReason(),
+                    reason = response.error.toReceiptFailureReason(json),
                 )
             }
             is WorkerApiResult.Success -> {
@@ -72,17 +72,28 @@ class WorkerReceiptRepository(
                     stage = "response_mapping",
                     metadata = listOf("status=${response.response.statusCode}"),
                 ) {
-                    mapReceipt(response.response.body).also { receipt ->
+                    try {
+                        mapReceipt(response.response.body).also { receipt ->
+                            logTiming(
+                                requestId = requestId,
+                                stage = "response_mapping_result",
+                                durationMs = 0L,
+                                metadata = listOf(
+                                    "itemCount=${receipt.items.size}",
+                                    "feeCount=${receipt.fees.size}",
+                                    "warningCount=${receipt.parseMetadata.reviewWarnings.size}",
+                                ),
+                            )
+                        }
+                    } catch (error: ReceiptDataException) {
                         logTiming(
                             requestId = requestId,
-                            stage = "response_mapping_result",
+                            stage = "response_mapping_failed",
                             durationMs = 0L,
-                            metadata = listOf(
-                                "itemCount=${receipt.items.size}",
-                                "feeCount=${receipt.fees.size}",
-                                "warningCount=${receipt.parseMetadata.reviewWarnings.size}",
-                            ),
+                            metadata = error.safeMappingMetadata(),
+                            warning = true,
                         )
+                        throw error
                     }
                 }
             }
@@ -242,14 +253,27 @@ private fun estimateBase64ByteLength(value: String): Int {
     return ((normalized.length * 3) / 4 - padding).coerceAtLeast(0)
 }
 
-private fun WorkerNetworkError.toReceiptFailureReason(): ReceiptDataFailureReason = when (this) {
+private fun WorkerNetworkError.toReceiptFailureReason(json: Json): ReceiptDataFailureReason = when (this) {
     WorkerNetworkError.ConnectionFailed,
     WorkerNetworkError.InvalidBaseUrl,
     WorkerNetworkError.InvalidPath,
     -> ReceiptDataFailureReason.Connection
     WorkerNetworkError.Timeout -> ReceiptDataFailureReason.Timeout
-    is WorkerNetworkError.HttpFailure -> ReceiptDataFailureReason.ParseRejected
+    is WorkerNetworkError.HttpFailure -> body.toReceiptFailureReason(json) ?: ReceiptDataFailureReason.ParseRejected
     WorkerNetworkError.Unknown -> ReceiptDataFailureReason.Unknown
+}
+
+private fun String.toReceiptFailureReason(json: Json): ReceiptDataFailureReason? {
+    val code = runCatching {
+        json.decodeFromString<ReceiptErrorResponseDto>(this).error?.code
+    }.getOrNull()
+
+    return when (code) {
+        "RECEIPT_IMAGE_UNSUPPORTED" -> ReceiptDataFailureReason.UnsupportedImage
+        "RECEIPT_IMAGE_TOO_LARGE" -> ReceiptDataFailureReason.ImageTooLarge
+        "RECEIPT_PARSE_FAILED" -> ReceiptDataFailureReason.ParseRejected
+        else -> null
+    }
 }
 
 private fun WorkerNetworkError.isRetryableReceiptParseFailure(): Boolean = when (this) {
@@ -277,9 +301,25 @@ private fun WorkerNetworkError.safeMetadata(): List<String> = when (this) {
 }
 
 private fun ReceiptParseResponseDto.toDomain(): Receipt {
+    requireReceiptMapping(
+        condition = merchantName.isNotBlank(),
+        reason = "blank_merchant_name",
+        fieldPath = "merchantName",
+    )
+    val normalizedCurrency = currency.trim().uppercase()
+    requireReceiptMapping(
+        condition = CURRENCY_CODE_PATTERN.matches(normalizedCurrency),
+        reason = "invalid_currency",
+        fieldPath = "currency",
+    )
+    requireReceiptMapping(
+        condition = items.isNotEmpty(),
+        reason = "no_items",
+        fieldPath = "items",
+    )
     val receipt = Receipt(
-        merchantName = merchantName.trim().ifEmpty { throw IllegalArgumentException("Merchant name is required.") },
-        currencyCode = CurrencyCode(currency.uppercase()),
+        merchantName = merchantName.trim(),
+        currencyCode = CurrencyCode(normalizedCurrency),
         items = items.mapIndexed { index, item -> item.toDomain(index) },
         fees = fees.mapIndexed { index, fee -> fee.toDomain(index) },
         total = MoneyMinor(totalMinor),
@@ -294,11 +334,28 @@ private fun ReceiptParseResponseDto.toDomain(): Receipt {
 }
 
 private fun ReceiptItemDto.toDomain(index: Int): ReceiptItem {
+    val fieldPrefix = "items[$index]"
     val quantityInt = quantity.toInt()
-    require(quantity > 0.0 && quantity == quantityInt.toDouble()) { "Quantity must be a positive whole number." }
-    require(name.isNotBlank()) { "Item name is required." }
-    require(unitPriceMinor >= 0) { "Unit price must not be negative." }
-    require(totalPriceMinor > 0) { "Item total must be positive." }
+    requireReceiptMapping(
+        condition = quantity > 0.0 && quantity == quantityInt.toDouble(),
+        reason = "invalid_item_quantity",
+        fieldPath = "$fieldPrefix.quantity",
+    )
+    requireReceiptMapping(
+        condition = name.isNotBlank(),
+        reason = "blank_item_name",
+        fieldPath = "$fieldPrefix.name",
+    )
+    requireReceiptMapping(
+        condition = unitPriceMinor > 0,
+        reason = "non_positive_unit_price",
+        fieldPath = "$fieldPrefix.unitPriceMinor",
+    )
+    requireReceiptMapping(
+        condition = totalPriceMinor > 0,
+        reason = "non_positive_total_price",
+        fieldPath = "$fieldPrefix.totalPriceMinor",
+    )
 
     return ReceiptItem(
         id = ReceiptItemId("item_${index + 1}"),
@@ -315,10 +372,21 @@ private fun ReceiptItemDto.toDomain(index: Int): ReceiptItem {
 }
 
 private fun ReceiptFeeDto.toDomain(index: Int): ReceiptFee {
-    require(label.isNotBlank()) { "Fee label is required." }
+    val fieldPrefix = "fees[$index]"
+    val feeType = type.toFeeType()
+    requireReceiptMapping(
+        condition = label.isNotBlank(),
+        reason = "blank_fee_label",
+        fieldPath = "$fieldPrefix.label",
+    )
+    requireReceiptMapping(
+        condition = if (feeType == FeeType.Discount) amountMinor < 0 else amountMinor > 0,
+        reason = if (feeType == FeeType.Discount) "invalid_discount_amount" else "non_positive_fee_amount",
+        fieldPath = "$fieldPrefix.amountMinor",
+    )
     return ReceiptFee(
         id = FeeId("fee_${index + 1}"),
-        type = type.toFeeType(),
+        type = feeType,
         label = label.trim(),
         amount = MoneyMinor(amountMinor),
     )
@@ -331,6 +399,45 @@ private fun String.toFeeType(): FeeType = when (uppercase()) {
     "DISCOUNT" -> FeeType.Discount
     else -> FeeType.Other
 }
+
+private class ReceiptMappingException(
+    val reason: String,
+    val fieldPath: String,
+) : IllegalArgumentException("$reason fieldPath=$fieldPath")
+
+private fun requireReceiptMapping(
+    condition: Boolean,
+    reason: String,
+    fieldPath: String,
+) {
+    if (!condition) {
+        throw ReceiptMappingException(reason = reason, fieldPath = fieldPath)
+    }
+}
+
+private fun ReceiptDataException.safeMappingMetadata(): List<String> {
+    val mappingCause = cause as? ReceiptMappingException
+    return if (mappingCause != null) {
+        listOf(
+            "errorType=${this::class.java.simpleName}",
+            "reason=${mappingCause.reason}",
+            "fieldPath=${mappingCause.fieldPath}",
+        )
+    } else {
+        listOf(
+            "errorType=${this::class.java.simpleName}",
+            "causeType=${cause?.javaClass?.simpleName ?: "None"}",
+            "causeMessage=${cause?.message?.sanitizeLogValue() ?: "None"}",
+        )
+    }
+}
+
+private fun String.sanitizeLogValue(): String = replace(Regex("\\s+"), "_")
+    .filter { character -> character.isLetterOrDigit() || character in "._:-=[]" }
+    .take(MAX_SAFE_LOG_VALUE_LENGTH)
+
+private val CURRENCY_CODE_PATTERN = Regex("^[A-Z]{3}$")
+private const val MAX_SAFE_LOG_VALUE_LENGTH = 80
 
 @Serializable
 private data class ReceiptParseRequestDto(
@@ -379,6 +486,16 @@ private data class ReceiptParseCorrectionDto(
     val fromMinor: Long,
     val toMinor: Long,
     val reason: String,
+)
+
+@Serializable
+private data class ReceiptErrorResponseDto(
+    val error: ReceiptErrorDto? = null,
+)
+
+@Serializable
+private data class ReceiptErrorDto(
+    val code: String? = null,
 )
 
 private fun ReceiptParseCorrectionDto.toDomain(): ReceiptParseCorrection = ReceiptParseCorrection(

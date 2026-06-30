@@ -23,6 +23,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dps.evenup.core.camera.api.ReceiptCaptureTargetFactory
+import com.dps.evenup.core.camera.api.ReceiptImageReadException
+import com.dps.evenup.core.camera.api.ReceiptImageReadFailureReason
 import com.dps.evenup.core.camera.api.ReceiptImageReader
 import com.dps.evenup.core.camera.api.ReceiptImageSource
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
@@ -75,33 +77,55 @@ fun ReceiptScanRoute(
 
     fun parseImage(uri: Uri, source: ReceiptImageSource) {
         coroutineScope.launch {
-            uiState = uiState.copy(isParsing = true, errorMessage = null)
+            uiState = uiState.copy(
+                isParsing = true,
+                errorMessage = null,
+                errorPrimaryActionLabel = DEFAULT_ERROR_PRIMARY_ACTION_LABEL,
+            )
             uiState = try {
                 when (val result = presenter.parseImage(uri = uri, source = source)) {
                     ReceiptScanParseResult.Saved -> {
                         lastFailedParseTarget = null
                         onContinue()
-                        uiState.copy(isParsing = false)
+                        uiState.copy(
+                            isParsing = false,
+                            errorPrimaryActionLabel = DEFAULT_ERROR_PRIMARY_ACTION_LABEL,
+                        )
                     }
                     is ReceiptScanParseResult.Invalid -> {
-                        lastFailedParseTarget = ReceiptScanRetryTarget(uri = uri, source = source)
+                        lastFailedParseTarget = source.retryTargetFor(
+                            uri = uri,
+                            reason = ReceiptDataFailureReason.ParseRejected,
+                        )
                         uiState.copy(
                             isParsing = false,
                             errorMessage = result.message,
+                            errorPrimaryActionLabel = source.errorPrimaryActionLabel(
+                                reason = ReceiptDataFailureReason.ParseRejected,
+                            ),
                         )
                     }
                 }
-            } catch (error: ReceiptDataException) {
-                lastFailedParseTarget = ReceiptScanRetryTarget(uri = uri, source = source)
+            } catch (error: ReceiptImageReadException) {
+                lastFailedParseTarget = null
                 uiState.copy(
                     isParsing = false,
                     errorMessage = error.toUserMessage(),
+                    errorPrimaryActionLabel = source.errorPrimaryActionLabel(error.reason),
+                )
+            } catch (error: ReceiptDataException) {
+                lastFailedParseTarget = source.retryTargetFor(uri = uri, reason = error.reason)
+                uiState.copy(
+                    isParsing = false,
+                    errorMessage = error.toUserMessage(),
+                    errorPrimaryActionLabel = source.errorPrimaryActionLabel(error.reason),
                 )
             } catch (_: RuntimeException) {
                 lastFailedParseTarget = ReceiptScanRetryTarget(uri = uri, source = source)
                 uiState.copy(
                     isParsing = false,
                     errorMessage = "We couldn't read this receipt. Try again or enter it manually.",
+                    errorPrimaryActionLabel = DEFAULT_ERROR_PRIMARY_ACTION_LABEL,
                 )
             }
         }
@@ -113,6 +137,12 @@ fun ReceiptScanRoute(
         if (uri != null) {
             parseImage(uri = uri, source = ReceiptImageSource.Gallery)
         }
+    }
+
+    fun launchGalleryPicker() {
+        galleryLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+        )
     }
 
     fun captureReceipt() {
@@ -174,14 +204,14 @@ fun ReceiptScanRoute(
                     }
                 }
                 ReceiptScanUiEvent.GalleryClick -> {
-                    galleryLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
+                    launchGalleryPicker()
                 }
                 ReceiptScanUiEvent.TryAgainClick -> {
                     val retryTarget = lastFailedParseTarget
                     if (retryTarget != null) {
                         parseImage(uri = retryTarget.uri, source = retryTarget.source)
+                    } else if (uiState.errorPrimaryActionLabel == GALLERY_ERROR_PRIMARY_ACTION_LABEL) {
+                        launchGalleryPicker()
                     } else {
                         uiState = uiState.copy(errorMessage = null)
                     }
@@ -198,9 +228,65 @@ private data class ReceiptScanRetryTarget(
     val source: ReceiptImageSource,
 )
 
+private fun ReceiptImageSource.retryTargetFor(
+    uri: Uri,
+    reason: ReceiptDataFailureReason,
+): ReceiptScanRetryTarget? = when (reason) {
+    ReceiptDataFailureReason.Connection,
+    ReceiptDataFailureReason.Timeout,
+    ReceiptDataFailureReason.Unknown,
+    -> ReceiptScanRetryTarget(uri = uri, source = this)
+    ReceiptDataFailureReason.ParseRejected,
+    -> if (this == ReceiptImageSource.Gallery) {
+        null
+    } else {
+        ReceiptScanRetryTarget(uri = uri, source = this)
+    }
+    ReceiptDataFailureReason.UnsupportedImage,
+    ReceiptDataFailureReason.ImageTooLarge,
+    -> null
+}
+
+private fun ReceiptImageSource.errorPrimaryActionLabel(reason: ReceiptDataFailureReason): String = when (reason) {
+    ReceiptDataFailureReason.ParseRejected,
+    ReceiptDataFailureReason.UnsupportedImage,
+    ReceiptDataFailureReason.ImageTooLarge,
+    -> if (this == ReceiptImageSource.Gallery) {
+        GALLERY_ERROR_PRIMARY_ACTION_LABEL
+    } else {
+        DEFAULT_ERROR_PRIMARY_ACTION_LABEL
+    }
+    ReceiptDataFailureReason.Connection,
+    ReceiptDataFailureReason.Timeout,
+    ReceiptDataFailureReason.Unknown,
+    -> DEFAULT_ERROR_PRIMARY_ACTION_LABEL
+}
+
+private fun ReceiptImageSource.errorPrimaryActionLabel(reason: ReceiptImageReadFailureReason): String = when (reason) {
+    ReceiptImageReadFailureReason.CannotOpenImage,
+    ReceiptImageReadFailureReason.UnsupportedImage,
+    ReceiptImageReadFailureReason.ImageTooLarge,
+    -> if (this == ReceiptImageSource.Gallery) {
+        GALLERY_ERROR_PRIMARY_ACTION_LABEL
+    } else {
+        DEFAULT_ERROR_PRIMARY_ACTION_LABEL
+    }
+}
+
 private fun ReceiptDataException.toUserMessage(): String = when (reason) {
     ReceiptDataFailureReason.Connection -> "No internet connection. Check your connection and try again."
     ReceiptDataFailureReason.Timeout -> "Receipt parsing took too long. Try again with a clearer image."
-    ReceiptDataFailureReason.ParseRejected -> "The image was too blurry or the text was hard to read. Try another photo."
+    ReceiptDataFailureReason.ParseRejected -> "The receipt text was hard to read. Choose a clearer photo or enter it manually."
+    ReceiptDataFailureReason.UnsupportedImage -> "That image format is not supported. Choose a JPEG or PNG receipt photo."
+    ReceiptDataFailureReason.ImageTooLarge -> "That image is too large to upload. Choose a smaller receipt photo or crop it first."
     ReceiptDataFailureReason.Unknown -> "We couldn't read this receipt. Try again or enter it manually."
 }
+
+private fun ReceiptImageReadException.toUserMessage(): String = when (reason) {
+    ReceiptImageReadFailureReason.CannotOpenImage -> "We couldn't open that image. Choose another photo or enter it manually."
+    ReceiptImageReadFailureReason.UnsupportedImage -> "That image format could not be prepared. Choose a JPEG or PNG receipt photo."
+    ReceiptImageReadFailureReason.ImageTooLarge -> "That image is too large to upload. Choose a smaller receipt photo or crop it first."
+}
+
+private const val DEFAULT_ERROR_PRIMARY_ACTION_LABEL = "Try again"
+private const val GALLERY_ERROR_PRIMARY_ACTION_LABEL = "Choose another photo"

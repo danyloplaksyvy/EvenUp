@@ -32,9 +32,11 @@ class AssignItemsPresenterTest {
 
         assertEquals(listOf("p1"), state.selectedParticipantIds)
         assertEquals(listOf(true, false), state.participants.map { participant -> participant.selected })
-        assertEquals("Assigning to John", state.helperText)
+        assertEquals("Tap items to assign to John", state.helperText)
         assertEquals("$10.00", state.subtotalLabel)
         assertEquals("$5.00 each", state.items.single().unitPriceLabel)
+        assertEquals("Unassigned", state.items.single().assignmentSummaryLabel)
+        assertEquals("Assign", state.items.single().itemActionLabel)
     }
 
     @Test
@@ -46,7 +48,8 @@ class AssignItemsPresenterTest {
         state = presenter.reduce(state, AssignItemsUiEvent.ItemTapped("item-1"))
 
         assertEquals(listOf("p1"), state.items.single().assignees.map { assignee -> assignee.participantId })
-        assertEquals("John", state.items.single().assignmentActionLabel)
+        assertEquals("John", state.items.single().assignmentSummaryLabel)
+        assertEquals("Edit", state.items.single().itemActionLabel)
         assertEquals("All items assigned", state.feedback?.message)
 
         presenter.saveDraft(state)
@@ -70,7 +73,8 @@ class AssignItemsPresenterTest {
         assertEquals(AssignItemsSplitMode.Units, item.splitMode)
         assertEquals(listOf("p1", "p2"), item.assignees.map { assignee -> assignee.participantId })
         assertEquals(listOf(1, 1), item.shares.map { share -> share.quantity })
-        assertEquals("John 1x · Amy 1x", item.assignmentActionLabel)
+        assertEquals("John 1x · Amy 1x", item.assignmentSummaryLabel)
+        assertEquals("Edit", item.itemActionLabel)
     }
 
     @Test
@@ -86,7 +90,8 @@ class AssignItemsPresenterTest {
         val item = state.items.single()
         assertEquals(AssignItemsSplitMode.Units, item.splitMode)
         assertEquals(listOf("p1", "p2", "p3"), item.assignees.map { assignee -> assignee.participantId })
-        assertEquals("3 people · Units", item.assignmentActionLabel)
+        assertEquals("3 people · Units", item.assignmentSummaryLabel)
+        assertEquals("Edit", item.itemActionLabel)
     }
 
     @Test
@@ -101,7 +106,8 @@ class AssignItemsPresenterTest {
         val item = state.items.single()
         assertEquals(AssignItemsSplitMode.SharedEqual, item.splitMode)
         assertEquals(listOf("p1", "p2"), item.assignees.map { assignee -> assignee.participantId })
-        assertEquals("John + Amy · Equal", item.assignmentActionLabel)
+        assertEquals("2 people · Equal", item.assignmentSummaryLabel)
+        assertEquals("Edit", item.itemActionLabel)
     }
 
     @Test
@@ -116,9 +122,11 @@ class AssignItemsPresenterTest {
         val assignedItem = state.items.first { item -> item.id == "item-1" }
         val unassignedItem = state.items.first { item -> item.id == "item-2" }
         assertEquals(listOf("p1"), assignedItem.assignees.map { assignee -> assignee.participantId })
-        assertEquals("John", assignedItem.assignmentActionLabel)
+        assertEquals("John", assignedItem.assignmentSummaryLabel)
+        assertEquals("Edit", assignedItem.itemActionLabel)
         assertEquals(emptyList<String>(), unassignedItem.assignees.map { assignee -> assignee.participantId })
-        assertEquals("Unassigned", unassignedItem.assignmentActionLabel)
+        assertEquals("Unassigned", unassignedItem.assignmentSummaryLabel)
+        assertEquals("Assign", unassignedItem.itemActionLabel)
     }
 
     @Test
@@ -129,14 +137,29 @@ class AssignItemsPresenterTest {
         var state = presenter.load()
         state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
         assertEquals(listOf("p1", "p2"), state.selectedParticipantIds)
-        assertEquals("Splitting between John and Amy", state.helperText)
+        assertEquals("Assigning to John and Amy", state.helperText)
         assertEquals("Amy selected", state.feedback?.message)
 
         state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p1"))
         state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
 
         assertEquals(emptyList<String>(), state.selectedParticipantIds)
-        assertEquals("Select people, then tap items", state.helperText)
+        assertEquals("Select people, then assign items", state.helperText)
+        assertEquals(listOf(false, false), state.participants.map { participant -> participant.selected })
+    }
+
+    @Test
+    fun `helper text supports more than two selected people`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft(includeThirdParticipant = true))
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p2"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p3"))
+
+        assertEquals(listOf("p1", "p2", "p3"), state.selectedParticipantIds)
+        assertEquals(listOf(true, true, true), state.participants.map { participant -> participant.selected })
+        assertEquals("Assigning to 3 people", state.helperText)
     }
 
     @Test
@@ -163,6 +186,40 @@ class AssignItemsPresenterTest {
         assertEquals(null, state.splitSheet)
         assertEquals(AssignItemsSplitMode.Units, state.items.single().splitMode)
         assertEquals(listOf("p1"), state.items.single().assignees.map { assignee -> assignee.participantId })
+    }
+
+    @Test
+    fun `item action assigns unassigned item and opens editor for assigned item`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemActionClick("item-1"))
+
+        assertEquals("John", state.items.single().assignmentSummaryLabel)
+        assertEquals("Edit", state.items.single().itemActionLabel)
+        assertEquals(null, state.splitSheet)
+
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemActionClick("item-1"))
+
+        assertEquals("item-1", state.splitSheet?.itemId)
+        assertEquals("John", state.items.single().assignmentSummaryLabel)
+    }
+
+    @Test
+    fun `item action with no selected people guides without assigning`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+        state = presenter.reduce(state, AssignItemsUiEvent.ParticipantSelected("p1"))
+        state = presenter.reduce(state, AssignItemsUiEvent.ItemActionClick("item-1"))
+
+        assertEquals(emptyList<String>(), state.selectedParticipantIds)
+        assertEquals("Select people, then assign items", state.helperText)
+        assertEquals("Select people, then assign items.", state.fieldErrors["assignment"])
+        assertEquals(AssignItemsItemState.Unassigned, state.items.single().assignmentState)
+        assertEquals(emptyList<String>(), state.items.single().assignees.map { assignee -> assignee.participantId })
     }
 
     @Test
@@ -201,6 +258,21 @@ class AssignItemsPresenterTest {
         assertEquals(AssignItemsItemState.Assigned, state.items.single().assignmentState)
         assertEquals(true, state.canContinue)
         assertEquals("Assignments restored", state.feedback?.message)
+    }
+
+    @Test
+    fun `clear assignments click is ignored when no assignments exist`() = runBlocking {
+        val repository = FakeExpenseDraftRepository(draft())
+        val presenter = AssignItemsPresenter(repository, AlwaysValidAssignments)
+
+        var state = presenter.load()
+
+        assertEquals(false, state.canClearAssignments)
+
+        state = presenter.reduce(state, AssignItemsUiEvent.ClearAssignmentsClick)
+
+        assertEquals(false, state.showClearAssignmentsConfirmation)
+        assertEquals(AssignItemsItemState.Unassigned, state.items.single().assignmentState)
     }
 
     @Test
@@ -245,6 +317,46 @@ class AssignItemsPresenterTest {
         assertEquals(AssignItemsSplitMode.SharedEqual, state.items.single().splitMode)
         assertEquals(listOf("p1", "p2"), state.items.single().assignees.map { assignee -> assignee.participantId })
         assertEquals(listOf(500L, 500L), state.items.single().shares.map { share -> share.amountMinor })
+    }
+
+    @Test
+    fun `assigned split modes expose edit action and concise summaries`() = runBlocking {
+        val equalState = AssignItemsPresenter(
+            FakeExpenseDraftRepository(draft(assignments = listOf(sharedEqualAssignment("p1", "p2")))),
+            AlwaysValidAssignments,
+        ).load()
+
+        assertEquals("2 people · Equal", equalState.items.single().assignmentSummaryLabel)
+        assertEquals("Edit", equalState.items.single().itemActionLabel)
+
+        val customState = AssignItemsPresenter(
+            FakeExpenseDraftRepository(
+                draft(
+                    assignments = listOf(
+                        ItemAssignment(
+                            receiptItemId = ReceiptItemId("item-1"),
+                            mode = ItemAssignmentMode.CustomAmount,
+                            shares = listOf(
+                                ItemParticipantShare(ParticipantId("p1"), MoneyMinor(600)),
+                                ItemParticipantShare(ParticipantId("p2"), MoneyMinor(400)),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            AlwaysValidAssignments,
+        ).load()
+
+        assertEquals("2 people · Custom", customState.items.single().assignmentSummaryLabel)
+        assertEquals("Edit", customState.items.single().itemActionLabel)
+
+        val percentState = AssignItemsPresenter(
+            FakeExpenseDraftRepository(draft(assignments = listOf(percentageAssignment("p1" to 7000, "p2" to 3000)))),
+            AlwaysValidAssignments,
+        ).load()
+
+        assertEquals("2 people · Percent", percentState.items.single().assignmentSummaryLabel)
+        assertEquals("Edit", percentState.items.single().itemActionLabel)
     }
 
     @Test

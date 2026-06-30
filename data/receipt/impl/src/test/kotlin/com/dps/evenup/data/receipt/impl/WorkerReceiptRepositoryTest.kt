@@ -5,6 +5,7 @@ import com.dps.evenup.core.network.api.WorkerApiResponse
 import com.dps.evenup.core.network.api.WorkerApiResult
 import com.dps.evenup.core.network.api.WorkerNetworkError
 import com.dps.evenup.data.receipt.api.ReceiptDataException
+import com.dps.evenup.data.receipt.api.ReceiptDataFailureReason
 import com.dps.evenup.data.receipt.api.ReceiptImageParseRequest
 import com.dps.evenup.domain.receipt.api.FeeType
 import kotlinx.coroutines.runBlocking
@@ -147,6 +148,78 @@ class WorkerReceiptRepositoryTest {
     }
 
     @Test
+    fun `worker parse failed error maps to parse rejected failure reason`() {
+        val apiClient = FakeWorkerApiClient(
+            WorkerApiResult.Failure(
+                WorkerNetworkError.HttpFailure(
+                    502,
+                    """{"error":{"code":"RECEIPT_PARSE_FAILED","message":"Could not read this receipt."}}""",
+                ),
+            ),
+            WorkerApiResult.Failure(
+                WorkerNetworkError.HttpFailure(
+                    502,
+                    """{"error":{"code":"RECEIPT_PARSE_FAILED","message":"Could not read this receipt."}}""",
+                ),
+            ),
+        )
+        val repository = WorkerReceiptRepository(apiClient)
+
+        val error = assertThrows(ReceiptDataException::class.java) {
+            runBlocking {
+                repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+            }
+        }
+
+        assertEquals(ReceiptDataFailureReason.ParseRejected, error.reason)
+        assertEquals(2, apiClient.postCount)
+    }
+
+    @Test
+    fun `unsupported image worker error maps to unsupported image failure reason`() {
+        val apiClient = FakeWorkerApiClient(
+            WorkerApiResult.Failure(
+                WorkerNetworkError.HttpFailure(
+                    400,
+                    """{"error":{"code":"RECEIPT_IMAGE_UNSUPPORTED","message":"Unsupported image."}}""",
+                ),
+            ),
+        )
+        val repository = WorkerReceiptRepository(apiClient)
+
+        val error = assertThrows(ReceiptDataException::class.java) {
+            runBlocking {
+                repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/heic"))
+            }
+        }
+
+        assertEquals(ReceiptDataFailureReason.UnsupportedImage, error.reason)
+        assertEquals(1, apiClient.postCount)
+    }
+
+    @Test
+    fun `oversized image worker error maps to image too large failure reason`() {
+        val apiClient = FakeWorkerApiClient(
+            WorkerApiResult.Failure(
+                WorkerNetworkError.HttpFailure(
+                    413,
+                    """{"error":{"code":"RECEIPT_IMAGE_TOO_LARGE","message":"Image too large."}}""",
+                ),
+            ),
+        )
+        val repository = WorkerReceiptRepository(apiClient)
+
+        val error = assertThrows(ReceiptDataException::class.java) {
+            runBlocking {
+                repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+            }
+        }
+
+        assertEquals(ReceiptDataFailureReason.ImageTooLarge, error.reason)
+        assertEquals(1, apiClient.postCount)
+    }
+
+    @Test
     fun `final retryable failure is returned after second attempt`() {
         val apiClient = FakeWorkerApiClient(
             WorkerApiResult.Failure(WorkerNetworkError.Timeout),
@@ -199,11 +272,40 @@ class WorkerReceiptRepositoryTest {
     fun `invalid values produce controlled errors`() {
         val repository = WorkerReceiptRepository(FakeWorkerApiClient(receiptJson(quantity = 1.5)))
 
-        assertThrows(ReceiptDataException::class.java) {
+        val error = assertThrows(ReceiptDataException::class.java) {
             runBlocking {
                 repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
             }
         }
+
+        assertEquals("Receipt parse response contained invalid values.", error.message)
+        assertEquals("invalid_item_quantity fieldPath=items[0].quantity", error.cause?.message)
+    }
+
+    @Test
+    fun `invalid currency produces controlled field error`() {
+        val repository = WorkerReceiptRepository(FakeWorkerApiClient(receiptJson(currency = "EURO")))
+
+        val error = assertThrows(ReceiptDataException::class.java) {
+            runBlocking {
+                repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+            }
+        }
+
+        assertEquals("invalid_currency fieldPath=currency", error.cause?.message)
+    }
+
+    @Test
+    fun `empty items produce controlled field error`() {
+        val repository = WorkerReceiptRepository(FakeWorkerApiClient(receiptJson(itemsJson = "[]")))
+
+        val error = assertThrows(ReceiptDataException::class.java) {
+            runBlocking {
+                repository.parseReceiptImage(ReceiptImageParseRequest("abc", "image/jpeg"))
+            }
+        }
+
+        assertEquals("no_items fieldPath=items", error.cause?.message)
     }
 
     private fun receiptJson(
@@ -212,22 +314,26 @@ class WorkerReceiptRepositoryTest {
         feeAmountMinor: Long = 600,
         totalMinor: Long = 4200,
         quantity: Double = 2.0,
+        currency: String = "EUR",
+        itemsJson: String = """
+            [
+              {
+                "name": "Pasta",
+                "quantity": $quantity,
+                "unitPriceMinor": 1800,
+                "totalPriceMinor": 3600,
+                "confidence": 0.62,
+                "candidatesMinor": [3500, 3600],
+                "needsReview": true
+              }
+            ]
+        """.trimIndent(),
     ): String = """
         {
           "merchantName": "Bella Roma",
           "transactionDate": "2026-06-15",
-          "currency": "EUR",
-          "items": [
-            {
-              "name": "Pasta",
-              "quantity": $quantity,
-              "unitPriceMinor": 1800,
-              "totalPriceMinor": 3600,
-              "confidence": 0.62,
-              "candidatesMinor": [3500, 3600],
-              "needsReview": true
-            }
-          ],
+          "currency": "$currency",
+          "items": $itemsJson,
           "fees": [
             {
               "type": "$feeType",

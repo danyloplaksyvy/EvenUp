@@ -34,7 +34,8 @@ class ChoosePeoplePresenterTest {
         assertEquals(1, state.participants.size)
         assertEquals(state.participants.single().id, state.payerId)
         assertEquals("Payer", state.selectedParticipants.single().payerActionLabel)
-        assertEquals("Add 1 more person to continue.", state.helperText)
+        assertEquals("Add at least two people for this expense.", state.helperText)
+        assertEquals("Add person", state.footerPrimaryLabel)
         assertFalse(state.canContinue)
     }
 
@@ -50,7 +51,15 @@ class ChoosePeoplePresenterTest {
 
         assertEquals(storakId, state.payerId)
         assertEquals(listOf("Set payer", "Payer"), state.selectedParticipants.map { participant -> participant.payerActionLabel })
+        assertEquals(
+            listOf(
+                "Kehn, involved. Double tap to set Kehn as payer.",
+                "Storak, involved, payer. Double tap to keep Storak as payer.",
+            ),
+            state.selectedParticipants.map { participant -> participant.setPayerContentDescription },
+        )
         assertEquals("Tap a person to change who paid.", state.helperText)
+        assertEquals("Continue", state.footerPrimaryLabel)
         assertTrue(state.canContinue)
     }
 
@@ -80,7 +89,7 @@ class ChoosePeoplePresenterTest {
 
         assertTrue(state.participants.isEmpty())
         assertNull(state.payerId)
-        assertEquals("Add at least 2 people to continue.", state.helperText)
+        assertEquals("Add at least two people for this expense.", state.helperText)
         assertFalse(state.canContinue)
     }
 
@@ -133,7 +142,26 @@ class ChoosePeoplePresenterTest {
         )
 
         assertFalse(state.canContinue)
-        assertEquals("Choose who paid to continue.", state.helperText)
+        assertEquals("Choose who paid for this expense.", state.helperText)
+        assertEquals("Continue disabled. Choose who paid for this expense.", state.footerContentDescription)
+    }
+
+    @Test
+    fun `typed participant names are trimmed and capped`() = runBlocking {
+        val presenter = presenter()
+        var state = presenter.load()
+
+        state = presenter.reduce(state, ChoosePeopleUiEvent.ParticipantNameInputChanged("  Kehn  "))
+        state = presenter.reduce(state, ChoosePeopleUiEvent.AddParticipantClick)
+
+        assertEquals("Kehn", state.participants.single().name)
+
+        val tooLongName = "A".repeat(MAX_PARTICIPANT_NAME_LENGTH + 1)
+        state = presenter.reduce(state, ChoosePeopleUiEvent.ParticipantNameInputChanged(tooLongName))
+        state = presenter.reduce(state, ChoosePeopleUiEvent.AddParticipantClick)
+
+        assertEquals("Use 40 characters or fewer.", state.fieldErrors["participantName"])
+        assertEquals(1, state.participants.size)
     }
 
     private suspend fun addTyped(

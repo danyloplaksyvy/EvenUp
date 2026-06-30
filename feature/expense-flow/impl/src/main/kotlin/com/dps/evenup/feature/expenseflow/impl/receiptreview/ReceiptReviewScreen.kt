@@ -472,27 +472,23 @@ private fun ReceiptReviewAdjustmentsCard(
         verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
     ) {
         SectionHeader(
-            title = if (uiState.additiveFees.isEmpty() && uiState.discounts.isNotEmpty()) "Discounts" else "Fees",
-            detail = if (uiState.additiveFees.isEmpty() && uiState.discounts.isNotEmpty()) {
-                uiState.discountCountLabel
-            } else {
-                uiState.feeCountLabel
-            },
+            title = "Adjustments",
+            detail = uiState.adjustmentCountLabel,
         )
         EvenUpCard {
             uiState.fieldErrors["fees"]?.let { error ->
                 EvenUpValidationMessage(message = error)
             }
-            if (uiState.additiveFees.isEmpty() && uiState.discounts.isEmpty()) {
+            if (uiState.fees.isEmpty()) {
                 Text(
-                    text = "No fees or discounts",
+                    text = "No adjustments yet",
                     style = EvenUpTheme.typography.bodySmall,
                     color = EvenUpTheme.colors.textSecondary,
                     textAlign = TextAlign.Start,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            uiState.additiveFees.forEachIndexed { index, fee ->
+            uiState.fees.forEachIndexed { index, fee ->
                 ReceiptReviewFeeRow(
                     fee = fee,
                     currencyCode = uiState.currencyCode,
@@ -500,32 +496,12 @@ private fun ReceiptReviewAdjustmentsCard(
                         uiState.fieldErrors.containsKey("fee_amount_${fee.id}"),
                     onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Fee(fee.id))) },
                 )
-                if (index != uiState.additiveFees.lastIndex || uiState.discounts.isNotEmpty()) {
-                    HorizontalDivider(color = EvenUpTheme.colors.divider)
-                }
-            }
-            if (uiState.discounts.isNotEmpty()) {
-                Text(
-                    text = "Discounts",
-                    style = EvenUpTheme.typography.caption,
-                    color = EvenUpTheme.colors.textSecondary,
-                    modifier = Modifier.padding(top = EvenUpTheme.spacing.space4),
-                )
-            }
-            uiState.discounts.forEachIndexed { index, fee ->
-                ReceiptReviewFeeRow(
-                    fee = fee,
-                    currencyCode = uiState.currencyCode,
-                    hasError = uiState.fieldErrors.containsKey("fee_label_${fee.id}") ||
-                        uiState.fieldErrors.containsKey("fee_amount_${fee.id}"),
-                    onClick = { onEvent(ReceiptReviewUiEvent.EditTargetSelected(ReceiptReviewEditTarget.Fee(fee.id))) },
-                )
-                if (index != uiState.discounts.lastIndex) {
+                if (index != uiState.fees.lastIndex) {
                     HorizontalDivider(color = EvenUpTheme.colors.divider)
                 }
             }
             SecondaryListActionRow(
-                text = "+ Add fee",
+                text = "+ Add adjustment",
                 onClick = { onEvent(ReceiptReviewUiEvent.AddFeeClick) },
             )
         }
@@ -545,7 +521,7 @@ private fun ReceiptReviewFeeRow(
             .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
-                contentDescription = "Edit ${fee.label.ifBlank { if (fee.isDiscount) "discount" else "fee" }}"
+                contentDescription = "Edit ${fee.displayLabel.ifBlank { "adjustment" }} adjustment"
             }
             .padding(vertical = EvenUpTheme.spacing.space8),
         horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space12),
@@ -661,6 +637,8 @@ private fun ReceiptReviewSummaryStatus(
     uiState: ReceiptReviewUiState,
     onEvent: (ReceiptReviewUiEvent) -> Unit,
 ) {
+    if (uiState.reconciliation.type == ReceiptReviewReconciliationType.Matched) return
+
     val clickAction = when (uiState.reconciliation.type) {
         ReceiptReviewReconciliationType.ReviewItems -> ({ onEvent(ReceiptReviewUiEvent.ReviewHighlightedItemsClick) })
         ReceiptReviewReconciliationType.Mismatch -> {
@@ -913,7 +891,7 @@ private fun ReceiptReviewEditSheet(
 
 private fun ReceiptReviewEditDraft?.primaryActionLabel(): String = when (this) {
     is ReceiptReviewEditDraft.Item -> primaryActionLabel
-    is ReceiptReviewEditDraft.Fee -> if (isNew) "Add fee" else "Save changes"
+    is ReceiptReviewEditDraft.Fee -> if (isNew) "Add adjustment" else "Save changes"
     null -> "Done"
     else -> "Save changes"
 }
@@ -1015,11 +993,7 @@ private fun editSheetTitle(draft: ReceiptReviewEditDraft?): String = when (draft
     is ReceiptReviewEditDraft.ReceiptTotal -> "Edit scanned total"
     ReceiptReviewEditDraft.TotalCheck -> "Total check"
     is ReceiptReviewEditDraft.Item -> if (draft.isNew) "Add item" else "Edit item"
-    is ReceiptReviewEditDraft.Fee -> when {
-        draft.isNew -> "Add fee"
-        draft.type == FeeType.Discount -> "Edit discount"
-        else -> "Edit fee"
-    }
+    is ReceiptReviewEditDraft.Fee -> if (draft.isNew) "Add adjustment" else "Edit adjustment"
     null -> ""
 }
 
@@ -1048,7 +1022,7 @@ private fun EditSheetHeaderAction(
             val feeId = editDraft.feeId ?: return
             if (editDraft.isNew) return
             EvenUpIconButton(
-                contentDescription = if (editDraft.type == FeeType.Discount) "Delete discount" else "Delete fee",
+                contentDescription = "Delete adjustment",
                 onClick = { onEvent(ReceiptReviewUiEvent.RemoveFeeClick(feeId)) },
             ) {
                 Icon(
@@ -1459,14 +1433,14 @@ private fun FeeEditContent(
     val fieldId = draft.feeId ?: "draft"
     FeeTypeSelector(
         selectedType = draft.type,
-        includeDiscount = draft.type == FeeType.Discount,
+        includeDiscount = draft.isNew || draft.type == FeeType.Discount,
         onTypeSelected = { onEvent(ReceiptReviewUiEvent.FeeTypeChanged(it)) },
     )
     if (draft.type == FeeType.Other || draft.type == FeeType.Discount) {
         EvenUpTextField(
             value = draft.label,
             onValueChange = { onEvent(ReceiptReviewUiEvent.FeeLabelChanged(it)) },
-            label = if (draft.type == FeeType.Discount) "Discount name" else "Fee name",
+            label = if (draft.type == FeeType.Discount) "Discount name" else "Adjustment name",
             isError = fieldErrors.containsKey("fee_label_$fieldId"),
             supportingText = fieldErrors["fee_label_$fieldId"],
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
@@ -1480,7 +1454,7 @@ private fun FeeEditContent(
         EvenUpMoneyField(
             value = draft.amount,
             onValueChange = { onEvent(ReceiptReviewUiEvent.FeeAmountChanged(it)) },
-            label = if (draft.type == FeeType.Discount) "Discount amount" else "Fee amount",
+            label = if (draft.type == FeeType.Discount) "Discount amount" else "Adjustment amount",
             modifier = Modifier.weight(1f),
             isError = fieldErrors.containsKey("fee_amount_$fieldId"),
             supportingText = fieldErrors["fee_amount_$fieldId"],
@@ -1496,7 +1470,7 @@ private fun FeeTypeSelector(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
         Text(
-            text = "Fee type",
+            text = "Adjustment type",
             style = EvenUpTheme.typography.bodySmall,
             color = EvenUpTheme.colors.textSecondary,
         )
@@ -1569,11 +1543,13 @@ private fun SectionHeader(
             style = EvenUpTheme.typography.button,
             color = EvenUpTheme.colors.textPrimary,
         )
-        Text(
-            text = detail,
-            style = EvenUpTheme.typography.caption,
-            color = EvenUpTheme.colors.textSecondary,
-            textAlign = TextAlign.End,
-        )
+        if (detail.isNotBlank()) {
+            Text(
+                text = detail,
+                style = EvenUpTheme.typography.caption,
+                color = EvenUpTheme.colors.textSecondary,
+                textAlign = TextAlign.End,
+            )
+        }
     }
 }
