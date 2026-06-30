@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,50 +43,58 @@ fun ExpenseSavedRoute(
                     if (uiState.canShareInvite) {
                         shareInvite(context, uiState.fullInviteMessage)
                     } else {
-                        uiState = uiState.copy(message = "Share invite is not ready yet.")
+                        uiState = uiState.withSnackbar("Share invite is not ready yet")
                     }
                 }
                 ExpenseSavedUiEvent.CopyLinkClick -> {
                     if (uiState.canCopyLink) {
                         copyText(context, "EvenUp share link", uiState.copyLinkPayload)
-                        uiState = uiState.copy(message = "Link copied.")
+                        uiState = uiState.withSnackbar("Link copied")
                     } else {
-                        uiState = uiState.copy(message = "Share link is not ready yet.")
+                        uiState = uiState.withSnackbar("Share link is not ready yet")
                     }
                 }
                 ExpenseSavedUiEvent.CopyCodeClick -> {
                     if (uiState.canCopyCode) {
                         copyText(context, "EvenUp guest code", uiState.copyCodePayload)
-                        uiState = uiState.copy(message = "Guest code copied.")
+                        uiState = uiState.withSnackbar("Code copied")
                     } else {
-                        uiState = uiState.copy(message = "Guest code is not ready yet.")
+                        uiState = uiState.withSnackbar("Guest code is not ready yet")
                     }
                 }
-                ExpenseSavedUiEvent.CopyInviteClick -> {
-                    if (uiState.canShareInvite) {
-                        copyText(context, "EvenUp invite", uiState.copyInvitePayload)
-                        uiState = uiState.copy(message = "Invite copied.")
+                ExpenseSavedUiEvent.QrOpenClick -> {
+                    val qrAccessUrl = uiState.qrAccessUrl
+                    if (qrAccessUrl != null) {
+                        if (!openLink(context, qrAccessUrl)) {
+                            uiState = uiState.withSnackbar("Could not open breakdown")
+                        }
                     } else {
-                        uiState = uiState.copy(message = "Share invite is not ready yet.")
+                        uiState = uiState.withSnackbar("Breakdown link is not ready yet")
                     }
                 }
                 ExpenseSavedUiEvent.AddAnotherClick -> {
                     coroutineScope.launch {
-                        uiState = uiState.copy(isWorking = true, message = null)
+                        uiState = uiState.copy(isWorking = true, snackbarMessage = null)
                         try {
                             draftRepository.clearDraft()
                             onAddAnother()
                         } catch (_: RuntimeException) {
-                            uiState = uiState.copy(
-                                isWorking = false,
-                                message = "Could not start a new expense. Try again.",
-                            )
+                            uiState = uiState
+                                .copy(isWorking = false)
+                                .withSnackbar("Could not start a new expense. Try again.")
                         }
                     }
                 }
             }
         },
         modifier = modifier,
+    )
+}
+
+private fun ExpenseSavedUiState.withSnackbar(message: String): ExpenseSavedUiState {
+    return copy(
+        snackbarMessage = message,
+        snackbarMessageId = snackbarMessageId + 1L,
     )
 }
 
@@ -107,4 +116,16 @@ private fun copyText(
 ) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
+}
+
+private fun openLink(
+    context: Context,
+    url: String,
+): Boolean {
+    return try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        true
+    } catch (_: RuntimeException) {
+        false
+    }
 }

@@ -7,7 +7,7 @@ sealed interface ExpenseSavedUiEvent {
 
     data object CopyCodeClick : ExpenseSavedUiEvent
 
-    data object CopyInviteClick : ExpenseSavedUiEvent
+    data object QrOpenClick : ExpenseSavedUiEvent
 
     data object AddAnotherClick : ExpenseSavedUiEvent
 }

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -45,7 +46,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -109,15 +113,18 @@ fun AssignItemsScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
             )
+
             uiState.missingDraft -> EvenUpErrorState(
                 title = "Items unavailable",
-                message = uiState.submitError ?: "Complete the previous steps before assigning items.",
+                message = uiState.submitError
+                    ?: "Complete the previous steps before assigning items.",
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
                 retryText = "Go back",
                 onRetryClick = { onEvent(AssignItemsUiEvent.BackClick) },
             )
+
             else -> AssignItemsContent(
                 uiState = uiState,
                 onEvent = onEvent,
@@ -242,13 +249,13 @@ private fun AssignmentHeader(
                 horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                EvenUpTextButton(
+                AssignmentHeaderActionButton(
                     text = "Split all equally",
                     onClick = { onEvent(AssignItemsUiEvent.ApplyEqualSplitClick) },
                     modifier = Modifier.weight(1f),
                     enabled = uiState.canApplyEqualSplit,
                 )
-                EvenUpTextButton(
+                AssignmentHeaderActionButton(
                     text = "Clear assignments",
                     onClick = { onEvent(AssignItemsUiEvent.ClearAssignmentsClick) },
                     modifier = Modifier.weight(1f),
@@ -260,6 +267,46 @@ private fun AssignmentHeader(
 }
 
 @Composable
+private fun AssignmentHeaderActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Surface(
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .semantics {
+                role = Role.Button
+                if (!enabled) disabled()
+                contentDescription = if (enabled) text else "$text unavailable"
+            },
+        shape = EvenUpTheme.shapes.chip,
+        color = if (enabled) EvenUpTheme.colors.surfaceElevated else EvenUpTheme.colors.surface,
+        contentColor = if (enabled) EvenUpTheme.colors.textPrimary else EvenUpTheme.colors.textTertiary,
+        border = BorderStroke(
+            1.dp,
+            if (enabled) EvenUpTheme.colors.border else EvenUpTheme.colors.divider
+        ),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = EvenUpTheme.spacing.space12,
+                    vertical = EvenUpTheme.spacing.space12
+                ),
+            style = EvenUpTheme.typography.button,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun ParticipantSelector(
     uiState: AssignItemsUiState,
     onEvent: (AssignItemsUiEvent) -> Unit,
@@ -267,7 +314,7 @@ private fun ParticipantSelector(
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
-        contentPadding = PaddingValues(horizontal = EvenUpTheme.spacing.space4),
+        contentPadding = PaddingValues(start = EvenUpTheme.spacing.space4, end = EvenUpTheme.spacing.space20,),
     ) {
         items(
             items = uiState.participants,
@@ -283,7 +330,7 @@ private fun ParticipantSelector(
                     contentDescription = if (participant.selected) {
                         "${participant.name} selected"
                     } else {
-                        "Set assignment target to ${participant.name}"
+                        "Select ${participant.name} for assignments"
                     }
                 },
             )
@@ -328,11 +375,13 @@ private fun ReceiptAssignmentCard(
                         detail = assignee.detail,
                     )
                 },
-                assignmentActionLabel = item.assignmentActionLabel,
-                accessibilityLabel = "${item.name}, ${item.totalLabel}, ${item.quantityLabel}, ${item.unitPriceLabel}. ${item.assignmentActionLabel}. Split available.",
+                assignmentSummaryLabel = item.assignmentSummaryLabel,
+                itemActionLabel = item.itemActionLabel,
+                itemActionContentDescription = item.itemActionContentDescription,
+                accessibilityLabel = "${item.name}, ${item.totalLabel}, ${item.quantityLabel}, ${item.unitPriceLabel}. ${item.assignmentSummaryLabel}. ${item.itemActionLabel}.",
                 shouldBringIntoView = uiState.scrollToItemId == item.id,
-                onAssignClick = { onEvent(AssignItemsUiEvent.ItemTapped(item.id)) },
-                onSplitClick = { onEvent(AssignItemsUiEvent.ItemSplitClick(item.id)) },
+                onRowClick = { onEvent(AssignItemsUiEvent.ItemTapped(item.id)) },
+                onActionClick = { onEvent(AssignItemsUiEvent.ItemActionClick(item.id)) },
             )
             if (index < uiState.items.lastIndex) {
                 HorizontalDivider(color = EvenUpTheme.colors.divider)
@@ -365,11 +414,13 @@ private fun CompactAssignmentItemRow(
     totalLabel: String,
     assignmentState: AssignItemsItemState,
     assignees: List<EvenUpReceiptAssignee>,
-    assignmentActionLabel: String,
+    assignmentSummaryLabel: String,
+    itemActionLabel: String,
+    itemActionContentDescription: String,
     accessibilityLabel: String,
     shouldBringIntoView: Boolean,
-    onAssignClick: () -> Unit,
-    onSplitClick: () -> Unit,
+    onRowClick: () -> Unit,
+    onActionClick: () -> Unit,
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     LaunchedEffect(shouldBringIntoView) {
@@ -387,7 +438,7 @@ private fun CompactAssignmentItemRow(
                 contentDescription = accessibilityLabel
             }
             .clickable {
-                onAssignClick()
+                onRowClick()
             },
         verticalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space4),
     ) {
@@ -431,15 +482,18 @@ private fun CompactAssignmentItemRow(
             AssignmentSummary(
                 assignmentState = assignmentState,
                 assignees = assignees,
-                assignmentActionLabel = assignmentActionLabel,
+                assignmentSummaryLabel = assignmentSummaryLabel,
                 modifier = Modifier.weight(1f),
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 EvenUpTextButton(
-                    text = "Split",
-                    onClick = onSplitClick,
+                    text = itemActionLabel,
+                    onClick = onActionClick,
+                    modifier = Modifier.semantics {
+                        contentDescription = itemActionContentDescription
+                    },
                 )
             }
         }
@@ -450,7 +504,7 @@ private fun CompactAssignmentItemRow(
 private fun AssignmentSummary(
     assignmentState: AssignItemsItemState,
     assignees: List<EvenUpReceiptAssignee>,
-    assignmentActionLabel: String,
+    assignmentSummaryLabel: String,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -468,7 +522,7 @@ private fun AssignmentSummary(
         if (assignees.size > MAX_VISIBLE_ASSIGNEE_AVATARS) {
             AssignmentOverflowBadge(count = assignees.size - MAX_VISIBLE_ASSIGNEE_AVATARS)
         }
-        Crossfade(targetState = assignmentActionLabel, label = "AssignmentSummaryLabel") { animatedLabel ->
+        Crossfade(targetState = assignmentSummaryLabel, label = "AssignmentSummaryLabel") { animatedLabel ->
             Text(
                 text = animatedLabel,
                 style = EvenUpTheme.typography.bodySmall,
@@ -760,12 +814,18 @@ private fun SharedSplitRow(
             .clickable(onClick = onClick),
         shape = EvenUpTheme.shapes.input,
         color = if (row.included) EvenUpTheme.colors.surfaceElevated else EvenUpTheme.colors.background,
-        border = BorderStroke(1.dp, if (row.included) EvenUpTheme.colors.primary else EvenUpTheme.colors.border),
+        border = BorderStroke(
+            1.dp,
+            if (row.included) EvenUpTheme.colors.primary else EvenUpTheme.colors.border
+        ),
     ) {
         Row(
             modifier = Modifier
                 .heightIn(min = 48.dp)
-                .padding(horizontal = EvenUpTheme.spacing.space12, vertical = EvenUpTheme.spacing.space8),
+                .padding(
+                    horizontal = EvenUpTheme.spacing.space12,
+                    vertical = EvenUpTheme.spacing.space8
+                ),
             horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -889,34 +949,53 @@ private fun ClearAssignmentsDialog(
     uiState: AssignItemsUiState,
     onEvent: (AssignItemsUiEvent) -> Unit,
 ) {
-    if (!uiState.showClearAssignmentsConfirmation) return
-    AlertDialog(
+    EvenUpBottomSheet(
+        visible = uiState.showClearAssignmentsConfirmation,
         onDismissRequest = { onEvent(AssignItemsUiEvent.ClearAssignmentsDismissed) },
-        title = {
-            Text(
-                text = "Clear all assignments?",
-                style = EvenUpTheme.typography.cardTitle,
-                color = EvenUpTheme.colors.textPrimary,
-            )
-        },
-        text = {
-            Text(
-                text = "This will unassign all receipt items but keep the receipt.",
-                style = EvenUpTheme.typography.body,
-                color = EvenUpTheme.colors.textSecondary,
-            )
-        },
-        confirmButton = {
-            EvenUpTextButton(
-                text = "Clear",
-                onClick = { onEvent(AssignItemsUiEvent.ClearAssignmentsConfirmed) },
-            )
-        },
-        dismissButton = {
-            EvenUpTextButton(
-                text = "Cancel",
-                onClick = { onEvent(AssignItemsUiEvent.ClearAssignmentsDismissed) },
-            )
-        },
-    )
+        title = "Clear all assignments?",
+        headerAction = { IconButton(onClick = { onEvent(AssignItemsUiEvent.ClearAssignmentsDismissed) }) {
+            Icon(imageVector = Icons.Filled.Close, contentDescription = null)
+        } }
+    ) {
+        Text(
+            text = "All item assignments will be removed. Your receipt and people will stay unchanged.",
+            style = EvenUpTheme.typography.body,
+            color = EvenUpTheme.colors.textSecondary,
+        )
+        DestructiveSheetAction(
+            text = "Clear assignments",
+            onClick = { onEvent(AssignItemsUiEvent.ClearAssignmentsConfirmed) },
+        )
+    }
+}
+
+@Composable
+private fun DestructiveSheetAction(
+    text: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = text
+            },
+        shape = EvenUpTheme.shapes.button,
+        color = EvenUpTheme.colors.errorContainer,
+        contentColor = EvenUpTheme.colors.error,
+        border = BorderStroke(1.dp, EvenUpTheme.colors.error.copy(alpha = 0.22f)),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(
+                horizontal = EvenUpTheme.spacing.space20,
+                vertical = EvenUpTheme.spacing.space16,
+            ),
+            style = EvenUpTheme.typography.button,
+            textAlign = TextAlign.Center,
+        )
+    }
 }

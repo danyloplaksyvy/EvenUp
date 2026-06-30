@@ -221,10 +221,14 @@ class ReceiptReviewPresenter(
                 when (this) {
                     is ReceiptReviewEditDraft.Fee -> copy(
                         type = event.value,
-                        label = if (event.value == FeeType.Other) {
-                            if (type == FeeType.Other) label.take(MAX_FEE_LABEL_LENGTH) else ""
-                        } else {
-                            feeDisplayLabel(event.value)
+                        label = when (event.value) {
+                            FeeType.Other -> if (type == FeeType.Other) label.take(MAX_FEE_LABEL_LENGTH) else ""
+                            FeeType.Discount -> if (type == FeeType.Discount) {
+                                label.take(MAX_FEE_LABEL_LENGTH)
+                            } else {
+                                feeDisplayLabel(FeeType.Discount)
+                            }
+                            else -> feeDisplayLabel(event.value)
                         },
                     )
                     else -> this
@@ -575,7 +579,7 @@ class ReceiptReviewPresenter(
         val errors = mutableMapOf<String, String>()
         val amount = parseMoneyMinor(draft.amount)
         val fieldId = draft.feeId ?: "draft"
-        val label = if (draft.type == FeeType.Other) {
+        val label = if (draft.type == FeeType.Other || draft.type == FeeType.Discount) {
             draft.label.trim()
         } else {
             feeDisplayLabel(draft.type)
@@ -871,7 +875,7 @@ class ReceiptReviewPresenter(
             ReceiptValidationError.NoItems -> "items" to "Add at least one item."
             ReceiptValidationError.BlankItemName -> "items" to "Each item needs a name."
             ReceiptValidationError.NonPositiveItemAmount -> "items" to "Each item needs a positive amount."
-            ReceiptValidationError.NonPositiveFeeAmount -> "fees" to "Review fee and discount amounts."
+            ReceiptValidationError.NonPositiveFeeAmount -> "fees" to "Review adjustment amounts."
             ReceiptValidationError.TotalMismatch -> "summary" to "Total must equal items plus fees."
             ReceiptValidationError.NegativeTotal -> "summary" to "Total cannot be negative."
             ReceiptValidationError.FutureDate -> "date" to FUTURE_DATE_ERROR

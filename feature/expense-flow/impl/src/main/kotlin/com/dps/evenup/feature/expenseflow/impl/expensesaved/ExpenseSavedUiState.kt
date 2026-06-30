@@ -7,7 +7,8 @@ data class ExpenseSavedUiState(
     val shareUrl: String,
     val guestPasscode: String,
     val isWorking: Boolean = false,
-    val message: String? = null,
+    val snackbarMessage: String? = null,
+    val snackbarMessageId: Long = 0L,
 ) {
     val bareShareLink: String = shareUrl.trim()
     val normalizedGuestCode: String = guestPasscode.trim().uppercase()
@@ -17,11 +18,18 @@ data class ExpenseSavedUiState(
     val canCopyCode: Boolean = hasGuestCode
     val canShareInvite: Boolean = hasShareLink && hasGuestCode
     val fullInviteMessage: String = buildInviteMessage(bareShareLink, normalizedGuestCode)
-    val copyInvitePayload: String = fullInviteMessage
     val copyLinkPayload: String = bareShareLink
     val copyCodePayload: String = normalizedGuestCode
     val qrAccessUrl: String? = buildQrAccessUrl(bareShareLink, normalizedGuestCode)
     val canShowQr: Boolean = qrAccessUrl != null
+    val canOpenQr: Boolean = qrAccessUrl != null
+    val guestCodeHelperText: String = if (hasGuestCode) "For manual access only" else "Not available"
+    val guestCodeCopyContentDescription: String = if (hasGuestCode) {
+        "Guest code $normalizedGuestCode. Tap to copy only the guest code."
+    } else {
+        "Guest code is not available"
+    }
+    val copyLinkContentDescription: String = "Copy only the expense share link"
 }
 
 private fun buildInviteMessage(

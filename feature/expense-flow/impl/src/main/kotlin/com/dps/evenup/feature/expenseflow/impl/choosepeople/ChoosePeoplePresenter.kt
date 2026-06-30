@@ -111,6 +111,9 @@ class ChoosePeoplePresenter(
         if (name.isBlank()) {
             return state.copy(fieldErrors = mapOf("participantName" to "Enter a name."))
         }
+        if (name.length > MAX_PARTICIPANT_NAME_LENGTH) {
+            return state.copy(fieldErrors = mapOf("participantName" to "Use ${MAX_PARTICIPANT_NAME_LENGTH} characters or fewer."))
+        }
         if (state.participants.any { participant -> participant.name.equals(name, ignoreCase = true) }) {
             return state.copy(fieldErrors = mapOf("participantName" to "$name is already selected."))
         }

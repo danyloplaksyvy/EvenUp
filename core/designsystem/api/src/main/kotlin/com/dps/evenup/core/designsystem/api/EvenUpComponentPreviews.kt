@@ -37,7 +37,8 @@ private fun EvenUpInputsAndStatesPreview() {
             EvenUpCard {
                 Row(horizontalArrangement = Arrangement.spacedBy(EvenUpTheme.spacing.space8)) {
                     EvenUpParticipantChip(name = "Ari", selected = true)
-                    EvenUpParticipantChip(name = "Sam", colorIndex = 1)
+                    EvenUpParticipantChip(name = "Sam", colorIndex = 1, selected = true)
+                    EvenUpParticipantChip(name = "Max", colorIndex = 2)
                 }
             }
         }

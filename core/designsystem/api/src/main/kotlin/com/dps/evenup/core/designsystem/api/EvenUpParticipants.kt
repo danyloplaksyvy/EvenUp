@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +63,7 @@ fun EvenUpParticipantChip(
     modifier: Modifier = Modifier,
     colorIndex: Int = 0,
     selected: Boolean = false,
+    showSelectedIndicator: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     val background = if (selected) EvenUpTheme.colors.primary else EvenUpTheme.colors.surfaceElevated
@@ -68,7 +73,7 @@ fun EvenUpParticipantChip(
     Surface(
         modifier = modifier.then(
             if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-        ),
+        ).semantics { this.selected = selected },
         shape = EvenUpTheme.shapes.chip,
         color = background,
         contentColor = contentColor,
@@ -94,6 +99,14 @@ fun EvenUpParticipantChip(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (selected && showSelectedIndicator) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = contentColor,
+                )
+            }
         }
     }
 }

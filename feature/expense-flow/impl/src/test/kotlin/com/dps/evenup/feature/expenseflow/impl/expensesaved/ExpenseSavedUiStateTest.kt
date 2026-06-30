@@ -20,12 +20,19 @@ class ExpenseSavedUiStateTest {
         assertEquals("KTRQ", state.copyCodePayload)
         assertEquals(
             "EvenUp expense breakdown\nhttps://evenup.example/e/A8xQ2Lm9\nGuest code: KTRQ",
-            state.copyInvitePayload,
+            state.fullInviteMessage,
         )
-        assertEquals(state.copyInvitePayload, state.fullInviteMessage)
+        assertFalse(state.copyLinkPayload.contains("Guest code"))
+        assertFalse(state.copyLinkPayload.contains("EvenUp expense breakdown"))
         assertTrue(state.canCopyLink)
         assertTrue(state.canCopyCode)
         assertTrue(state.canShareInvite)
+        assertEquals("For manual access only", state.guestCodeHelperText)
+        assertEquals(
+            "Guest code KTRQ. Tap to copy only the guest code.",
+            state.guestCodeCopyContentDescription,
+        )
+        assertEquals("Copy only the expense share link", state.copyLinkContentDescription)
     }
 
     @Test
@@ -38,6 +45,7 @@ class ExpenseSavedUiStateTest {
         assertEquals("https://evenup.example/e/A8xQ2Lm9", state.copyLinkPayload)
         assertEquals("https://evenup.example/e/A8xQ2Lm9?code=KTRQ", state.qrAccessUrl)
         assertTrue(state.canShowQr)
+        assertTrue(state.canOpenQr)
     }
 
     @Test
@@ -59,6 +67,8 @@ class ExpenseSavedUiStateTest {
         assertTrue(state.canCopyCode)
         assertFalse(state.canShareInvite)
         assertFalse(state.canShowQr)
+        assertFalse(state.canOpenQr)
+        assertEquals("For manual access only", state.guestCodeHelperText)
         assertNull(state.qrAccessUrl)
     }
 
@@ -73,6 +83,35 @@ class ExpenseSavedUiStateTest {
         assertFalse(state.canCopyCode)
         assertFalse(state.canShareInvite)
         assertFalse(state.canShowQr)
+        assertFalse(state.canOpenQr)
+        assertEquals("Not available", state.guestCodeHelperText)
+        assertEquals("Guest code is not available", state.guestCodeCopyContentDescription)
         assertNull(state.qrAccessUrl)
+    }
+
+    @Test
+    fun `long share urls are copied as full bare link`() {
+        val longUrl = "https://evenup.example/e/A8xQ2Lm9?source=very-long-share-source&campaign=summer-dinner"
+        val state = ExpenseSavedUiState(
+            shareUrl = " $longUrl ",
+            guestPasscode = "KTRQ",
+        )
+
+        assertEquals(longUrl, state.bareShareLink)
+        assertEquals(longUrl, state.copyLinkPayload)
+        assertEquals("KTRQ", state.copyCodePayload)
+    }
+
+    @Test
+    fun `snackbar state can represent repeated feedback`() {
+        val state = ExpenseSavedUiState(
+            shareUrl = "https://evenup.example/e/A8xQ2Lm9",
+            guestPasscode = "KTRQ",
+            snackbarMessage = "Link copied",
+            snackbarMessageId = 2L,
+        )
+
+        assertEquals("Link copied", state.snackbarMessage)
+        assertEquals(2L, state.snackbarMessageId)
     }
 }

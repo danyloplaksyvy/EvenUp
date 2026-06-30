@@ -53,14 +53,143 @@ test("GET /e/:shareId renders read-only guest page", async () => {
   assert.equal(response.headers.get("Content-Type"), "text/html; charset=utf-8");
   const html = await response.text();
   assert.match(html, /EvenUp/);
+  assert.match(html, /class="brand-logo"/);
+  assert.match(html, /data:image\/png;base64/);
+  assert.doesNotMatch(html, /class="brand-mark"/);
+  assert.doesNotMatch(html, /class="brand-wordmark"/);
   assert.match(html, /Bella Roma/);
+  assert.match(html, /15 Jun 2026/);
+  assert.doesNotMatch(html, /2026-06-15/);
   assert.match(html, /Settlement Summary/);
-  assert.match(html, /Who pays for what/);
+  assert.match(html, /Breakdown by person/);
+  assert.doesNotMatch(html, /Who pays for what/);
+  assert.match(html, /Paid by<\/span><strong>Dana/);
+  assert.doesNotMatch(html, /Paid byDana/);
   assert.match(html, /Dana/);
   assert.match(html, /Pizza Margherita/);
   assert.match(html, /Shared Equal/);
+  assert.match(html, /<h3>Fees<\/h3>/);
   assert.match(html, /Tax/);
+  assert.doesNotMatch(html, /<h3>Discounts<\/h3>/);
+  assert.doesNotMatch(html, /No discount credits/);
   assert.match(html, /read-only guest view/);
+});
+
+test("GET /e/:shareId formats uppercase merchant names and missing dates safely", async () => {
+  const payload = validExpensePayload({
+    receipt: {
+      ...validExpensePayload().receipt,
+      merchantName: "CROWNE PLAZA BARCELONA - FIRA CENTER",
+      transactionDate: "not-a-date"
+    }
+  });
+  const response = await handleRequest(new Request("http://localhost/e/A8xQ2Lm9"), {
+    EXPENSES_DB: new FakeD1Database([
+      expenseRow({
+        shareId: "A8xQ2Lm9",
+        payload
+      })
+    ])
+  });
+
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Crowne Plaza Barcelona – Fira Center/);
+  assert.doesNotMatch(html, /CROWNE PLAZA BARCELONA - FIRA CENTER/);
+  assert.match(html, /Date not set/);
+  assert.doesNotMatch(html, /Invalid Date/);
+});
+
+test("GET /e/:shareId hides empty participant fees and discounts sections", async () => {
+  const payload = validExpensePayload({
+    receipt: {
+      ...validExpensePayload().receipt,
+      fees: []
+    },
+    feeAllocations: [],
+    summary: {
+      ...validExpensePayload().summary,
+      participantSummaries: validExpensePayload().summary.participantSummaries.map((summary) => ({
+        ...summary,
+        allocatedFeeTotalMinor: 0,
+        shareMinor: 5000,
+        netBalanceMinor: summary.participantId === "participant_1" ? 5000 : -5000
+      })),
+      settlementRows: [
+        {
+          fromParticipantId: "participant_2",
+          toParticipantId: "participant_1",
+          amountMinor: 5000
+        }
+      ]
+    }
+  });
+  const response = await handleRequest(new Request("http://localhost/e/A8xQ2Lm9"), {
+    EXPENSES_DB: new FakeD1Database([
+      expenseRow({
+        shareId: "A8xQ2Lm9",
+        payload
+      })
+    ])
+  });
+
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.doesNotMatch(html, /<h3>Fees<\/h3>/);
+  assert.doesNotMatch(html, /No allocated fees/);
+  assert.doesNotMatch(html, /<h3>Discounts<\/h3>/);
+  assert.doesNotMatch(html, /No discount credits/);
+});
+
+test("GET /e/:shareId renders non-empty participant discounts section", async () => {
+  const basePayload = validExpensePayload();
+  const payload = validExpensePayload({
+    receipt: {
+      ...basePayload.receipt,
+      fees: [
+        ...basePayload.receipt.fees,
+        {
+          id: "fee_discount",
+          type: "DISCOUNT",
+          label: "Coupon",
+          amountMinor: -500
+        }
+      ],
+      totalMinor: 11550
+    },
+    feeAllocations: [
+      ...basePayload.feeAllocations,
+      {
+        feeId: "fee_discount",
+        mode: "Equal",
+        shares: [
+          {
+            participantId: "participant_1",
+            amountMinor: -250
+          },
+          {
+            participantId: "participant_2",
+            amountMinor: -250
+          }
+        ]
+      }
+    ]
+  });
+  const response = await handleRequest(new Request("http://localhost/e/A8xQ2Lm9"), {
+    EXPENSES_DB: new FakeD1Database([
+      expenseRow({
+        shareId: "A8xQ2Lm9",
+        payload
+      })
+    ])
+  });
+
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<h3>Fees<\/h3>/);
+  assert.match(html, /Tax/);
+  assert.match(html, /<h3>Discounts<\/h3>/);
+  assert.match(html, /Coupon/);
 });
 
 test("protected guest page requires passcode and remembers successful access", async () => {
@@ -93,7 +222,7 @@ test("protected guest page requires passcode and remembers successful access", a
 
   assert.equal(gatedResponse.status, 200);
   assert.match(gatedHtml, /Enter guest code/);
-  assert.doesNotMatch(gatedHtml, /Who pays for what/);
+  assert.doesNotMatch(gatedHtml, /Breakdown by person/);
 
   const accessResponse = await handleRequest(
     new Request(`http://localhost/e/${saved.shareId}/access`, {
@@ -127,7 +256,7 @@ test("protected guest page requires passcode and remembers successful access", a
   const unlockedHtml = await unlockedResponse.text();
 
   assert.equal(unlockedResponse.status, 200);
-  assert.match(unlockedHtml, /Who pays for what/);
+  assert.match(unlockedHtml, /Breakdown by person/);
   assert.match(unlockedHtml, /Pizza Margherita/);
 });
 
@@ -181,7 +310,7 @@ test("protected guest page accepts QR access code query and redirects to clean l
   const unlockedHtml = await unlockedResponse.text();
 
   assert.equal(unlockedResponse.status, 200);
-  assert.match(unlockedHtml, /Who pays for what/);
+  assert.match(unlockedHtml, /Breakdown by person/);
 });
 
 test("protected API fetch accepts guest passcode header", async () => {
