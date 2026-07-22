@@ -4,7 +4,11 @@ import com.dps.evenup.core.network.api.WorkerApiClient
 import com.dps.evenup.core.network.api.WorkerApiResponse
 import com.dps.evenup.core.network.api.WorkerApiResult
 import com.dps.evenup.data.expense.api.ExpenseDataException
+import com.dps.evenup.data.expenseinput.api.AiExpenseSessionRepository
 import com.dps.evenup.data.sharing.impl.DefaultShareLinkResponseMapper
+import com.dps.evenup.domain.expense.api.ExpenseBaseAllocation
+import com.dps.evenup.domain.expense.api.ExpenseBaseAllocationMode
+import com.dps.evenup.domain.expense.api.ExpenseBaseParticipantShare
 import com.dps.evenup.domain.expense.api.ExpenseDraftId
 import com.dps.evenup.domain.expense.api.ExpenseSummary
 import com.dps.evenup.domain.expense.api.FeeAllocation
@@ -19,6 +23,8 @@ import com.dps.evenup.domain.expense.api.SettlementRow
 import com.dps.evenup.domain.participant.api.Participant
 import com.dps.evenup.domain.participant.api.ParticipantId
 import com.dps.evenup.domain.receipt.api.CurrencyCode
+import com.dps.evenup.domain.receipt.api.DescriptiveExpenseItem
+import com.dps.evenup.domain.receipt.api.ExpensePricingMode
 import com.dps.evenup.domain.receipt.api.FeeId
 import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.MoneyMinor
@@ -28,6 +34,9 @@ import com.dps.evenup.domain.receipt.api.ReceiptFee
 import com.dps.evenup.domain.receipt.api.ReceiptItem
 import com.dps.evenup.domain.receipt.api.ReceiptItemId
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import com.dps.evenup.domain.expenseinput.api.AiExpenseSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -74,6 +83,65 @@ class WorkerExpenseRepositoryTest {
         repository.saveFinalizedExpense(finalizedPayload().copy(guestPasscode = "KTRQ"))
 
         assertTrue(worker.lastBody.contains(""""guestAccess":{"passcode":"KTRQ"}"""))
+    }
+
+    @Test
+    fun `total-only expense uses schema v2 and clears AI session after successful save`() = runBlocking {
+        val worker = FakeWorkerApiClient(
+            """{"expenseId":"expense_123","shareId":"A8xQ2Lm9","shareUrl":"https://evenup.example/e/A8xQ2Lm9"}""",
+        )
+        val aiSession = FakeAiExpenseSessionRepository()
+        val repository = WorkerExpenseRepository(
+            workerApiClient = worker,
+            shareLinkResponseMapper = DefaultShareLinkResponseMapper(),
+            aiSessionRepository = aiSession,
+        )
+        val participants = finalizedPayload().participants
+        val baseAllocation = ExpenseBaseAllocation(
+            ExpenseBaseAllocationMode.Equal,
+            listOf(
+                ExpenseBaseParticipantShare(ParticipantId("p1"), MoneyMinor(501)),
+                ExpenseBaseParticipantShare(ParticipantId("p2"), MoneyMinor(500)),
+            ),
+        )
+        val payload = finalizedPayload().copy(
+            receipt = finalizedPayload().receipt.copy(
+                items = emptyList(),
+                descriptiveItems = listOf(DescriptiveExpenseItem(ReceiptItemId("detail-1"), "Coffee")),
+                fees = emptyList(),
+                subtotal = MoneyMinor(1_001),
+                total = MoneyMinor(1_001),
+                pricingMode = ExpensePricingMode.TotalOnly,
+            ),
+            itemAssignments = emptyList(),
+            feeAllocations = emptyList(),
+            baseAllocation = baseAllocation,
+            summary = ExpenseSummary(
+                receiptTotal = MoneyMinor(1_001),
+                participantSummaries = participants.mapIndexed { index, participant ->
+                    val base = if (index == 0) 501L else 500L
+                    ParticipantExpenseSummary(
+                        participant.id,
+                        MoneyMinor.Zero,
+                        MoneyMinor.Zero,
+                        MoneyMinor(base),
+                        if (index == 0) MoneyMinor(1_001) else MoneyMinor.Zero,
+                        if (index == 0) MoneyMinor(500) else MoneyMinor(-500),
+                        baseShare = MoneyMinor(base),
+                    )
+                },
+                settlementRows = listOf(SettlementRow(ParticipantId("p2"), ParticipantId("p1"), MoneyMinor(500))),
+            ),
+        )
+
+        repository.saveFinalizedExpense(payload)
+
+        assertTrue(worker.lastBody.contains("\"schemaVersion\":2"))
+        assertTrue(worker.lastBody.contains("\"pricingMode\":\"TOTAL_ONLY\""))
+        assertTrue(worker.lastBody.contains("\"descriptiveItems\""))
+        assertTrue(worker.lastBody.contains("\"baseAllocation\""))
+        assertTrue(worker.lastBody.contains("\"baseShareMinor\":501"))
+        assertTrue(aiSession.cleared)
     }
 
     @Test
@@ -174,5 +242,13 @@ class WorkerExpenseRepositoryTest {
             lastBody = body
             return WorkerApiResult.Success(WorkerApiResponse(201, responseBody))
         }
+    }
+
+    private class FakeAiExpenseSessionRepository : AiExpenseSessionRepository {
+        var cleared = false
+        override val session: Flow<AiExpenseSession?> = flowOf(null)
+        override suspend fun getSession(): AiExpenseSession? = null
+        override suspend fun saveSession(session: AiExpenseSession) = Unit
+        override suspend fun clearSession() { cleared = true }
     }
 }

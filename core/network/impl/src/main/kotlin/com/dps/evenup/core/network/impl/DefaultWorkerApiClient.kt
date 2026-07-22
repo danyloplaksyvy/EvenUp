@@ -9,9 +9,14 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 class DefaultWorkerApiClient(
     private val config: WorkerApiConfig,
@@ -42,17 +47,39 @@ class DefaultWorkerApiClient(
         method: String,
         body: String?,
         headers: Map<String, String> = emptyMap(),
-    ): WorkerApiResult = withContext(ioDispatcher) {
-        val url = buildUrl(path) ?: return@withContext WorkerApiResult.Failure(WorkerNetworkError.InvalidPath)
+    ): WorkerApiResult {
+        val url = buildUrl(path) ?: return WorkerApiResult.Failure(WorkerNetworkError.InvalidPath)
+        return suspendCancellableCoroutine { continuation ->
+            val activeConnection = AtomicReference<HttpURLConnection?>(null)
+            val requestJob = CoroutineScope(ioDispatcher).launch {
+                ensureActive()
+                val result = executeRequest(url, method, body, headers, activeConnection)
+                if (continuation.isActive) continuation.resume(result)
+            }
+            continuation.invokeOnCancellation {
+                activeConnection.get()?.disconnect()
+                requestJob.cancel()
+            }
+        }
+    }
+
+    private fun executeRequest(
+        url: URL,
+        method: String,
+        body: String?,
+        headers: Map<String, String>,
+        activeConnection: AtomicReference<HttpURLConnection?>,
+    ): WorkerApiResult {
         val connection = try {
             openConnection(url)
         } catch (_: IllegalArgumentException) {
-            return@withContext WorkerApiResult.Failure(WorkerNetworkError.InvalidBaseUrl)
+            return WorkerApiResult.Failure(WorkerNetworkError.InvalidBaseUrl)
         } catch (_: IOException) {
-            return@withContext WorkerApiResult.Failure(WorkerNetworkError.ConnectionFailed)
+            return WorkerApiResult.Failure(WorkerNetworkError.ConnectionFailed)
         }
+        activeConnection.set(connection)
 
-        try {
+        return try {
             connection.requestMethod = method
             connection.connectTimeout = CONNECT_TIMEOUT_MILLIS
             connection.readTimeout = READ_TIMEOUT_MILLIS
@@ -84,6 +111,7 @@ class DefaultWorkerApiClient(
             WorkerApiResult.Failure(WorkerNetworkError.Unknown)
         } finally {
             connection.disconnect()
+            activeConnection.compareAndSet(connection, null)
         }
     }
 

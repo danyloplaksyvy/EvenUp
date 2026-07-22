@@ -1,3 +1,5 @@
+import { interpretExpense } from "./ai-expense.js";
+
 export default {
   async fetch(request, env) {
     return handleRequest(request, env);
@@ -148,6 +150,10 @@ export async function handleRequest(request, env = {}) {
 
   if (url.pathname === "/v1/expenses") {
     return methodGuard(request, "POST", () => saveExpense(request, env));
+  }
+
+  if (url.pathname === "/v1/expenses/interpret") {
+    return methodGuard(request, "POST", () => interpretExpense(request, env));
   }
 
   if (url.pathname.startsWith("/v1/expenses/")) {
@@ -359,8 +365,8 @@ function validateExpensePayload(payload) {
     return "Request body must be a finalized expense object.";
   }
 
-  if (payload.schemaVersion !== 1) {
-    return "schemaVersion must be 1.";
+  if (payload.schemaVersion !== 1 && payload.schemaVersion !== 2) {
+    return "schemaVersion must be 1 or 2.";
   }
 
   if (typeof payload.title !== "string" || payload.title.trim().length === 0) {
@@ -375,11 +381,24 @@ function validateExpensePayload(payload) {
     return "participants must be an array.";
   }
 
+  const participantIds = new Set(
+    payload.participants
+      .filter((participant) => participant && typeof participant.id === "string" && participant.id.trim())
+      .map((participant) => participant.id)
+  );
+  if (participantIds.size !== payload.participants.length) {
+    return "participants must have unique non-empty ids.";
+  }
+
   if (
     typeof payload.payerParticipantId !== "string" ||
     payload.payerParticipantId.trim().length === 0
   ) {
     return "payerParticipantId is required.";
+  }
+
+  if (!participantIds.has(payload.payerParticipantId)) {
+    return "payerParticipantId must identify a participant.";
   }
 
   if (!Array.isArray(payload.itemAssignments)) {
@@ -394,6 +413,11 @@ function validateExpensePayload(payload) {
     return "summary is required.";
   }
 
+  if (payload.schemaVersion === 2) {
+    const totalOnlyValidation = validateTotalOnlyExpensePayload(payload, participantIds);
+    if (totalOnlyValidation) return totalOnlyValidation;
+  }
+
   if (payload.guestAccess !== undefined) {
     if (!payload.guestAccess || typeof payload.guestAccess !== "object" || Array.isArray(payload.guestAccess)) {
       return "guestAccess must be an object.";
@@ -404,6 +428,53 @@ function validateExpensePayload(payload) {
     }
   }
 
+  return null;
+}
+
+function validateTotalOnlyExpensePayload(payload, participantIds) {
+  const receipt = payload.receipt;
+  if (receipt.pricingMode !== "TOTAL_ONLY") return "schemaVersion 2 requires receipt.pricingMode TOTAL_ONLY.";
+  if (participantIds.size < 2) return "schemaVersion 2 requires at least two participants.";
+  if (!Number.isInteger(receipt.totalMinor) || receipt.totalMinor <= 0) return "receipt.totalMinor must be positive.";
+  if (!Array.isArray(receipt.items) || receipt.items.length !== 0) return "Total-only expenses cannot contain priced items.";
+  if (!Array.isArray(payload.itemAssignments) || payload.itemAssignments.length !== 0) {
+    return "Total-only expenses cannot contain item assignments.";
+  }
+  if (receipt.descriptiveItems !== undefined && receipt.descriptiveItems !== null) {
+    if (!Array.isArray(receipt.descriptiveItems)) return "receipt.descriptiveItems must be an array.";
+    if (receipt.descriptiveItems.some((item) => !item || typeof item.name !== "string" || !item.name.trim())) {
+      return "Descriptive items must have non-empty names.";
+    }
+  }
+  if (!Array.isArray(receipt.fees) || receipt.fees.some((fee) => !Number.isInteger(fee?.amountMinor))) {
+    return "receipt.fees must use integer minor units.";
+  }
+
+  const feeTotal = receipt.fees.reduce((sum, fee) => sum + fee.amountMinor, 0);
+  const expectedBase = receipt.totalMinor - feeTotal;
+  if (expectedBase < 0) return "Total-only base amount cannot be negative.";
+  const allocation = payload.baseAllocation;
+  if (!allocation || allocation.mode !== "EQUAL" || !Array.isArray(allocation.shares)) {
+    return "schemaVersion 2 requires an equal baseAllocation.";
+  }
+  const shareParticipants = new Set(allocation.shares.map((share) => share?.participantId));
+  if (
+    allocation.shares.length !== participantIds.size ||
+    shareParticipants.size !== participantIds.size ||
+    Array.from(participantIds).some((participantId) => !shareParticipants.has(participantId))
+  ) {
+    return "baseAllocation must include every participant exactly once.";
+  }
+  if (allocation.shares.some((share) => !Number.isInteger(share?.amountMinor) || share.amountMinor < 0)) {
+    return "baseAllocation shares must use non-negative integer minor units.";
+  }
+  const amounts = allocation.shares.map((share) => share.amountMinor);
+  if (amounts.reduce((sum, amount) => sum + amount, 0) !== expectedBase) {
+    return "baseAllocation shares must sum to total minus fees and discounts.";
+  }
+  if (amounts.length && Math.max(...amounts) - Math.min(...amounts) > 1) {
+    return "baseAllocation shares must be equal with deterministic remainder cents.";
+  }
   return null;
 }
 
@@ -1584,9 +1655,13 @@ function renderGuestExpensePage(expense) {
     ? summary.participantSummaries
     : [];
   const items = Array.isArray(receipt.items) ? receipt.items : [];
+  const descriptiveItems = Array.isArray(receipt.descriptiveItems) ? receipt.descriptiveItems : [];
   const fees = Array.isArray(receipt.fees) ? receipt.fees : [];
   const itemAssignments = Array.isArray(expense.itemAssignments) ? expense.itemAssignments : [];
   const feeAllocations = Array.isArray(expense.feeAllocations) ? expense.feeAllocations : [];
+  const baseAllocation = expense.baseAllocation && typeof expense.baseAllocation === "object"
+    ? expense.baseAllocation
+    : null;
   const currency = receipt.currency || expense.currency || "USD";
   const totalMinor = firstNumber(receipt.totalMinor, summary.totalMinor, summary.receiptTotalMinor);
   const participantDetails = buildParticipantDetails({
@@ -1598,6 +1673,9 @@ function renderGuestExpensePage(expense) {
     fees,
     itemAssignments,
     feeAllocations,
+    baseAllocation,
+    descriptiveItems,
+    pricingMode: receipt.pricingMode,
     currency
   });
 
@@ -1756,12 +1834,18 @@ function renderParticipantDetails(details, currency) {
         </summary>
         <div class="person-body">
           <div class="totals-grid">
-            <div><span>Items</span><b>${formatMoney(detail.itemTotalMinor, currency)}</b></div>
+            <div><span>${detail.totalOnly ? "Overall total split" : "Items"}</span><b>${formatMoney(
+              detail.totalOnly ? detail.baseShareMinor : detail.itemTotalMinor,
+              currency
+            )}</b></div>
             <div><span>Fees</span><b>${formatMoney(detail.feeTotalMinor, currency)}</b></div>
             <div><span>Discounts</span><b>${formatMoney(detail.discountCreditMinor, currency)}</b></div>
             <div><span>Paid</span><b>${formatMoney(detail.paidMinor, currency)}</b></div>
+            <div><span>Total share</span><b>${formatMoney(detail.shareMinor, currency)}</b></div>
           </div>
-          ${renderDetailRows("Items", detail.items, currency, { emptyMessage: "No assigned items." })}
+          ${detail.totalOnly
+            ? renderUnpricedRows("Descriptive items", detail.descriptiveItems, "No descriptive items were provided.")
+            : renderDetailRows("Items", detail.items, currency, { emptyMessage: "No assigned items." })}
           ${renderDetailRows("Fees", detail.fees, currency, { hideWhenEmpty: true })}
           ${renderDetailRows("Discounts", detail.discounts, currency, { hideWhenEmpty: true })}
           <div class="subsection">
@@ -1772,6 +1856,16 @@ function renderParticipantDetails(details, currency) {
       </details>`;
     })
     .join("");
+}
+
+function renderUnpricedRows(title, rows, emptyMessage) {
+  if (!rows.length) {
+    return `<div class="subsection"><h3>${escapeHtml(title)}</h3><p class="muted">${escapeHtml(emptyMessage)}</p></div>`;
+  }
+  return `<div class="subsection">
+    <h3>${escapeHtml(title)}</h3>
+    ${rows.map((row) => `<div class="detail-row"><span>${escapeHtml(row.label)}<small>${escapeHtml(row.meta)}</small></span></div>`).join("")}
+  </div>`;
 }
 
 function renderDetailRows(title, rows, currency, options = {}) {
@@ -1808,6 +1902,9 @@ function buildParticipantDetails({
   fees,
   itemAssignments,
   feeAllocations,
+  baseAllocation,
+  descriptiveItems,
+  pricingMode,
   currency
 }) {
   const participantIds = new Set([
@@ -1854,17 +1951,27 @@ function buildParticipantDetails({
           return `Receives ${amount} from ${participantName(row.fromParticipantId, participants)}`;
         });
 
+      const baseShare = Array.isArray(baseAllocation?.shares)
+        ? baseAllocation.shares.find((share) => share.participantId === participantId)
+        : null;
+
       return {
         participantId,
         name: participantName(participantId, participants),
         isPayer: participantId === payerParticipantId,
         itemTotalMinor: firstNumber(summary.assignedItemTotalMinor, summary.assignedItemTotal),
+        baseShareMinor: firstNumber(summary.baseShareMinor, baseShare?.amountMinor),
         feeTotalMinor: firstNumber(summary.allocatedFeeTotalMinor, summary.allocatedFeeTotal),
         discountCreditMinor: firstNumber(summary.discountCreditTotalMinor, summary.discountCreditTotal),
         shareMinor: firstNumber(summary.shareMinor, summary.personShareMinor, summary.personShare),
         paidMinor: firstNumber(summary.paidMinor, summary.amountPaidMinor, summary.amountPaid),
         netBalanceMinor: firstNumber(summary.netBalanceMinor, summary.netBalance),
         items: itemRows,
+        descriptiveItems: descriptiveItems.map((item) => ({
+          label: item.name || "Expense detail",
+          meta: Number.isFinite(item.quantity) ? `${item.quantity} unit${item.quantity === 1 ? "" : "s"}` : "Unpriced"
+        })),
+        totalOnly: pricingMode === "TOTAL_ONLY",
         fees: feeRows,
         discounts: discountRows,
         settlementLines

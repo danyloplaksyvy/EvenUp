@@ -65,13 +65,19 @@ docs/design/stitch/new_expense/code.html
 Implements:
 
 - App entry point
-- Receipt-first start screen
-- Primary CTA: Scan receipt
-- Secondary CTA: Enter manually
+- Multiline AI expense composer as the primary action
+- White outlined composer with footer utilities and a solid-black circular send action
+- Text/voice, processing, clarification, offline, retry, and defaults states
+- Root-level blocking processing overlay; no inline loading or extracted-details card
+- Receipt scan and manual-entry fallback actions
+- No example chips or privacy card
 
 Related tasks:
 
 - `T070 - Implement New Expense screen`
+- `T069 - Implement AI session, connectivity, and speech data`
+
+The Stitch image remains a hierarchy/spacing reference. Where it shows a static receipt-first card, follow the approved AI composer behavior in `DESIGN_SYSTEM.md` and `TASK_AI_EXPENSE_INPUT_CLIENT.md`.
 
 ### Receipt Scan
 
@@ -238,12 +244,18 @@ Implements:
 - Settlement summary
 - Payer and total
 - Expandable calculation details
+- AI original description and review flags
+- Section-level user-facing review notices only for actionable ambiguity; silent defaults are not warnings
+- Editable facts, people, item/base assignments, fees, and discounts
+- Full-screen details hub with typed Apply-only bottom sheets and a sticky contextual action
+- Total-only overall split state
 - Save CTA
 
 Related tasks:
 
 - `T101 - Implement Review Expense screen`
 - `T102 - Implement calculation details UI`
+- `T074 - Implement AI extracted-details editor and direct Review return`
 
 ### Expense Saved / Share
 
@@ -284,6 +296,7 @@ Implements:
 - Settlement summary
 - Person-first participant breakdown
 - Expandable per-participant item and fee details
+- Total-only overall base shares and unpriced descriptive items
 - Split/allocation method labels
 - Discount credits and payer's own share
 - Powered by EvenUp footer

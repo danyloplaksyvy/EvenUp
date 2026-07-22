@@ -169,6 +169,7 @@ Required P0 components:
 - `EvenUpIconButton`
 - `EvenUpTextField`
 - `EvenUpMoneyField`
+- `EvenUpComposerField`
 - `EvenUpCard`
 - `EvenUpTopBar`
 - `EvenUpBottomActionBar`
@@ -257,9 +258,23 @@ docs/design/stitch/new_expense/
 Use:
 
 - Premium hero layout
-- Primary black `Scan receipt` CTA
-- Secondary `Enter manually` CTA
-- No history, groups, or AI text prompt
+- Multiline AI expense composer as the primary action
+- Pure white composer container with a subtle idle outline, 2dp black focus outline, four-line writing area, footer utilities, and a solid-black circular send action
+- Clear send, recording, stop, cancel, processing, retry, clarification, error, and offline states
+- A small editable `Defaults: name · currency` action below the composer
+- Receipt scan and manual entry as visible fallback actions below the composer
+- Keep the original description visible while showing a separate clarification answer composer
+- Show processing as a blocking root overlay that does not resize the underlying content
+- Do not show example chips or the “Secure & private” card
+- Do not show history, groups, contacts, or social UI
+
+### AI extracted details
+
+Use a full-screen, button-first review hub for title, date, currency, total, pricing mode, payer, participants, items, fees/discounts, and split intent. Match Manual Entry and Receipt Review with a pinned top bar, section cards, tappable rows with chevrons, and a sticky contextual CTA. All values are edited in typed bottom sheets; Apply commits local sheet state and dismissal discards it. Do not place an extracted-details card inline on New Expense.
+
+### Review Expense
+
+AI-created expenses expand the existing Review screen rather than introducing another final-preview visual language. Show editable sections for the original description, expense facts, payer/participants, item or total-only allocation, fees/discounts, and per-person settlement. Derived/defaulted title, date, and currency appear normally and remain editable. Reserve amber review treatment for actionable ambiguity or inconsistency and use section-level user-facing notices, never internal field paths.
 
 ### Receipt Scan
 

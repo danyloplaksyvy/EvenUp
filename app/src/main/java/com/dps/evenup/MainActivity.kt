@@ -8,7 +8,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
 import com.dps.evenup.core.navigation.api.EvenUpEntryProviderInstaller
@@ -42,6 +44,10 @@ class MainActivity : ComponentActivity() {
                     backStack = navigator.backStack,
                     modifier = Modifier.fillMaxSize(),
                     onBack = { navigator.navigateBack() },
+                    entryDecorators = listOf(
+                        rememberSaveableStateHolderNavEntryDecorator(),
+                        rememberViewModelStoreNavEntryDecorator(),
+                    ),
                     entryProvider = entryProvider {
                         entryProviderInstallers.forEach { installer ->
                             installer.install(this)

@@ -89,6 +89,23 @@ class DefaultAllocateFeesUseCaseTest {
         assertTrue(FeeAllocationValidationError.AmountTotalMismatch in result.errors)
     }
 
+    @Test
+    fun `discount allocation preserves negative sign and deterministic remainder`() {
+        val allocation = useCase.allocateEqual(
+            fee = ReceiptFee(FeeId("discount"), FeeType.Discount, "Coupon", MoneyMinor(-101)),
+            participants = participants().take(2),
+        )
+
+        assertEquals(listOf(-51L, -50L), allocation.shares.map { it.amount.value })
+        assertTrue(
+            useCase.validateCustom(
+                ReceiptFee(FeeId("discount"), FeeType.Discount, "Coupon", MoneyMinor(-101)),
+                participants().take(2),
+                allocation.shares,
+            ).isValid,
+        )
+    }
+
     private fun fee(amount: Long): ReceiptFee = ReceiptFee(
         id = FeeId("fee-1"),
         type = FeeType.Tax,

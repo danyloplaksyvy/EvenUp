@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,7 +12,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
+import com.dps.evenup.data.expenseinput.api.AiExpenseSessionRepository
 import kotlinx.coroutines.launch
 
 @Composable
@@ -21,6 +22,7 @@ fun ExpenseSavedRoute(
     shareUrl: String,
     guestPasscode: String,
     draftRepository: ExpenseDraftRepository,
+    aiSessionRepository: AiExpenseSessionRepository,
     onAddAnother: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -77,6 +79,7 @@ fun ExpenseSavedRoute(
                         uiState = uiState.copy(isWorking = true, snackbarMessage = null)
                         try {
                             draftRepository.clearDraft()
+                            aiSessionRepository.clearSession()
                             onAddAnother()
                         } catch (_: RuntimeException) {
                             uiState = uiState
@@ -123,7 +126,7 @@ private fun openLink(
     url: String,
 ): Boolean {
     return try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         true
     } catch (_: RuntimeException) {
         false

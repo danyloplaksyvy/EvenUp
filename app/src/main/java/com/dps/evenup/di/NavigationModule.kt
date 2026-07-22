@@ -16,7 +16,7 @@ import dagger.hilt.android.scopes.ActivityRetainedScoped
 object NavigationModule {
     @Provides
     @EvenUpStartDestination
-    fun provideStartDestination(): NavKey = NewExpenseDestination
+    fun provideStartDestination(): NavKey = NewExpenseDestination.fresh()
 
     @Provides
     @ActivityRetainedScoped

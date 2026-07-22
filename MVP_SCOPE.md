@@ -2,16 +2,19 @@
 
 ## Product definition
 
-EvenUp MVP is an Android app for creating one-off shared expenses from real receipts, assigning receipt items to people, allocating fees transparently, and sharing a passcode-gated read-only web result link.
+EvenUp MVP is an Android app for creating one-off shared expenses from an English natural-language description, a real receipt, or manual entry; allocating the expense transparently; and sharing a passcode-gated read-only web result link.
 
 ## Pitch narrative
 
-EvenUp reduces money conflicts by making shared expenses transparent: scan the receipt, assign what each person had, see exactly who owes whom, and share a clear passcode-gated breakdown.
+EvenUp reduces money conflicts by making shared expenses transparent: describe or scan the expense, review exactly how it is divided, see who owes whom, and share a clear passcode-gated breakdown.
 
 ## Must have
 
 - Android-only native app
-- Receipt-first creation flow
+- Natural-language text creation as the primary Add expense action
+- Android `SpeechRecognizer` dictation that sends text only
+- English AI clarification and editable extracted-details flow
+- Receipt scan and manual-entry fallbacks
 - Camera capture
 - Gallery import
 - Real OpenAI receipt scanning through Cloudflare Worker
@@ -43,6 +46,8 @@ EvenUp reduces money conflicts by making shared expenses transparent: scan the r
 - Guest page remembers successful passcode entry
 - Guest page rate-limits repeated passcode failures
 - Person-level guest breakdown showing each participant's items, fees, discounts, paid amount, share, and settlement result
+- Total-only equal expenses with unpriced descriptive items and explicit base allocation
+- A minimum of two participants before AI readiness or final save
 - No login required for guest page
 
 ## Out of scope
@@ -51,7 +56,6 @@ EvenUp reduces money conflicts by making shared expenses transparent: scan the r
 - Friends/social graph
 - In-app payments
 - Expense history screen
-- AI natural language expense creation
 - Contacts import
 - Notifications
 - Payment reminders
@@ -62,28 +66,32 @@ EvenUp reduces money conflicts by making shared expenses transparent: scan the r
 
 ## Primary screens
 
-1. New Expense
-2. Receipt Scan
-3. Receipt Review
-4. Manual Receipt Entry
-5. Choose People
-6. Assign Receipt
-7. Item Detail Bottom Sheet
-8. Fees Allocation
-9. Review Expense
-10. Saved / Share
-11. Guest Web View
+1. New Expense / AI Composer
+2. AI Clarification / Extracted Details
+3. Receipt Scan
+4. Receipt Review
+5. Manual Receipt Entry
+6. Choose People
+7. Assign Receipt
+8. Item Detail Bottom Sheet
+9. Fees Allocation
+10. Review Expense
+11. Saved / Share
+12. Guest Web View
 
 ## Demo critical path
 
 ```text
 New Expense
--> Scan or Manual Entry
--> Receipt Review
--> Choose People
--> Assign Items
--> Allocate Fees
--> Review Settlement
+|-- Describe by text/voice
+|   -> Clarify missing AI facts when needed
+|   -> Review Expense
+|-- Scan receipt or enter manually
+|   -> Receipt Review
+|   -> Choose People
+|   -> Assign Items
+|   -> Allocate Fees
+|   -> Review Settlement
 -> Save Expense
 -> Share Link + Passcode
 -> Guest Enters Passcode
@@ -95,6 +103,7 @@ New Expense
 ### P0
 
 - Manual full flow
+- AI text/voice expense input with review
 - Calculation engine
 - Save/share backend
 - Guest page

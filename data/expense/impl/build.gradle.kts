@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":core:datastore:api"))
     implementation(project(":core:network:api"))
     implementation(project(":data:expense:api"))
+    implementation(project(":data:expense-input:api"))
     implementation(project(":data:sharing:api"))
     implementation(project(":domain:expense:api"))
     implementation(project(":domain:participant:api"))

@@ -5,6 +5,9 @@ import com.dps.evenup.data.expense.api.ExpenseDataException
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.domain.expense.api.ExpenseDraft
 import com.dps.evenup.domain.expense.api.ExpenseDraftId
+import com.dps.evenup.domain.expense.api.ExpenseBaseAllocation
+import com.dps.evenup.domain.expense.api.ExpenseBaseAllocationMode
+import com.dps.evenup.domain.expense.api.ExpenseBaseParticipantShare
 import com.dps.evenup.domain.expense.api.FeeAllocation
 import com.dps.evenup.domain.expense.api.FeeAllocationMode
 import com.dps.evenup.domain.expense.api.FeeParticipantShare
@@ -15,6 +18,8 @@ import com.dps.evenup.domain.expense.api.PercentageBasisPoints
 import com.dps.evenup.domain.participant.api.Participant
 import com.dps.evenup.domain.participant.api.ParticipantId
 import com.dps.evenup.domain.receipt.api.CurrencyCode
+import com.dps.evenup.domain.receipt.api.DescriptiveExpenseItem
+import com.dps.evenup.domain.receipt.api.ExpensePricingMode
 import com.dps.evenup.domain.receipt.api.FeeId
 import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.MoneyMinor
@@ -73,6 +78,7 @@ private fun ExpenseDraft.toDto(): ExpenseDraftDto = ExpenseDraftDto(
     payerId = payerId.value,
     itemAssignments = itemAssignments.map { assignment -> assignment.toDraftDto() },
     feeAllocations = feeAllocations.map { allocation -> allocation.toDraftDto() },
+    baseAllocation = baseAllocation?.toDraftDto(),
 )
 
 private fun ExpenseDraftDto.toDomain(): ExpenseDraft = ExpenseDraft(
@@ -82,6 +88,7 @@ private fun ExpenseDraftDto.toDomain(): ExpenseDraft = ExpenseDraft(
     payerId = ParticipantId(payerId),
     itemAssignments = itemAssignments.map { assignment -> assignment.toDomain() },
     feeAllocations = feeAllocations.map { allocation -> allocation.toDomain() },
+    baseAllocation = baseAllocation?.toDomain(),
 )
 
 private fun Receipt.toDraftDto(): DraftReceiptDto = DraftReceiptDto(
@@ -94,6 +101,8 @@ private fun Receipt.toDraftDto(): DraftReceiptDto = DraftReceiptDto(
     subtotalMinor = subtotal?.value,
     corrections = parseMetadata.corrections.map { correction -> correction.toDraftDto() },
     reviewWarnings = parseMetadata.reviewWarnings,
+    pricingMode = pricingMode.name,
+    descriptiveItems = descriptiveItems.map { item -> item.toDraftDto() },
 )
 
 private fun DraftReceiptDto.toDomain(): Receipt = Receipt(
@@ -108,6 +117,20 @@ private fun DraftReceiptDto.toDomain(): Receipt = Receipt(
         corrections = corrections.map { correction -> correction.toDomain() },
         reviewWarnings = reviewWarnings,
     ),
+    pricingMode = runCatching { ExpensePricingMode.valueOf(pricingMode) }.getOrDefault(ExpensePricingMode.Itemized),
+    descriptiveItems = descriptiveItems.map { item -> item.toDomain() },
+)
+
+private fun DescriptiveExpenseItem.toDraftDto(): DraftDescriptiveItemDto = DraftDescriptiveItemDto(
+    id = id.value,
+    name = name,
+    quantity = quantity?.value,
+)
+
+private fun DraftDescriptiveItemDto.toDomain(): DescriptiveExpenseItem = DescriptiveExpenseItem(
+    id = ReceiptItemId(id),
+    name = name,
+    quantity = quantity?.let(::Quantity),
 )
 
 private fun ReceiptItem.toDraftDto(): DraftReceiptItemDto = DraftReceiptItemDto(
@@ -226,6 +249,20 @@ private fun DraftFeeParticipantShareDto.toDomain(): FeeParticipantShare = FeePar
     amount = MoneyMinor(amountMinor),
 )
 
+private fun ExpenseBaseAllocation.toDraftDto(): DraftBaseAllocationDto = DraftBaseAllocationDto(
+    mode = mode.name,
+    shares = shares.map { share ->
+        DraftBaseParticipantShareDto(share.participantId.value, share.amount.value)
+    },
+)
+
+private fun DraftBaseAllocationDto.toDomain(): ExpenseBaseAllocation = ExpenseBaseAllocation(
+    mode = ExpenseBaseAllocationMode.valueOf(mode),
+    shares = shares.map { share ->
+        ExpenseBaseParticipantShare(ParticipantId(share.participantId), MoneyMinor(share.amountMinor))
+    },
+)
+
 @Serializable
 private data class ExpenseDraftDto(
     val id: String,
@@ -234,6 +271,7 @@ private data class ExpenseDraftDto(
     val payerId: String,
     val itemAssignments: List<DraftItemAssignmentDto>,
     val feeAllocations: List<DraftFeeAllocationDto>,
+    val baseAllocation: DraftBaseAllocationDto? = null,
 )
 
 @Serializable
@@ -247,6 +285,15 @@ private data class DraftReceiptDto(
     val subtotalMinor: Long? = null,
     val corrections: List<DraftReceiptParseCorrectionDto> = emptyList(),
     val reviewWarnings: List<String> = emptyList(),
+    val pricingMode: String = ExpensePricingMode.Itemized.name,
+    val descriptiveItems: List<DraftDescriptiveItemDto> = emptyList(),
+)
+
+@Serializable
+private data class DraftDescriptiveItemDto(
+    val id: String,
+    val name: String,
+    val quantity: Int? = null,
 )
 
 @Serializable
@@ -310,6 +357,18 @@ private data class DraftFeeAllocationDto(
 
 @Serializable
 private data class DraftFeeParticipantShareDto(
+    val participantId: String,
+    val amountMinor: Long,
+)
+
+@Serializable
+private data class DraftBaseAllocationDto(
+    val mode: String,
+    val shares: List<DraftBaseParticipantShareDto>,
+)
+
+@Serializable
+private data class DraftBaseParticipantShareDto(
     val participantId: String,
     val amountMinor: Long,
 )

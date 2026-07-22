@@ -19,6 +19,7 @@ The Worker must:
 
 - hide the OpenAI API key
 - parse receipt images through OpenAI
+- interpret English expense descriptions through stateless OpenAI Structured Outputs
 - save finalized immutable expenses in D1
 - return finalized expenses by public share ID
 - verify guest passcodes for protected share links
@@ -28,6 +29,7 @@ The Worker must:
 
 Never expose the OpenAI API key to Android.
 Do not log receipt image payloads.
+Do not log AI descriptions, clarification answers, transcripts, prompts, or model output.
 Do not store receipt images unless explicitly requested.
 Guest links must be unguessable and passcode-gated for new shares.
 Legacy rows without passcode metadata remain public.
@@ -46,7 +48,7 @@ For `GET /e/:shareId`, use the guest view reference:
 
 The guest page must be mobile-first, read-only, white/black, and visually consistent with the Android app. It does not need to use the Android design system, but it should preserve the same product hierarchy and tone.
 
-For protected shares, first render a simple four-letter passcode gate. After access is verified, render a person-first breakdown where expanding a participant shows their items, split methods, fee allocations, discounts, paid amount, total share, and settlement result.
+For protected shares, first render a simple four-letter passcode gate. After access is verified, render a person-first breakdown where expanding a participant shows their items or total-only base split, unpriced descriptive items, split methods, fee allocations, discounts, paid amount, total share, and settlement result.
 
 ## D1 MVP schema
 
@@ -72,6 +74,7 @@ Use a separate rate-limit table or equivalent Worker storage for failed guest pa
 ```http
 GET /health
 POST /v1/receipts/parse
+POST /v1/expenses/interpret
 POST /v1/expenses
 GET /v1/expenses/:shareId
 POST /e/:shareId/access

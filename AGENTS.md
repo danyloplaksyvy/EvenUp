@@ -4,7 +4,7 @@
 
 EvenUp is an Android-only shared expense MVP.
 
-The app lets a user scan or manually enter a receipt, review receipt data, add temporary participants, choose a payer, assign receipt items to people, allocate tax/tip/fees, review who owes whom, save the finalized expense, and create a passcode-gated read-only share link.
+The app lets a user describe an expense by English text or local speech transcription, scan a receipt, or enter it manually; review and edit the structured data; allocate the expense; save it; and create a passcode-gated read-only share link.
 
 ## Current MVP goal
 
@@ -13,8 +13,8 @@ Build a fully functional pitch-ready MVP with scalable architecture.
 Primary demo flow:
 
 1. Open app.
-2. Scan receipt or enter manually.
-3. Review receipt.
+2. Describe by text/voice, scan a receipt, or enter manually.
+3. Clarify and review structured expense details.
 4. Add participants.
 5. Choose payer.
 6. Assign items.
@@ -67,7 +67,7 @@ Allowed dependency direction:
 
 ```text
 :app -> feature impl, domain impl, data impl, core impl
-feature:*:impl -> feature:*:api, domain:*:api, core:*:api
+feature:*:impl -> feature:*:api, domain:*:api, data:*:api, core:*:api
 feature:*:impl -> core:designsystem:api, core:navigation:api
 domain:*:impl -> domain:*:api and data:*:api only when use cases need repository contracts
 data:*:impl -> data:*:api, domain:*:api, core:*:api
@@ -136,7 +136,6 @@ Do not implement out-of-scope features:
 - Friends/social graph
 - In-app payments
 - Expense history screen
-- AI natural language expense creation
 - Contacts import
 - Notifications
 - Payment reminders

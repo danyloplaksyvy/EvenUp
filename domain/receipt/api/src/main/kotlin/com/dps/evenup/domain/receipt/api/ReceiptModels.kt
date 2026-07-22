@@ -9,6 +9,8 @@ data class Receipt(
     val transactionDateLabel: String? = null,
     val subtotal: MoneyMinor? = null,
     val parseMetadata: ReceiptParseMetadata = ReceiptParseMetadata(),
+    val pricingMode: ExpensePricingMode = ExpensePricingMode.Itemized,
+    val descriptiveItems: List<DescriptiveExpenseItem> = emptyList(),
 )
 
 data class ReceiptItem(
@@ -18,6 +20,17 @@ data class ReceiptItem(
     val unitPrice: MoneyMinor,
     val totalPrice: MoneyMinor,
     val parseMetadata: ReceiptItemParseMetadata = ReceiptItemParseMetadata(),
+)
+
+enum class ExpensePricingMode {
+    Itemized,
+    TotalOnly,
+}
+
+data class DescriptiveExpenseItem(
+    val id: ReceiptItemId,
+    val name: String,
+    val quantity: Quantity? = null,
 )
 
 data class ReceiptFee(

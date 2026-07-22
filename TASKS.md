@@ -96,6 +96,24 @@ Validation:
 ./gradlew :domain:sharing:impl:test
 ```
 
+### T015 - Implement AI expense preparation and total-only calculations
+
+Goal: Turn a structured AI extraction into a valid draft using client-owned clarification ordering and deterministic domain rules.
+
+Requirements:
+
+- Enforce at least two participants and a payer in the participant set.
+- Support itemized assignments plus total-only equal base allocation.
+- Allocate signed fees and discounts deterministically.
+- Default/flag date and currency; derive or default/flag title.
+- Require confirmation for possible saved-participant matches.
+
+Validation:
+
+```bash
+./gradlew :domain:expense-input:impl:test :domain:expense:impl:test
+```
+
 ## Backend
 
 ### T050 - Implement Worker health endpoint
@@ -170,6 +188,25 @@ Validation:
 ```bash
 cd backend
 npm test
+```
+
+### T055 - Implement AI expense interpretation endpoint
+
+Goal: `POST /v1/expenses/interpret` returns a full merged structured extraction from English text.
+
+Requirements:
+
+- Use strict OpenAI Structured Outputs from the Worker only.
+- Keep the endpoint stateless and preserve stable references across clarification turns.
+- Enforce 4,000/1,000 character limits and 10 clarification turns.
+- Handle refusals, incomplete responses, rate limits, timeout, and unavailable upstream safely.
+- Perform semantic validation with at most one repair attempt.
+- Log metadata only; never log descriptions, answers, transcripts, prompts, or model output.
+
+Validation:
+
+```bash
+cd backend && npm test && npm run typecheck
 ```
 
 ### T061 - Implement base guest web page
@@ -294,6 +331,23 @@ Validation:
 ./gradlew :feature:expense-flow:impl:compileDebugKotlin
 ```
 
+### T069 - Implement AI session, preferences, connectivity, and speech data
+
+Goal: Persist the local AI session and defaults, call the interpretation endpoint, observe connectivity, and transcribe locally through Android `SpeechRecognizer`.
+
+Requirements:
+
+- Never upload, retain, or log audio.
+- Restore interrupted processing as a retryable state without auto-submission.
+- Cancel active HTTP work and reject stale request IDs.
+- Clear raw local session data only after save or explicit discard.
+
+Validation:
+
+```bash
+./gradlew :core:network:impl:testDebugUnitTest :data:expense-input:impl:testDebugUnitTest
+```
+
 ## Android Screens
 
 ### T070 - Implement New Expense screen
@@ -302,6 +356,18 @@ Use:
 
 - `docs/design/stitch/new_expense/screen.png`
 - `docs/design/stitch/new_expense/code.html`
+
+The primary action is the multiline AI composer. Keep scan and manual actions below it, remove example chips/privacy card, and implement text/voice, clarification, offline, retry, cancellation, defaults, and discard/regeneration confirmation states.
+
+### T074 - Implement AI extracted-details editor and direct Review return
+
+Goal: Edit multiple extracted fields together and update the shared draft/session repository before returning directly to Review.
+
+Validation:
+
+```bash
+./gradlew :feature:expense-flow:impl:testDebugUnitTest
+```
 
 ### T071 - Implement Receipt Scan screen
 
@@ -374,6 +440,8 @@ Use:
 
 - `docs/design/stitch/review_expense/screen.png`
 - `docs/design/stitch/review_expense/code.html`
+
+Expand it for AI drafts with original description, pricing mode, editable facts/items, people, assignments/base split, fees/discounts, review flags, and direct editor-return navigation.
 
 ### T102 - Implement calculation details UI
 

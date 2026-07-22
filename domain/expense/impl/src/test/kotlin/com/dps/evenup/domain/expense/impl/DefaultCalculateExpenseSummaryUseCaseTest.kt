@@ -81,6 +81,31 @@ class DefaultCalculateExpenseSummaryUseCaseTest {
         assertEquals(listOf(34L, 33L, 33L), summary.participantSummaries.map { it.discountCreditTotal.value })
     }
 
+    @Test
+    fun `explicit discount allocation overrides implicit proportional credits`() {
+        val summary = useCase.calculate(
+            receipt = receipt().copy(
+                fees = receipt().fees + ReceiptFee(FeeId("discount"), FeeType.Discount, "Promo", MoneyMinor(-100)),
+                total = MoneyMinor(11_950),
+            ),
+            participants = participants(),
+            payerId = ParticipantId("anna"),
+            itemAssignments = itemAssignments(),
+            feeAllocations = feeAllocations() + FeeAllocation(
+                FeeId("discount"),
+                FeeAllocationMode.Custom,
+                listOf(
+                    FeeParticipantShare(ParticipantId("anna"), MoneyMinor(-100)),
+                    FeeParticipantShare(ParticipantId("ben"), MoneyMinor.Zero),
+                    FeeParticipantShare(ParticipantId("chris"), MoneyMinor.Zero),
+                ),
+            ),
+        )
+
+        assertEquals(listOf(100L, 0L, 0L), summary.participantSummaries.map { it.discountCreditTotal.value })
+        assertEquals(MoneyMinor(11_950), summary.participantShareTotal)
+    }
+
     private fun participants(): List<Participant> = listOf(
         Participant(ParticipantId("anna"), "Anna", 0),
         Participant(ParticipantId("ben"), "Ben", 1),

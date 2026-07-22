@@ -1,7 +1,6 @@
 package com.dps.evenup.feature.expenseflow.impl.reviewexpense
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -10,10 +9,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.expense.api.ExpenseDataException
 import com.dps.evenup.data.expense.api.ExpenseDataFailureReason
 import com.dps.evenup.data.expense.api.ExpenseRepository
+import com.dps.evenup.data.expenseinput.api.AiExpenseSessionRepository
 import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
 import com.dps.evenup.domain.sharing.api.GenerateGuestPasscodeUseCase
@@ -26,8 +28,14 @@ fun ReviewExpenseRoute(
     calculateSummary: CalculateExpenseSummaryUseCase,
     validateExpenseBeforeSave: ValidateExpenseBeforeSaveUseCase,
     generateGuestPasscode: GenerateGuestPasscodeUseCase,
+    aiSessionRepository: AiExpenseSessionRepository? = null,
     onBack: () -> Boolean,
     onSaved: (shareUrl: String, guestPasscode: String) -> Unit,
+    onEditDescription: () -> Unit = {},
+    onEditDetails: () -> Unit = {},
+    onEditPeople: () -> Unit = {},
+    onEditAssignments: () -> Unit = {},
+    onEditFees: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val presenter = remember(
@@ -36,6 +44,7 @@ fun ReviewExpenseRoute(
         calculateSummary,
         validateExpenseBeforeSave,
         generateGuestPasscode,
+        aiSessionRepository,
     ) {
         ReviewExpensePresenter(
             draftRepository = draftRepository,
@@ -43,6 +52,7 @@ fun ReviewExpenseRoute(
             calculateSummary = calculateSummary,
             validateExpenseBeforeSave = validateExpenseBeforeSave,
             generateGuestPasscode = generateGuestPasscode,
+            aiSessionRepository = aiSessionRepository,
         )
     }
     val coroutineScope = rememberCoroutineScope()
@@ -84,14 +94,23 @@ fun ReviewExpenseRoute(
         }
     }
 
-    LaunchedEffect(presenter) {
-        uiState = try {
-            presenter.load()
-        } catch (_: RuntimeException) {
-            ReviewExpenseUiState(
-                isLoading = false,
-                submitError = "Could not load expense review. Try again.",
-            )
+    fun openStructuredEditor(action: () -> Unit) {
+        coroutineScope.launch {
+            presenter.markAiSessionManuallyEdited()
+            action()
+        }
+    }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        coroutineScope.launch {
+            uiState = try {
+                presenter.load()
+            } catch (_: RuntimeException) {
+                ReviewExpenseUiState(
+                    isLoading = false,
+                    submitError = "Could not load expense review. Try again.",
+                )
+            }
         }
     }
 
@@ -100,6 +119,11 @@ fun ReviewExpenseRoute(
         onEvent = { event ->
             when (event) {
                 ReviewExpenseUiEvent.BackClick -> onBack()
+                ReviewExpenseUiEvent.EditDescriptionClick -> onEditDescription()
+                ReviewExpenseUiEvent.EditDetailsClick -> openStructuredEditor(onEditDetails)
+                ReviewExpenseUiEvent.EditPeopleClick -> openStructuredEditor(onEditPeople)
+                ReviewExpenseUiEvent.EditAssignmentsClick -> openStructuredEditor(onEditAssignments)
+                ReviewExpenseUiEvent.EditFeesClick -> openStructuredEditor(onEditFees)
                 ReviewExpenseUiEvent.SaveClick,
                 ReviewExpenseUiEvent.SaveRetryClick,
                 -> saveExpense()

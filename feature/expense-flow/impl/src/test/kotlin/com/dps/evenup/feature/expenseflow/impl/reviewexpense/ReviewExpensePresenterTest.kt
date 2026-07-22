@@ -2,6 +2,7 @@ package com.dps.evenup.feature.expenseflow.impl.reviewexpense
 
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.expense.api.ExpenseRepository
+import com.dps.evenup.data.expenseinput.api.AiExpenseSessionRepository
 import com.dps.evenup.data.sharing.api.SavedShareLink
 import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ExpenseDraft
@@ -14,6 +15,7 @@ import com.dps.evenup.domain.expense.api.FinalizedExpensePayload
 import com.dps.evenup.domain.expense.api.ParticipantExpenseSummary
 import com.dps.evenup.domain.expense.api.SettlementRow
 import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
+import com.dps.evenup.domain.expenseinput.api.AiExpenseSession
 import com.dps.evenup.domain.participant.api.Participant
 import com.dps.evenup.domain.participant.api.ParticipantId
 import com.dps.evenup.domain.receipt.api.CurrencyCode
@@ -22,6 +24,8 @@ import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.sharing.api.GenerateGuestPasscodeUseCase
 import com.dps.evenup.domain.sharing.api.ShareLink
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -295,15 +299,55 @@ class ReviewExpensePresenterTest {
     @Test
     fun `save generates guest passcode and returns it with share link`() = runBlocking {
         val expenseRepository = FakeExpenseRepository()
+        val draftRepository = FakeExpenseDraftRepository(reviewExpenseDraft(currencyCode = "USD"))
+        val sessionRepository = FakeAiExpenseSessionRepository(AiExpenseSession("session-1", description = "Dinner"))
         val presenter = presenter(
+            draftRepository = draftRepository,
             expenseRepository = expenseRepository,
             generateGuestPasscode = FakeGenerateGuestPasscodeUseCase("KTRQ"),
+            aiSessionRepository = sessionRepository,
         )
 
         val result = presenter.saveDraft()
 
         assertEquals(SaveReviewExpenseResult.Saved("https://example.test/e/share-1", "KTRQ"), result)
         assertEquals("KTRQ", expenseRepository.savedPayload?.guestPasscode)
+        assertNull(draftRepository.draft)
+        assertNull(sessionRepository.current.value)
+    }
+
+    @Test
+    fun `invalid save preserves draft and AI session`() = runBlocking {
+        val draftRepository = FakeExpenseDraftRepository(reviewExpenseDraft(currencyCode = "USD"))
+        val sessionRepository = FakeAiExpenseSessionRepository(AiExpenseSession("session-1", description = "Dinner"))
+        val presenter = presenter(
+            draftRepository = draftRepository,
+            aiSessionRepository = sessionRepository,
+            validationErrors = setOf(FinalExpenseValidationError.InvalidReceipt),
+        )
+
+        val result = presenter.saveDraft()
+
+        assertTrue(result is SaveReviewExpenseResult.Invalid)
+        assertTrue(draftRepository.draft != null)
+        assertTrue(sessionRepository.current.value != null)
+    }
+
+    @Test
+    fun `worker save failure preserves draft and AI session`() = runBlocking {
+        val draftRepository = FakeExpenseDraftRepository(reviewExpenseDraft(currencyCode = "USD"))
+        val sessionRepository = FakeAiExpenseSessionRepository(AiExpenseSession("session-1", description = "Dinner"))
+        val presenter = presenter(
+            draftRepository = draftRepository,
+            aiSessionRepository = sessionRepository,
+            expenseRepository = FakeExpenseRepository(shouldFail = true),
+        )
+
+        val result = runCatching { presenter.saveDraft() }
+
+        assertTrue(result.isFailure)
+        assertTrue(draftRepository.draft != null)
+        assertTrue(sessionRepository.current.value != null)
     }
 
     private fun presenter(
@@ -311,16 +355,34 @@ class ReviewExpensePresenterTest {
         draft: ExpenseDraft = reviewExpenseDraft(currencyCode = currencyCode),
         summary: ExpenseSummary = reviewExpenseSummary(),
         validationErrors: Set<FinalExpenseValidationError> = emptySet(),
+        draftRepository: FakeExpenseDraftRepository = FakeExpenseDraftRepository(draft),
         expenseRepository: FakeExpenseRepository = FakeExpenseRepository(),
         generateGuestPasscode: GenerateGuestPasscodeUseCase = FakeGenerateGuestPasscodeUseCase("KTRQ"),
+        aiSessionRepository: AiExpenseSessionRepository? = null,
     ): ReviewExpensePresenter {
         return ReviewExpensePresenter(
-            draftRepository = FakeExpenseDraftRepository(draft),
+            draftRepository = draftRepository,
             expenseRepository = expenseRepository,
             calculateSummary = FakeCalculateExpenseSummaryUseCase(summary),
             validateExpenseBeforeSave = FakeValidateExpenseBeforeSaveUseCase(summary, validationErrors),
             generateGuestPasscode = generateGuestPasscode,
+            aiSessionRepository = aiSessionRepository,
         )
+    }
+
+    private class FakeAiExpenseSessionRepository(initial: AiExpenseSession?) : AiExpenseSessionRepository {
+        val current = MutableStateFlow(initial)
+        override val session: Flow<AiExpenseSession?> = current
+
+        override suspend fun getSession(): AiExpenseSession? = current.value
+
+        override suspend fun saveSession(session: AiExpenseSession) {
+            current.value = session
+        }
+
+        override suspend fun clearSession() {
+            current.value = null
+        }
     }
 
     private class FakeExpenseDraftRepository(
@@ -337,10 +399,13 @@ class ReviewExpensePresenterTest {
         }
     }
 
-    private class FakeExpenseRepository : ExpenseRepository {
+    private class FakeExpenseRepository(
+        private val shouldFail: Boolean = false,
+    ) : ExpenseRepository {
         var savedPayload: FinalizedExpensePayload? = null
 
         override suspend fun saveFinalizedExpense(payload: FinalizedExpensePayload): SavedShareLink {
+            if (shouldFail) error("Worker unavailable")
             savedPayload = payload
             return SavedShareLink(
                 expenseId = ExpenseId("expense-1"),

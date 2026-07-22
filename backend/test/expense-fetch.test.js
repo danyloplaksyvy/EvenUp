@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { handleRequest } from "../src/index.js";
-import { FakeD1Database, validExpensePayload } from "./fixtures.js";
+import { FakeD1Database, validExpensePayload, validTotalOnlyExpensePayload } from "./fixtures.js";
 
 test("GET /v1/expenses/:shareId returns saved payload with server fields", async () => {
   const database = new FakeD1Database([
@@ -73,6 +73,25 @@ test("GET /e/:shareId renders read-only guest page", async () => {
   assert.doesNotMatch(html, /<h3>Discounts<\/h3>/);
   assert.doesNotMatch(html, /No discount credits/);
   assert.match(html, /read-only guest view/);
+});
+
+test("GET /e/:shareId renders person-first schema v2 total-only details", async () => {
+  const response = await handleRequest(new Request("http://localhost/e/A8xQ2Lm9"), {
+    EXPENSES_DB: new FakeD1Database([
+      expenseRow({ shareId: "A8xQ2Lm9", payload: validTotalOnlyExpensePayload() })
+    ])
+  });
+
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Overall total split/);
+  assert.match(html, /Coffee and pastries/);
+  assert.match(html, /Unpriced/);
+  assert.match(html, /Tip/);
+  assert.match(html, /Total share/);
+  assert.match(html, /Paid/);
+  assert.match(html, /Settlement/);
+  assert.doesNotMatch(html, /Coffee and pastries[\s\S]{0,80}\$0\.00/);
 });
 
 test("GET /e/:shareId formats uppercase merchant names and missing dates safely", async () => {

@@ -117,6 +117,80 @@ export function validExpensePayload(overrides = {}) {
   };
 }
 
+export function validTotalOnlyExpensePayload(overrides = {}) {
+  return {
+    schemaVersion: 2,
+    title: "Coffee catch-up",
+    receipt: {
+      merchantName: "Coffee catch-up",
+      transactionDate: "2026-07-16",
+      currency: "USD",
+      items: [],
+      descriptiveItems: [
+        { id: "detail_1", name: "Coffee and pastries", quantity: null }
+      ],
+      fees: [
+        { id: "fee_tip", type: "TIP", label: "Tip", amountMinor: 101 }
+      ],
+      subtotalMinor: null,
+      totalMinor: 1001,
+      pricingMode: "TOTAL_ONLY"
+    },
+    participants: [
+      { id: "participant_1", name: "Dana", creationOrder: 0 },
+      { id: "participant_2", name: "Lee", creationOrder: 1 }
+    ],
+    payerParticipantId: "participant_1",
+    itemAssignments: [],
+    baseAllocation: {
+      mode: "EQUAL",
+      shares: [
+        { participantId: "participant_1", amountMinor: 450 },
+        { participantId: "participant_2", amountMinor: 450 }
+      ]
+    },
+    feeAllocations: [
+      {
+        feeId: "fee_tip",
+        mode: "Equal",
+        shares: [
+          { participantId: "participant_1", amountMinor: 51 },
+          { participantId: "participant_2", amountMinor: 50 }
+        ]
+      }
+    ],
+    summary: {
+      receiptTotalMinor: 1001,
+      settlementRows: [
+        { fromParticipantId: "participant_2", toParticipantId: "participant_1", amountMinor: 500 }
+      ],
+      participantSummaries: [
+        {
+          participantId: "participant_1",
+          assignedItemTotalMinor: 0,
+          baseShareMinor: 450,
+          allocatedFeeTotalMinor: 51,
+          discountCreditTotalMinor: 0,
+          shareMinor: 501,
+          paidMinor: 1001,
+          netBalanceMinor: 500
+        },
+        {
+          participantId: "participant_2",
+          assignedItemTotalMinor: 0,
+          baseShareMinor: 450,
+          allocatedFeeTotalMinor: 50,
+          discountCreditTotalMinor: 0,
+          shareMinor: 500,
+          paidMinor: 0,
+          netBalanceMinor: -500
+        }
+      ]
+    },
+    ...overrides
+  };
+}
+
 export class FakeD1Database {
   rows = [];
   guestAccessAttempts = [];
