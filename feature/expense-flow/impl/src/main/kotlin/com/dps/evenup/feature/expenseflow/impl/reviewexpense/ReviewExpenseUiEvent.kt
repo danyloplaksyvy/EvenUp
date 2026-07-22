@@ -10,4 +10,10 @@ sealed interface ReviewExpenseUiEvent {
     data object SaveRetryClick : ReviewExpenseUiEvent
 
     data object BackClick : ReviewExpenseUiEvent
+
+    data object EditDescriptionClick : ReviewExpenseUiEvent
+    data object EditDetailsClick : ReviewExpenseUiEvent
+    data object EditPeopleClick : ReviewExpenseUiEvent
+    data object EditAssignmentsClick : ReviewExpenseUiEvent
+    data object EditFeesClick : ReviewExpenseUiEvent
 }

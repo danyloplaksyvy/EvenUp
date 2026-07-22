@@ -2,6 +2,7 @@ package com.dps.evenup.feature.expenseflow.impl.reviewexpense
 
 import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.expense.api.ExpenseRepository
+import com.dps.evenup.data.expenseinput.api.AiExpenseSessionRepository
 import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ExpenseDraft
 import com.dps.evenup.domain.expense.api.ExpenseSummary
@@ -12,6 +13,7 @@ import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
 import com.dps.evenup.domain.participant.api.Participant
 import com.dps.evenup.domain.receipt.api.CurrencyCode
 import com.dps.evenup.domain.receipt.api.MoneyMinor
+import com.dps.evenup.domain.receipt.api.ExpensePricingMode
 import com.dps.evenup.domain.sharing.api.GenerateGuestPasscodeUseCase
 import java.math.BigDecimal
 import java.util.Currency
@@ -23,14 +25,29 @@ class ReviewExpensePresenter(
     private val calculateSummary: CalculateExpenseSummaryUseCase,
     private val validateExpenseBeforeSave: ValidateExpenseBeforeSaveUseCase,
     private val generateGuestPasscode: GenerateGuestPasscodeUseCase,
+    private val aiSessionRepository: AiExpenseSessionRepository? = null,
 ) {
+    private var pendingSavedResult: SaveReviewExpenseResult.Saved? = null
+
     suspend fun load(): ReviewExpenseUiState {
         val draft = draftRepository.getDraft() ?: return ReviewExpenseUiState(
             isLoading = false,
             missingDraft = true,
             submitError = "No expense draft was found.",
         )
-        return buildState(draft, isLoading = false)
+        val aiSession = aiSessionRepository?.getSession()
+        return buildState(
+            draft = draft,
+            isLoading = false,
+            originalDescription = aiSession?.description?.takeIf { it.isNotBlank() },
+            reviewNotices = buildSet {
+                aiSession?.extraction?.provenance.orEmpty()
+                    .filter { it.needsReview }
+                    .mapNotNullTo(this) { it.path.toReviewNoticeSection() }
+                aiSession?.extraction?.warnings.orEmpty()
+                    .mapNotNullTo(this) { warning -> (warning.path ?: warning.code).toReviewNoticeSection() }
+            },
+        )
     }
 
     fun reduce(
@@ -41,6 +58,11 @@ class ReviewExpensePresenter(
             ReviewExpenseUiEvent.CalculationDetailsClick -> state.copy(detailsSheetVisible = true)
             ReviewExpenseUiEvent.CalculationDetailsDismissed -> state.copy(detailsSheetVisible = false)
             ReviewExpenseUiEvent.BackClick,
+            ReviewExpenseUiEvent.EditDescriptionClick,
+            ReviewExpenseUiEvent.EditDetailsClick,
+            ReviewExpenseUiEvent.EditPeopleClick,
+            ReviewExpenseUiEvent.EditAssignmentsClick,
+            ReviewExpenseUiEvent.EditFeesClick,
             ReviewExpenseUiEvent.SaveClick,
             ReviewExpenseUiEvent.SaveRetryClick,
             -> state
@@ -48,6 +70,11 @@ class ReviewExpensePresenter(
     }
 
     suspend fun saveDraft(): SaveReviewExpenseResult {
+        pendingSavedResult?.let { saved ->
+            clearExpenseStateAfterSave()
+            pendingSavedResult = null
+            return saved
+        }
         val draft = draftRepository.getDraft() ?: return SaveReviewExpenseResult.MissingDraft
         return when (val result = validateExpenseBeforeSave.validateAndBuildPayload(draft)) {
             is FinalExpenseValidationResult.Valid -> {
@@ -55,18 +82,35 @@ class ReviewExpensePresenter(
                 val savedShareLink = expenseRepository.saveFinalizedExpense(
                     result.payload.copy(guestPasscode = guestPasscode),
                 )
-                SaveReviewExpenseResult.Saved(
+                val saved = SaveReviewExpenseResult.Saved(
                     shareUrl = savedShareLink.shareLink.publicUrl,
                     guestPasscode = guestPasscode,
                 )
+                pendingSavedResult = saved
+                clearExpenseStateAfterSave()
+                pendingSavedResult = null
+                saved
             }
             is FinalExpenseValidationResult.Invalid -> SaveReviewExpenseResult.Invalid(result.errors.toValidationMessage())
         }
     }
 
+    private suspend fun clearExpenseStateAfterSave() {
+        aiSessionRepository?.clearSession()
+        draftRepository.clearDraft()
+    }
+
+    suspend fun markAiSessionManuallyEdited() {
+        val repository = aiSessionRepository ?: return
+        val session = repository.getSession() ?: return
+        if (!session.hasManualEdits) repository.saveSession(session.copy(hasManualEdits = true))
+    }
+
     private fun buildState(
         draft: ExpenseDraft,
         isLoading: Boolean,
+        originalDescription: String? = null,
+        reviewNotices: Set<ReviewNoticeSection> = emptySet(),
     ): ReviewExpenseUiState {
         val summary = calculateSummary.calculate(
             receipt = draft.receipt,
@@ -74,6 +118,7 @@ class ReviewExpensePresenter(
             payerId = draft.payerId,
             itemAssignments = draft.itemAssignments,
             feeAllocations = draft.feeAllocations,
+            baseAllocation = draft.baseAllocation,
         )
         val participantColorIndexes = draft.participants.mapIndexed { index, participant ->
             participant.id to index
@@ -96,6 +141,19 @@ class ReviewExpensePresenter(
         return ReviewExpenseUiState(
             isLoading = isLoading,
             merchantName = draft.receipt.merchantName,
+            originalDescription = originalDescription,
+            dateLabel = draft.receipt.transactionDateLabel ?: "Date not set",
+            currencyLabel = draft.receipt.currencyCode.value,
+            pricingModeLabel = if (draft.receipt.pricingMode == ExpensePricingMode.TotalOnly) "Overall total" else "Itemized",
+            itemsSummaryLabel = if (draft.receipt.pricingMode == ExpensePricingMode.TotalOnly) {
+                val count = draft.receipt.descriptiveItems.size
+                if (count == 0) "No item descriptions" else "$count unpriced ${if (count == 1) "item" else "items"}"
+            } else {
+                "${draft.receipt.items.size} priced ${if (draft.receipt.items.size == 1) "item" else "items"}"
+            },
+            assignmentsSummaryLabel = if (draft.baseAllocation != null) "Overall total split equally" else "${draft.itemAssignments.size} item assignments",
+            feesSummaryLabel = if (draft.receipt.fees.isEmpty()) "No fees or discounts" else "${draft.receipt.fees.size} fees or discounts",
+            reviewNotices = reviewNotices,
             totalLabel = formatMoney(summary.receiptTotal, currencyCode),
             totalContentDescription = "Expense total, ${spokenMoney(summary.receiptTotal, currencyCode)}",
             payerName = payer.name,
@@ -141,6 +199,9 @@ class ReviewExpensePresenter(
             detailRows = summary.participantSummaries.mapNotNull { participantSummary ->
                 val participant = participantsById[participantSummary.participantId] ?: return@mapNotNull null
                 val itemSubtotalLabel = formatMoney(participantSummary.assignedItemTotal, currencyCode)
+                val baseShareLabel = participantSummary.baseShare
+                    .takeIf { draft.receipt.pricingMode == ExpensePricingMode.TotalOnly }
+                    ?.let { formatMoney(it, currencyCode) }
                 val feesLabel = formatMoney(participantSummary.allocatedFeeTotal, currencyCode)
                 val discountsLabel = participantSummary.discountCreditTotal
                     .takeIf { discount -> discount.value > 0L }
@@ -153,6 +214,7 @@ class ReviewExpensePresenter(
                     participantName = participant.name,
                     participantColorIndex = participantColorIndexes.getValue(participant.id),
                     itemSubtotalLabel = itemSubtotalLabel,
+                    baseShareLabel = baseShareLabel,
                     feesLabel = feesLabel,
                     discountsLabel = discountsLabel,
                     totalShareLabel = totalShareLabel,
@@ -172,6 +234,19 @@ class ReviewExpensePresenter(
             canSave = validationError == null,
             validationError = validationError,
         )
+    }
+
+    private fun String.toReviewNoticeSection(): ReviewNoticeSection? = when (val normalized = lowercase(Locale.ROOT)) {
+        "title", "transactiondate", "currency", "totalminor", "pricingmode" -> ReviewNoticeSection.Expense
+        else -> when {
+            normalized.contains("participant") || normalized.contains("payer") -> ReviewNoticeSection.People
+            normalized.contains("fee") || normalized.contains("discount") -> ReviewNoticeSection.Fees
+            normalized.contains("assignment") || normalized.contains("split") -> ReviewNoticeSection.Split
+            normalized.contains("item") || normalized.contains("price") -> ReviewNoticeSection.Items
+            normalized.contains("total") || normalized.contains("currency") || normalized.contains("date") ||
+                normalized.contains("title") -> ReviewNoticeSection.Expense
+            else -> null
+        }
     }
 
     private fun ExpenseSummary.toConsistencyValidationMessage(): String? {
@@ -205,6 +280,7 @@ class ReviewExpensePresenter(
             FinalExpenseValidationError.InvalidParticipants in this -> "Review participants and payer before saving."
             FinalExpenseValidationError.InvalidItemAssignments in this -> "Assign every item before saving."
             FinalExpenseValidationError.InvalidFeeAllocations in this -> "Review fee allocations before saving."
+            FinalExpenseValidationError.InvalidBaseAllocation in this -> "Review the overall total split before saving."
             FinalExpenseValidationError.ParticipantSharesDoNotEqualReceiptTotal in this -> {
                 "Shares do not add up to the receipt total."
             }

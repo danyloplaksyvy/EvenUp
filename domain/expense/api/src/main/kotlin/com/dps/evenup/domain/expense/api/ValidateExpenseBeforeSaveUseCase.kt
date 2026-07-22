@@ -14,6 +14,7 @@ enum class FinalExpenseValidationError {
     InvalidParticipants,
     InvalidItemAssignments,
     InvalidFeeAllocations,
+    InvalidBaseAllocation,
     ParticipantSharesDoNotEqualReceiptTotal,
     NetBalancesDoNotSumToZero,
 }

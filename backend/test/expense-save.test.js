@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { handleRequest } from "../src/index.js";
-import { FakeD1Database, jsonRequest, validExpensePayload } from "./fixtures.js";
+import { FakeD1Database, jsonRequest, validExpensePayload, validTotalOnlyExpensePayload } from "./fixtures.js";
 
 test("POST /v1/expenses stores payload and returns generated share link", async () => {
   const database = new FakeD1Database();
@@ -54,6 +54,54 @@ test("POST /v1/expenses stores passcode metadata without plaintext payload", asy
   assert.equal(storedPayload.guestAccess, undefined);
   assert.match(database.rows[0].guest_passcode_hash, /^[0-9A-Za-z_-]+$/);
   assert.match(database.rows[0].guest_passcode_salt, /^[0-9A-Za-z_-]+$/);
+});
+
+test("POST /v1/expenses accepts and stores a schema v2 total-only expense", async () => {
+  const database = new FakeD1Database();
+  const payload = validTotalOnlyExpensePayload();
+  const response = await handleRequest(jsonRequest("http://localhost:8787/v1/expenses", payload), {
+    EXPENSES_DB: database
+  });
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(JSON.parse(database.rows[0].payload_json), payload);
+});
+
+test("POST /v1/expenses rejects inconsistent schema v2 base allocation", async () => {
+  const payload = validTotalOnlyExpensePayload({
+    baseAllocation: {
+      mode: "EQUAL",
+      shares: [
+        { participantId: "participant_1", amountMinor: 451 },
+        { participantId: "participant_2", amountMinor: 450 }
+      ]
+    }
+  });
+  const response = await handleRequest(jsonRequest("http://localhost:8787/v1/expenses", payload), {
+    EXPENSES_DB: new FakeD1Database()
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.message, "baseAllocation shares must sum to total minus fees and discounts.");
+});
+
+test("POST /v1/expenses rejects duplicate and non-equal schema v2 base shares", async () => {
+  for (const shares of [
+    [
+      { participantId: "participant_1", amountMinor: 500 },
+      { participantId: "participant_1", amountMinor: 500 }
+    ],
+    [
+      { participantId: "participant_1", amountMinor: 600 },
+      { participantId: "participant_2", amountMinor: 400 }
+    ]
+  ]) {
+    const payload = validTotalOnlyExpensePayload({ baseAllocation: { mode: "EQUAL", shares } });
+    const response = await handleRequest(jsonRequest("http://localhost:8787/v1/expenses", payload), {
+      EXPENSES_DB: new FakeD1Database()
+    });
+    assert.equal(response.status, 400);
+  }
 });
 
 test("POST /v1/expenses rejects invalid guest passcode", async () => {

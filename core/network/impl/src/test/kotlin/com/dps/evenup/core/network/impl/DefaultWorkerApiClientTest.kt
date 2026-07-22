@@ -8,6 +8,11 @@ import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,6 +63,19 @@ class DefaultWorkerApiClientTest {
         assertEquals(WorkerApiResult.Failure(WorkerNetworkError.Timeout), result)
     }
 
+    @Test
+    fun `cancelling request disconnects active http connection`() = runBlocking {
+        val connection = BlockingHttpURLConnection(URL("https://example.test/v1/expenses/interpret"))
+        val client = DefaultWorkerApiClient(WorkerApiConfig("https://example.test")) { connection }
+        val job = launch { client.get("/v1/expenses/interpret") }
+        yield()
+
+        assertTrue(connection.started.await(2, TimeUnit.SECONDS))
+        job.cancelAndJoin()
+
+        assertTrue(connection.disconnected.await(2, TimeUnit.SECONDS))
+    }
+
     private class FakeHttpURLConnection(
         url: URL,
         private val statusCode: Int,
@@ -89,5 +107,25 @@ class DefaultWorkerApiClientTest {
         ) {
             capturedRequestProperties[key] = value
         }
+    }
+
+    private class BlockingHttpURLConnection(url: URL) : HttpURLConnection(url) {
+        val started = CountDownLatch(1)
+        val disconnected = CountDownLatch(1)
+
+        override fun disconnect() {
+            disconnected.countDown()
+        }
+
+        override fun usingProxy(): Boolean = false
+        override fun connect() = Unit
+
+        override fun getResponseCode(): Int {
+            started.countDown()
+            disconnected.await(2, TimeUnit.SECONDS)
+            return 499
+        }
+
+        override fun getErrorStream(): ByteArrayInputStream = ByteArrayInputStream(ByteArray(0))
     }
 }

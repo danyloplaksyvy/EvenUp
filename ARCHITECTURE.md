@@ -27,6 +27,8 @@ Core modules provide reusable infrastructure.
 :core:datastore:impl
 :core:camera:api
 :core:camera:impl
+:core:speech:api
+:core:speech:impl
 
 :domain:receipt:api
 :domain:receipt:impl
@@ -36,6 +38,8 @@ Core modules provide reusable infrastructure.
 :domain:participant:impl
 :domain:sharing:api
 :domain:sharing:impl
+:domain:expense-input:api
+:domain:expense-input:impl
 
 :data:receipt:api
 :data:receipt:impl
@@ -45,6 +49,8 @@ Core modules provide reusable infrastructure.
 :data:participant:impl
 :data:sharing:api
 :data:sharing:impl
+:data:expense-input:api
+:data:expense-input:impl
 
 :feature:expense-flow:api
 :feature:expense-flow:impl
@@ -69,6 +75,7 @@ Feature impl modules may depend on:
 
 - own feature api
 - domain api modules
+- data api repository contracts
 - core api modules
 - design system api
 - navigation api
@@ -120,6 +127,16 @@ Data impl modules must hide DTOs and persistence entities from domain and featur
   -> :core:designsystem:api
   -> :core:navigation:api
   -> :core:camera:api
+  -> :core:speech:api
+  -> :core:network:api
+  -> :data:expense-input:api
+  -> :domain:expense-input:api
+
+:data:expense-input:impl
+  -> :data:expense-input:api
+  -> :domain:expense-input:api
+  -> :core:network:api
+  -> :core:datastore:api
 
 :data:receipt:impl
   -> :data:receipt:api
@@ -158,6 +175,10 @@ Each screen should define:
 - Screen composable
 - Route composable if navigation needs dependency collection
 
+Navigation 3 must install saveable-state and ViewModel-store entry decorators. AI composer and editor ViewModels are created through explicit factories using dependencies supplied by the Hilt-injected navigation installer, so their lifetime follows the navigation entry without adding a Hilt Compose dependency.
+
+AI input state is persisted in DataStore through `AiExpenseSessionRepository`. The Worker interpretation call is stateless: every clarification sends prior extraction and history, while Android domain logic owns readiness, question ordering, defaults, participant matching, total-only allocation, and final validation.
+
 ## Domain use cases
 
 Required P0 use cases:
@@ -182,6 +203,17 @@ SaveFinalizedExpenseUseCase
 CreateShareLinkUseCase
 GenerateGuestPasscodeUseCase
 ValidateGuestPasscodeUseCase
+PrepareAiExpenseUseCase
+```
+
+AI input repository contracts:
+
+```text
+AiExpenseInterpreter
+AiExpenseSessionRepository
+AiExpensePreferencesRepository
+SpeechTranscriber
+NetworkStatus
 ```
 
 Guest passcode rules:
@@ -199,11 +231,13 @@ The backend-rendered guest page derives display rows from the immutable saved pa
 ```text
 payload.receipt.items + payload.itemAssignments -> person item rows
 payload.receipt.fees + payload.feeAllocations -> person fee rows
+payload.baseAllocation -> total-only overall split rows
+payload.receipt.descriptiveItems -> unpriced descriptive context
 payload.summary.participantSummaries -> totals, paid amounts, net balances
 payload.summary.settlementRows -> who owes whom
 ```
 
-The guest page should be person-first. A participant row expands to show the exact items, split modes, fee allocations, discount credits, paid amount, total share, and settlement result for that participant.
+The guest page should be person-first. A participant row expands to show the exact items or total-only base share, unpriced descriptive context, split modes, fee allocations, discount credits, paid amount, total share, and settlement result for that participant.
 
 ## Post-pitch feature split
 

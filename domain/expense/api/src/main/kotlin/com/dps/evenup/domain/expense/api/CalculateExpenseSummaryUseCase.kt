@@ -13,6 +13,15 @@ interface CalculateExpenseSummaryUseCase {
         itemAssignments: List<ItemAssignment>,
         feeAllocations: List<FeeAllocation>,
     ): ExpenseSummary
+
+    fun calculate(
+        receipt: Receipt,
+        participants: List<Participant>,
+        payerId: ParticipantId,
+        itemAssignments: List<ItemAssignment>,
+        feeAllocations: List<FeeAllocation>,
+        baseAllocation: ExpenseBaseAllocation?,
+    ): ExpenseSummary = calculate(receipt, participants, payerId, itemAssignments, feeAllocations)
 }
 
 data class ExpenseSummary(
@@ -32,6 +41,7 @@ data class ParticipantExpenseSummary(
     val amountPaid: MoneyMinor,
     val netBalance: MoneyMinor,
     val discountCreditTotal: MoneyMinor = MoneyMinor.Zero,
+    val baseShare: MoneyMinor = MoneyMinor.Zero,
 )
 
 data class SettlementRow(

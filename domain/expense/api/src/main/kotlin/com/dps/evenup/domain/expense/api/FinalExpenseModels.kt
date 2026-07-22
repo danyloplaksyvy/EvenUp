@@ -11,6 +11,7 @@ data class ExpenseDraft(
     val payerId: ParticipantId,
     val itemAssignments: List<ItemAssignment>,
     val feeAllocations: List<FeeAllocation>,
+    val baseAllocation: ExpenseBaseAllocation? = null,
 )
 
 data class FinalizedExpensePayload(
@@ -22,4 +23,5 @@ data class FinalizedExpensePayload(
     val feeAllocations: List<FeeAllocation>,
     val summary: ExpenseSummary,
     val guestPasscode: String? = null,
+    val baseAllocation: ExpenseBaseAllocation? = null,
 )

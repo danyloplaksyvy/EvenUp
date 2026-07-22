@@ -2,6 +2,9 @@ package com.dps.evenup.domain.expense.impl
 
 import com.dps.evenup.domain.expense.api.ExpenseDraft
 import com.dps.evenup.domain.expense.api.ExpenseDraftId
+import com.dps.evenup.domain.expense.api.ExpenseBaseAllocation
+import com.dps.evenup.domain.expense.api.ExpenseBaseAllocationMode
+import com.dps.evenup.domain.expense.api.ExpenseBaseParticipantShare
 import com.dps.evenup.domain.expense.api.FinalExpenseValidationError
 import com.dps.evenup.domain.expense.api.FinalExpenseValidationResult
 import com.dps.evenup.domain.expense.api.FeeAllocation
@@ -15,6 +18,7 @@ import com.dps.evenup.domain.participant.api.ParticipantId
 import com.dps.evenup.domain.participant.api.ParticipantValidationResult
 import com.dps.evenup.domain.participant.api.ValidateParticipantsUseCase
 import com.dps.evenup.domain.receipt.api.CurrencyCode
+import com.dps.evenup.domain.receipt.api.ExpensePricingMode
 import com.dps.evenup.domain.receipt.api.FeeId
 import com.dps.evenup.domain.receipt.api.FeeType
 import com.dps.evenup.domain.receipt.api.MoneyMinor
@@ -53,6 +57,98 @@ class DefaultValidateExpenseBeforeSaveUseCaseTest {
         assertEquals(ExpenseDraftId("draft-1"), result.payload.draftId)
         assertEquals(MoneyMinor(1_200), result.payload.summary.participantShareTotal)
         assertEquals(MoneyMinor.Zero, result.payload.summary.netBalanceTotal)
+    }
+
+    @Test
+    fun `valid total-only draft produces payload with explicit base allocation`() {
+        val draft = validDraft().copy(
+            receipt = receipt().copy(
+                items = emptyList(),
+                fees = emptyList(),
+                subtotal = MoneyMinor(1_001),
+                total = MoneyMinor(1_001),
+                pricingMode = ExpensePricingMode.TotalOnly,
+            ),
+            itemAssignments = emptyList(),
+            feeAllocations = emptyList(),
+            baseAllocation = ExpenseBaseAllocation(
+                ExpenseBaseAllocationMode.Equal,
+                listOf(
+                    ExpenseBaseParticipantShare(ParticipantId("p1"), MoneyMinor(501)),
+                    ExpenseBaseParticipantShare(ParticipantId("p2"), MoneyMinor(500)),
+                ),
+            ),
+        )
+
+        val result = useCase().validateAndBuildPayload(draft)
+
+        assertTrue(result is FinalExpenseValidationResult.Valid)
+        result as FinalExpenseValidationResult.Valid
+        assertEquals(listOf(501L, 500L), result.payload.summary.participantSummaries.map { it.baseShare.value })
+        assertEquals(MoneyMinor(1_001), result.payload.summary.participantShareTotal)
+    }
+
+    @Test
+    fun `inconsistent total-only base allocation blocks save`() {
+        val draft = validDraft().copy(
+            receipt = receipt().copy(
+                items = emptyList(),
+                fees = emptyList(),
+                total = MoneyMinor(1_001),
+                pricingMode = ExpensePricingMode.TotalOnly,
+            ),
+            itemAssignments = emptyList(),
+            feeAllocations = emptyList(),
+            baseAllocation = ExpenseBaseAllocation(
+                ExpenseBaseAllocationMode.Equal,
+                listOf(
+                    ExpenseBaseParticipantShare(ParticipantId("p1"), MoneyMinor(500)),
+                    ExpenseBaseParticipantShare(ParticipantId("p2"), MoneyMinor(500)),
+                ),
+            ),
+        )
+
+        val result = useCase().validateAndBuildPayload(draft) as FinalExpenseValidationResult.Invalid
+
+        assertTrue(FinalExpenseValidationError.InvalidBaseAllocation in result.errors)
+    }
+
+    @Test
+    fun `duplicate or non-equal total-only shares block save`() {
+        val baseDraft = validDraft().copy(
+            receipt = receipt().copy(
+                items = emptyList(),
+                fees = emptyList(),
+                subtotal = MoneyMinor(1_000),
+                total = MoneyMinor(1_000),
+                pricingMode = ExpensePricingMode.TotalOnly,
+            ),
+            itemAssignments = emptyList(),
+            feeAllocations = emptyList(),
+        )
+        val duplicate = baseDraft.copy(
+            baseAllocation = ExpenseBaseAllocation(
+                ExpenseBaseAllocationMode.Equal,
+                listOf(
+                    ExpenseBaseParticipantShare(ParticipantId("p1"), MoneyMinor(500)),
+                    ExpenseBaseParticipantShare(ParticipantId("p1"), MoneyMinor(500)),
+                ),
+            ),
+        )
+        val nonEqual = baseDraft.copy(
+            baseAllocation = ExpenseBaseAllocation(
+                ExpenseBaseAllocationMode.Equal,
+                listOf(
+                    ExpenseBaseParticipantShare(ParticipantId("p1"), MoneyMinor(600)),
+                    ExpenseBaseParticipantShare(ParticipantId("p2"), MoneyMinor(400)),
+                ),
+            ),
+        )
+
+        listOf(duplicate, nonEqual).forEach { draft ->
+            val result = useCase().validateAndBuildPayload(draft) as FinalExpenseValidationResult.Invalid
+            assertTrue(FinalExpenseValidationError.InvalidBaseAllocation in result.errors)
+        }
     }
 
     private fun useCase(

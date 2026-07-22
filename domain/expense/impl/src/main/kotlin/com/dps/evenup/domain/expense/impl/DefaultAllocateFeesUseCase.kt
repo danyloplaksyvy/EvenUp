@@ -18,12 +18,16 @@ class DefaultAllocateFeesUseCase : AllocateFeesUseCase {
         participants: List<Participant>,
     ): FeeAllocation {
         val orderedParticipants = participants.sortedBy { it.creationOrder }
-        val amounts = DeterministicSplitRounding.splitEvenly(fee.amount, orderedParticipants.map { it.id })
+        val sign = if (fee.amount.value < 0L) -1L else 1L
+        val amounts = DeterministicSplitRounding.splitEvenly(
+            MoneyMinor(kotlin.math.abs(fee.amount.value)),
+            orderedParticipants.map { it.id },
+        )
         return FeeAllocation(
             feeId = fee.id,
             mode = FeeAllocationMode.Equal,
             shares = orderedParticipants.map { participant ->
-                FeeParticipantShare(participant.id, amounts.getValue(participant.id))
+                FeeParticipantShare(participant.id, MoneyMinor(amounts.getValue(participant.id).value * sign))
             },
         )
     }
@@ -59,7 +63,12 @@ class DefaultAllocateFeesUseCase : AllocateFeesUseCase {
             if (shares.any { it.participantId !in participantIds }) {
                 add(FeeAllocationValidationError.UnknownParticipant)
             }
-            if (shares.any { it.amount.value < 0 }) {
+            val hasWrongSign = if (fee.amount.value < 0L) {
+                shares.any { it.amount.value > 0L }
+            } else {
+                shares.any { it.amount.value < 0L }
+            }
+            if (hasWrongSign) {
                 add(FeeAllocationValidationError.NegativeShareAmount)
             }
             if (shares.sumOf { it.amount.value } != fee.amount.value) {
@@ -87,11 +96,13 @@ class DefaultAllocateFeesUseCase : AllocateFeesUseCase {
         totalSubtotal: Long,
     ): List<FeeParticipantShare> {
         val ordered = participants.sortedBy { it.creationOrder }
+        val sign = if (total.value < 0L) -1L else 1L
+        val absoluteTotal = kotlin.math.abs(total.value)
         val rawShares = ordered.map { participant ->
-            participant.id to ((total.value * subtotals.getValue(participant.id).value) / totalSubtotal)
+            participant.id to ((absoluteTotal * subtotals.getValue(participant.id).value) / totalSubtotal)
         }
         val allocated = rawShares.sumOf { it.second }
-        var remainder = total.value - allocated
+        var remainder = absoluteTotal - allocated
 
         return rawShares.map { (participantId, amount) ->
             val extra = if (remainder > 0 && subtotals.getValue(participantId).value > 0) {
@@ -100,7 +111,7 @@ class DefaultAllocateFeesUseCase : AllocateFeesUseCase {
             } else {
                 0L
             }
-            FeeParticipantShare(participantId, MoneyMinor(amount + extra))
+            FeeParticipantShare(participantId, MoneyMinor((amount + extra) * sign))
         }
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,6 +106,9 @@ private fun ReviewExpenseContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ReviewHeader(uiState = uiState)
+        if (uiState.originalDescription != null) {
+            ReviewEditableSections(uiState = uiState, onEvent = onEvent)
+        }
         SettlementSummary(uiState = uiState)
         PayerSummary(payerSummary = uiState.payerSummary)
         CalculationDetailsLauncher(uiState = uiState, onEvent = onEvent)
@@ -119,6 +123,104 @@ private fun ReviewExpenseContent(
             )
         }
     }
+}
+
+@Composable
+private fun ReviewEditableSections(
+    uiState: ReviewExpenseUiState,
+    onEvent: (ReviewExpenseUiEvent) -> Unit,
+) {
+    uiState.originalDescription?.let { description ->
+        EditableReviewCard(
+            title = "Original description",
+            lines = listOf(description),
+            onEdit = { onEvent(ReviewExpenseUiEvent.EditDescriptionClick) },
+        )
+    }
+    EditableReviewCard(
+        title = "Expense details",
+        lines = listOf(uiState.dateLabel, uiState.currencyLabel, uiState.pricingModeLabel),
+        notice = ReviewNoticeSection.Expense.takeIf { it in uiState.reviewNotices },
+        onEdit = { onEvent(ReviewExpenseUiEvent.EditDetailsClick) },
+    )
+    EditableReviewCard(
+        title = "Payer and participants",
+        lines = listOf(uiState.paidByLabel, uiState.participantCountLabel),
+        notice = ReviewNoticeSection.People.takeIf { it in uiState.reviewNotices },
+        onEdit = {
+            onEvent(
+                if (uiState.originalDescription != null) ReviewExpenseUiEvent.EditDetailsClick
+                else ReviewExpenseUiEvent.EditPeopleClick,
+            )
+        },
+    )
+    EditableReviewCard(
+        title = "Items and prices",
+        lines = listOf(uiState.itemsSummaryLabel),
+        notice = ReviewNoticeSection.Items.takeIf { it in uiState.reviewNotices },
+        onEdit = { onEvent(ReviewExpenseUiEvent.EditDetailsClick) },
+    )
+    EditableReviewCard(
+        title = "Assignments",
+        lines = listOf(uiState.assignmentsSummaryLabel),
+        notice = ReviewNoticeSection.Split.takeIf { it in uiState.reviewNotices },
+        onEdit = {
+            onEvent(
+                if (uiState.originalDescription != null || uiState.pricingModeLabel == "Overall total") {
+                    ReviewExpenseUiEvent.EditDetailsClick
+                }
+                else ReviewExpenseUiEvent.EditAssignmentsClick,
+            )
+        },
+    )
+    EditableReviewCard(
+        title = "Fees and discounts",
+        lines = listOf(uiState.feesSummaryLabel),
+        notice = ReviewNoticeSection.Fees.takeIf { it in uiState.reviewNotices },
+        onEdit = {
+            onEvent(
+                if (uiState.originalDescription != null) ReviewExpenseUiEvent.EditDetailsClick
+                else ReviewExpenseUiEvent.EditFeesClick,
+            )
+        },
+    )
+}
+
+@Composable
+private fun EditableReviewCard(
+    title: String,
+    lines: List<String>,
+    notice: ReviewNoticeSection? = null,
+    onEdit: () -> Unit,
+) {
+    EvenUpCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = EvenUpTheme.typography.cardTitle, color = EvenUpTheme.colors.textPrimary)
+            TextButton(onClick = onEdit) { Text("Edit") }
+        }
+        lines.filter(String::isNotBlank).forEach { line ->
+            Text(line, style = EvenUpTheme.typography.bodySmall, color = EvenUpTheme.colors.textSecondary)
+        }
+        if (notice != null) {
+            Text(
+                text = notice.userFacingMessage(),
+                style = EvenUpTheme.typography.caption,
+                color = EvenUpTheme.colors.warning,
+            )
+        }
+    }
+}
+
+private fun ReviewNoticeSection.userFacingMessage(): String = when (this) {
+    ReviewNoticeSection.Expense -> "Review an uncertain expense detail."
+    ReviewNoticeSection.People -> "Confirm the people and payer."
+    ReviewNoticeSection.Items -> "Review an uncertain item detail."
+    ReviewNoticeSection.Fees -> "Review a fee or discount."
+    ReviewNoticeSection.Split -> "Confirm how this expense is split."
 }
 
 @Composable
@@ -335,6 +437,7 @@ private fun ParticipantDetail(detail: ParticipantCalculationDetailUiState) {
                 )
             }
             DetailLine(label = "Items", value = detail.itemSubtotalLabel)
+            detail.baseShareLabel?.let { DetailLine(label = "Overall total", value = it) }
             DetailLine(label = "Fees", value = detail.feesLabel)
             detail.discountsLabel?.let { discountsLabel ->
                 DetailLine(label = "Discounts", value = discountsLabel)

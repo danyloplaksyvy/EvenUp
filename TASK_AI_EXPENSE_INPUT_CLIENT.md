@@ -23,7 +23,6 @@ This document defines product behavior and client-side requirements only. Implem
 
 - Automatically saving an expense without review.
 - Estimating missing prices from typical market prices.
-- Advanced split instructions such as percentages or arbitrary custom amounts from natural language.
 - Multiple payers.
 - Uploading or retaining voice recordings.
 - Full multilingual support.
@@ -57,6 +56,8 @@ The input must:
 - Remain editable at all times before submission.
 - Preserve the entered text after validation or processing errors.
 - Provide a clear send action.
+- Use a white, outlined, high-contrast writing surface rather than a nested gray card.
+- Keep normal text contrast while processing even though editing is temporarily read-only.
 
 Example:
 
@@ -121,9 +122,10 @@ The first version should understand the following information when explicitly pr
 - Equal split across all participants.
 - A whole item assigned to one participant.
 - An item shared by named participants.
+- Percentage, ratio, and arbitrary custom-amount item splits when explicitly stated.
 - Explicit tax, tip, service fee, or discount.
 
-The first version does not need to interpret percentage splits or arbitrary custom-amount splits from natural language. These can be configured manually from the preview.
+Percentage, ratio, and custom-amount splits use integer minor units or basis-point domain rules and still require all necessary item prices. They can also be corrected manually from the preview.
 
 ## 3.1 Current user identity
 
@@ -148,13 +150,13 @@ Until a full profile feature exists:
 
 A final settlement preview requires:
 
-- At least one participant.
+- At least two participants.
 - A payer.
 - A currency.
 - A positive total or sufficient item prices.
 - A valid split arrangement.
 
-The app may show an extracted-details summary before all required information is available, but it must not present an incomplete result as ready to save.
+Do not place an extracted-details card inline on the Add expense screen. When partial extraction exists, show a secondary **Review all details** action that opens the structured review hub. Never present an incomplete result as ready to save.
 
 ## 4.2 Clarification behavior
 
@@ -175,11 +177,12 @@ Previously extracted information must remain visible and must not be lost when a
 
 Ask questions in this order when relevant:
 
-1. Payer.
-2. Currency.
-3. Total or item prices.
-4. Ambiguous participants.
-5. Ambiguous split.
+1. Personal name, only for unresolved self-reference.
+2. Payer.
+3. Currency.
+4. Total or required item prices.
+5. Missing second participant or ambiguous participant identity.
+6. Ambiguous item, fee, discount, or overall split intent.
 
 ## 4.4 Missing payer
 
@@ -247,6 +250,8 @@ During processing:
 - Prevent duplicate submission.
 - Provide a way to cancel when practical.
 - Do not navigate to an incomplete preview.
+- Present a blocking root-level overlay with a translucent scrim, progress indicator, status copy, and one Cancel action.
+- Keep the underlying layout in place while blocking composer, defaults, scan, manual entry, system Back, and accessibility focus behind the overlay.
 
 ## 5.2 Processing failure
 
@@ -310,12 +315,16 @@ Every major section must have a direct edit action:
 
 After completing an edit, return directly to the preview rather than forcing the user through the entire creation flow again.
 
+**Review all details** opens a full-screen, button-first review hub using the same pinned top bar, section cards, tappable rows, and sticky action pattern as Manual Entry and Receipt Review. Expense, people, items, fees/discounts, and split edits open typed bottom sheets. Sheet changes apply only after tapping **Apply**; dismissing a sheet discards its local changes. When opened from Review expense, the hub uses **Save changes** and returns directly to Review.
+
 ## 6.4 Uncertain information
 
 - Confidently understood information should appear normally.
 - Only uncertain or ambiguous information should be visually marked.
 - Use clear language such as “Check this” rather than technical confidence scores.
 - The user must be able to correct uncertain values directly.
+- A derived title, device-local current date, or default currency is not uncertainty. Show these values normally and keep them editable without a warning badge.
+- Never expose internal property paths such as `transactionDate` in user-facing copy.
 
 ## 6.5 Regeneration
 
@@ -333,6 +342,9 @@ If regeneration would replace manual changes made in the preview:
 - The user must explicitly tap **Save expense**.
 - Saving is disabled while required information is missing or invalid.
 - Existing final validation messaging remains visible when the expense cannot be saved.
+- Readiness and save validation require at least two participants. This approved rule supersedes any older one-participant wording.
+- After the Worker confirms the save, clear the expense draft and AI session before showing the terminal Saved screen. Failed saves preserve both.
+- Back from Saved must not reopen the finalized editable review. **Add another** clears expense-specific state and opens a fresh Add expense instance while retaining personal-name and currency preferences.
 
 ---
 
@@ -377,6 +389,7 @@ For the first version:
 - [ ] No example chips are displayed.
 - [ ] The field accepts multiple lines and multiple sentences.
 - [ ] Blank input cannot be submitted.
+- [ ] The composer uses a white outlined surface with a black focused outline and solid-black send action.
 - [ ] Processing starts only after the send action.
 - [ ] The entered text survives recoverable failures.
 
@@ -395,11 +408,14 @@ For the first version:
 - [ ] Missing payer triggers a question rather than an assumption.
 - [ ] Ambiguous participant matches require confirmation.
 - [ ] No missing price is estimated or invented.
+- [ ] A description with only one participant cannot reach ready state.
+- [ ] Explicit percentage, ratio, and custom-amount split instructions can be represented.
 
 ## Clarification
 
 - [ ] The app asks one primary question at a time.
 - [ ] The user can also edit all extracted details.
+- [ ] Partial extraction shows only a Review all details action, not an inline extracted-details card.
 - [ ] Clarifications accept text and voice.
 - [ ] One natural answer may provide multiple missing details.
 - [ ] Existing extracted details remain intact across clarifications.
@@ -416,8 +432,10 @@ For the first version:
 - [ ] The existing Review expense experience is expanded for AI-created expenses.
 - [ ] The preview shows all expense, participant, item, split, fee, share, and settlement information available.
 - [ ] Each major section can be edited directly.
+- [ ] Review all details uses a full-screen review hub and typed Apply-only bottom sheets.
 - [ ] Completing an edit returns to the preview.
 - [ ] Only uncertain information is marked for review.
+- [ ] Derived/defaulted title, date, and currency are shown without warnings.
 - [ ] Regeneration warns before replacing manual edits.
 - [ ] Saving always requires explicit confirmation.
 
@@ -427,3 +445,4 @@ For the first version:
 - [ ] Offline state keeps manual alternatives available.
 - [ ] Closing an unsaved flow asks for discard confirmation.
 - [ ] Description and clarification answers persist until save or explicit discard.
+- [ ] Successful save clears expense-specific draft/session state and Add another opens an empty composer.

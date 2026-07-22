@@ -7,9 +7,11 @@ import com.dps.evenup.data.expense.api.ExpenseDraftRepository
 import com.dps.evenup.data.expense.api.ExpenseDataException
 import com.dps.evenup.data.expense.api.ExpenseDataFailureReason
 import com.dps.evenup.data.expense.api.ExpenseRepository
+import com.dps.evenup.data.expenseinput.api.AiExpenseSessionRepository
 import com.dps.evenup.data.sharing.api.SavedShareLink
 import com.dps.evenup.data.sharing.api.ShareLinkResponseMapper
 import com.dps.evenup.domain.expense.api.ExpenseSummary
+import com.dps.evenup.domain.expense.api.ExpenseBaseAllocation
 import com.dps.evenup.domain.expense.api.FeeAllocation
 import com.dps.evenup.domain.expense.api.FeeParticipantShare
 import com.dps.evenup.domain.expense.api.FinalizedExpensePayload
@@ -19,6 +21,7 @@ import com.dps.evenup.domain.expense.api.ParticipantExpenseSummary
 import com.dps.evenup.domain.expense.api.SettlementRow
 import com.dps.evenup.domain.participant.api.Participant
 import com.dps.evenup.domain.receipt.api.FeeType
+import com.dps.evenup.domain.receipt.api.ExpensePricingMode
 import com.dps.evenup.domain.receipt.api.Receipt
 import com.dps.evenup.domain.receipt.api.ReceiptFee
 import com.dps.evenup.domain.receipt.api.ReceiptItem
@@ -30,6 +33,7 @@ class WorkerExpenseRepository(
     private val workerApiClient: WorkerApiClient,
     private val shareLinkResponseMapper: ShareLinkResponseMapper,
     private val draftRepository: ExpenseDraftRepository? = null,
+    private val aiSessionRepository: AiExpenseSessionRepository? = null,
     private val json: Json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -46,6 +50,7 @@ class WorkerExpenseRepository(
             )
             is WorkerApiResult.Success -> mapSaveResponse(response.response.body).also {
                 draftRepository?.clearDraft()
+                aiSessionRepository?.clearSession()
             }
         }
     }
@@ -80,14 +85,16 @@ private fun WorkerNetworkError.toExpenseFailureReason(): ExpenseDataFailureReaso
 }
 
 private fun FinalizedExpensePayload.toDto(): SaveExpenseRequestDto = SaveExpenseRequestDto(
+    schemaVersion = if (receipt.pricingMode == ExpensePricingMode.TotalOnly) 2 else 1,
     title = receipt.merchantName,
     receipt = receipt.toDto(),
     participants = participants.map { participant -> participant.toDto() },
     payerParticipantId = payerId.value,
     itemAssignments = itemAssignments.map { assignment -> assignment.toDto() },
     feeAllocations = feeAllocations.map { allocation -> allocation.toDto() },
-    summary = summary.toDto(),
+    summary = summary.toDto(includeBaseShare = receipt.pricingMode == ExpensePricingMode.TotalOnly),
     guestAccess = guestPasscode?.let { passcode -> GuestAccessDto(passcode) },
+    baseAllocation = baseAllocation?.toDto(),
 )
 
 private fun Receipt.toDto(): ReceiptDto = ReceiptDto(
@@ -98,6 +105,15 @@ private fun Receipt.toDto(): ReceiptDto = ReceiptDto(
     fees = fees.map { fee -> fee.toDto() },
     subtotalMinor = subtotal?.value,
     totalMinor = total.value,
+    pricingMode = pricingMode.takeIf { it == ExpensePricingMode.TotalOnly }?.let { "TOTAL_ONLY" },
+    descriptiveItems = descriptiveItems.takeIf { pricingMode == ExpensePricingMode.TotalOnly }?.map { item ->
+        DescriptiveItemDto(item.id.value, item.name, item.quantity?.value)
+    },
+)
+
+private fun ExpenseBaseAllocation.toDto(): BaseAllocationDto = BaseAllocationDto(
+    mode = mode.name.uppercase(),
+    shares = shares.map { share -> BaseParticipantShareDto(share.participantId.value, share.amount.value) },
 )
 
 private fun ReceiptItem.toDto(): ReceiptItemDto = ReceiptItemDto(
@@ -146,13 +162,13 @@ private fun FeeParticipantShare.toDto(): FeeParticipantShareDto = FeeParticipant
     amountMinor = amount.value,
 )
 
-private fun ExpenseSummary.toDto(): ExpenseSummaryDto = ExpenseSummaryDto(
+private fun ExpenseSummary.toDto(includeBaseShare: Boolean): ExpenseSummaryDto = ExpenseSummaryDto(
     receiptTotalMinor = receiptTotal.value,
-    participantSummaries = participantSummaries.map { summary -> summary.toDto() },
+    participantSummaries = participantSummaries.map { summary -> summary.toDto(includeBaseShare) },
     settlementRows = settlementRows.map { row -> row.toDto() },
 )
 
-private fun ParticipantExpenseSummary.toDto(): ParticipantExpenseSummaryDto = ParticipantExpenseSummaryDto(
+private fun ParticipantExpenseSummary.toDto(includeBaseShare: Boolean): ParticipantExpenseSummaryDto = ParticipantExpenseSummaryDto(
     participantId = participantId.value,
     assignedItemTotalMinor = assignedItemTotal.value,
     allocatedFeeTotalMinor = allocatedFeeTotal.value,
@@ -160,6 +176,7 @@ private fun ParticipantExpenseSummary.toDto(): ParticipantExpenseSummaryDto = Pa
     shareMinor = personShare.value,
     paidMinor = amountPaid.value,
     netBalanceMinor = netBalance.value,
+    baseShareMinor = baseShare.value.takeIf { includeBaseShare },
 )
 
 private fun FeeType.toWireType(): String = when (this) {
@@ -178,7 +195,7 @@ private fun SettlementRow.toDto(): SettlementRowDto = SettlementRowDto(
 
 @Serializable
 private data class SaveExpenseRequestDto(
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int,
     val title: String,
     val receipt: ReceiptDto,
     val participants: List<ParticipantDto>,
@@ -187,6 +204,7 @@ private data class SaveExpenseRequestDto(
     val feeAllocations: List<FeeAllocationDto>,
     val summary: ExpenseSummaryDto,
     val guestAccess: GuestAccessDto?,
+    val baseAllocation: BaseAllocationDto? = null,
 )
 
 @Serializable
@@ -203,6 +221,27 @@ private data class ReceiptDto(
     val fees: List<ReceiptFeeDto>,
     val subtotalMinor: Long?,
     val totalMinor: Long,
+    val pricingMode: String? = null,
+    val descriptiveItems: List<DescriptiveItemDto>? = null,
+)
+
+@Serializable
+private data class DescriptiveItemDto(
+    val id: String,
+    val name: String,
+    val quantity: Int?,
+)
+
+@Serializable
+private data class BaseAllocationDto(
+    val mode: String,
+    val shares: List<BaseParticipantShareDto>,
+)
+
+@Serializable
+private data class BaseParticipantShareDto(
+    val participantId: String,
+    val amountMinor: Long,
 )
 
 @Serializable
@@ -274,6 +313,7 @@ private data class ParticipantExpenseSummaryDto(
     val shareMinor: Long,
     val paidMinor: Long,
     val netBalanceMinor: Long,
+    val baseShareMinor: Long? = null,
 )
 
 @Serializable

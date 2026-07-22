@@ -5,6 +5,14 @@ data class ReviewExpenseUiState(
     val isSaving: Boolean = false,
     val missingDraft: Boolean = false,
     val merchantName: String = "",
+    val originalDescription: String? = null,
+    val dateLabel: String = "",
+    val currencyLabel: String = "",
+    val pricingModeLabel: String = "",
+    val itemsSummaryLabel: String = "",
+    val assignmentsSummaryLabel: String = "",
+    val feesSummaryLabel: String = "",
+    val reviewNotices: Set<ReviewNoticeSection> = emptySet(),
     val totalLabel: String = "",
     val totalContentDescription: String = "",
     val payerName: String = "",
@@ -23,6 +31,14 @@ data class ReviewExpenseUiState(
     val validationError: String? = null,
     val submitError: String? = null,
 )
+
+enum class ReviewNoticeSection {
+    Expense,
+    People,
+    Items,
+    Fees,
+    Split,
+}
 
 data class SettlementRowUiState(
     val fromParticipantName: String,
@@ -53,6 +69,7 @@ data class ParticipantCalculationDetailUiState(
     val participantName: String,
     val participantColorIndex: Int,
     val itemSubtotalLabel: String,
+    val baseShareLabel: String? = null,
     val feesLabel: String,
     val discountsLabel: String? = null,
     val totalShareLabel: String,

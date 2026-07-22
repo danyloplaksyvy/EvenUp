@@ -24,14 +24,28 @@ Use basis points.
 1 = 0.01 percent
 ```
 
+AI ratio inputs are normalized to 10,000 basis points before allocation. For
+positive ratio weights, first calculate each participant's floored basis-point
+share:
+
+```text
+participant_bps = floor(participant_weight * 10000 / total_weight)
+```
+
+Distribute any remaining basis points in stable participant order, then use the
+normal percentage-allocation rules. Ratio weights are interpretation input only;
+the persisted assignment remains a percentage assignment in basis points.
+
 ## Core participant formula
 
 For each participant:
 
 ```text
 assigned_item_total = sum of assigned item shares
+base_share = explicit total-only base allocation, otherwise 0
 allocated_fee_total = sum of allocated tax, tip, service fee, and other fees
-person_share = assigned_item_total + allocated_fee_total
+discount_credit_total = sum of allocated discount credits
+person_share = assigned_item_total + base_share + allocated_fee_total - discount_credit_total
 amount_paid = receipt_total if participant is payer else 0
 net_balance = amount_paid - person_share
 ```
@@ -188,6 +202,29 @@ sum(shares.amount) == fee.amount
 no share amount < 0
 ```
 
+For discounts, allocation shares use the same modes but are stored as negative amounts. Their absolute values are presented as credits. Every share must have the same sign as the fee and the shares must sum exactly to the signed fee amount.
+
+Legacy itemized payloads without explicit discount allocations keep the existing proportional-to-item-subtotal behavior, with equal fallback when item subtotals are unavailable.
+
+## Total-only pricing mode
+
+Total-only mode is valid only for an explicitly equal split across at least two participants. It may contain unpriced descriptive items but no priced item assignments.
+
+```text
+signed_fee_total = sum(tax + tip + service fees + other fees + negative discounts)
+base_total = receipt_total - signed_fee_total
+person_share = base_share + allocated_fee_total - discount_credit_total
+```
+
+Rules:
+
+- `base_total` must be non-negative.
+- `baseAllocation.mode` is `EQUAL` and includes every participant exactly once.
+- Base remainder cents use payer-first, then participant creation order.
+- “Split everything equally” applies equal allocation to the base, every fee, and every discount.
+- A fee or discount with a separate stated allocation must use that allocation.
+- Total-only base shares plus signed fee/discount effects must equal the receipt total exactly.
+
 ## Final settlement example
 
 Receipt total:
@@ -242,6 +279,7 @@ Display must be person-first:
 ```text
 participant
 -> assigned item shares
+-> total-only base share when applicable
 -> allocated fee shares
 -> discount credits
 -> total share

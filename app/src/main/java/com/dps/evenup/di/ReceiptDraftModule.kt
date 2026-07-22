@@ -22,8 +22,22 @@ import com.dps.evenup.data.receipt.impl.WorkerReceiptRepository
 import com.dps.evenup.data.sharing.api.ShareLinkResponseMapper
 import com.dps.evenup.data.sharing.impl.DefaultShareLinkResponseMapper
 import com.dps.evenup.core.network.api.WorkerApiClient
+import com.dps.evenup.core.network.api.NetworkStatus
 import com.dps.evenup.core.network.api.WorkerApiConfig
 import com.dps.evenup.core.network.impl.DefaultWorkerApiClient
+import com.dps.evenup.core.network.impl.DefaultNetworkStatus
+import com.dps.evenup.core.speech.api.SpeechTranscriber
+import com.dps.evenup.core.speech.impl.DefaultSpeechTranscriber
+import com.dps.evenup.data.expenseinput.api.AiExpenseInterpreter
+import com.dps.evenup.data.expenseinput.api.AiExpensePreferencesRepository
+import com.dps.evenup.data.expenseinput.api.AiExpenseSessionRepository
+import com.dps.evenup.data.expenseinput.impl.DataStoreAiExpensePreferencesRepository
+import com.dps.evenup.data.expenseinput.impl.DataStoreAiExpenseSessionRepository
+import com.dps.evenup.data.expenseinput.impl.WorkerAiExpenseInterpreter
+import com.dps.evenup.domain.expenseinput.api.ParticipantNameMatcher
+import com.dps.evenup.domain.expenseinput.api.PrepareAiExpenseUseCase
+import com.dps.evenup.domain.expenseinput.impl.DefaultParticipantNameMatcher
+import com.dps.evenup.domain.expenseinput.impl.DefaultPrepareAiExpenseUseCase
 import com.dps.evenup.domain.expense.api.AllocateFeesUseCase
 import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
@@ -84,6 +98,44 @@ object ReceiptDraftModule {
 
     @Provides
     @Singleton
+    fun provideNetworkStatus(
+        @ApplicationContext context: Context,
+    ): NetworkStatus = DefaultNetworkStatus(context)
+
+    @Provides
+    @Singleton
+    fun provideSpeechTranscriber(
+        @ApplicationContext context: Context,
+    ): SpeechTranscriber = DefaultSpeechTranscriber(context)
+
+    @Provides
+    @Singleton
+    fun provideAiExpenseSessionRepository(
+        stringDataStore: StringDataStore,
+    ): AiExpenseSessionRepository = DataStoreAiExpenseSessionRepository(stringDataStore)
+
+    @Provides
+    @Singleton
+    fun provideAiExpensePreferencesRepository(
+        stringDataStore: StringDataStore,
+    ): AiExpensePreferencesRepository = DataStoreAiExpensePreferencesRepository(stringDataStore)
+
+    @Provides
+    @Singleton
+    fun provideAiExpenseInterpreter(
+        workerApiClient: WorkerApiClient,
+    ): AiExpenseInterpreter = WorkerAiExpenseInterpreter(workerApiClient)
+
+    @Provides
+    fun provideParticipantNameMatcher(): ParticipantNameMatcher = DefaultParticipantNameMatcher()
+
+    @Provides
+    fun providePrepareAiExpenseUseCase(
+        participantNameMatcher: ParticipantNameMatcher,
+    ): PrepareAiExpenseUseCase = DefaultPrepareAiExpenseUseCase(participantNameMatcher)
+
+    @Provides
+    @Singleton
     fun provideContentResolver(
         @ApplicationContext context: Context,
     ): ContentResolver = context.contentResolver
@@ -115,10 +167,12 @@ object ReceiptDraftModule {
         workerApiClient: WorkerApiClient,
         shareLinkResponseMapper: ShareLinkResponseMapper,
         draftRepository: ExpenseDraftRepository,
+        aiSessionRepository: AiExpenseSessionRepository,
     ): ExpenseRepository = WorkerExpenseRepository(
         workerApiClient = workerApiClient,
         shareLinkResponseMapper = shareLinkResponseMapper,
         draftRepository = draftRepository,
+        aiSessionRepository = aiSessionRepository,
     )
 
     @Provides
