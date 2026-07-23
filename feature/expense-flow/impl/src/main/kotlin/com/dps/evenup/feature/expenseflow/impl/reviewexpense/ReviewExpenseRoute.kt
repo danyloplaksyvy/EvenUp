@@ -31,6 +31,7 @@ fun ReviewExpenseRoute(
     aiSessionRepository: AiExpenseSessionRepository? = null,
     onBack: () -> Boolean,
     onSaved: (shareUrl: String, guestPasscode: String) -> Unit,
+    authorizeSave: suspend () -> Boolean,
     onEditDescription: () -> Unit = {},
     onEditDetails: () -> Unit = {},
     onEditPeople: () -> Unit = {},
@@ -126,7 +127,9 @@ fun ReviewExpenseRoute(
                 ReviewExpenseUiEvent.EditFeesClick -> openStructuredEditor(onEditFees)
                 ReviewExpenseUiEvent.SaveClick,
                 ReviewExpenseUiEvent.SaveRetryClick,
-                -> saveExpense()
+                -> coroutineScope.launch {
+                    if (authorizeSave()) saveExpense()
+                }
                 else -> {
                     coroutineScope.launch {
                         uiState = try {

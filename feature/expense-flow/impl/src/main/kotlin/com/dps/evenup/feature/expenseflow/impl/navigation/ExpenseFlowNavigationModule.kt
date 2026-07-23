@@ -13,6 +13,16 @@ import com.dps.evenup.data.expenseinput.api.AiExpensePreferencesRepository
 import com.dps.evenup.data.expenseinput.api.AiExpenseSessionRepository
 import com.dps.evenup.data.participant.api.SavedParticipantRepository
 import com.dps.evenup.data.receipt.api.ReceiptRepository
+import com.dps.evenup.data.account.api.PendingAuthActionRepository
+import com.dps.evenup.domain.account.api.PendingActionState
+import com.dps.evenup.domain.account.api.PendingAuthAction
+import com.dps.evenup.domain.account.api.PendingAuthActionType
+import com.dps.evenup.domain.account.api.PendingAuthOrigin
+import com.dps.evenup.domain.account.api.ProtectedActionDecision
+import com.dps.evenup.domain.account.api.RequireAuthenticatedAccountUseCase
+import com.dps.evenup.domain.account.api.ResumePendingAuthActionUseCase
+import com.dps.evenup.feature.account.api.AuthenticationDestination
+import com.dps.evenup.feature.account.api.ProfileDestination
 import com.dps.evenup.domain.expense.api.AllocateFeesUseCase
 import com.dps.evenup.domain.expense.api.CalculateExpenseSummaryUseCase
 import com.dps.evenup.domain.expense.api.ValidateExpenseBeforeSaveUseCase
@@ -52,6 +62,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.components.ActivityRetainedComponent
 import dagger.multibindings.IntoSet
+import java.util.UUID
 
 @Module
 @InstallIn(ActivityRetainedComponent::class)
@@ -80,6 +91,9 @@ object ExpenseFlowNavigationModule {
         normalizeReceipt: NormalizeReceiptUseCase,
         validateReceipt: ValidateReceiptUseCase,
         generateGuestPasscode: GenerateGuestPasscodeUseCase,
+        requireAuthenticatedAccount: RequireAuthenticatedAccountUseCase,
+        pendingActions: PendingAuthActionRepository,
+        resumePendingAction: ResumePendingAuthActionUseCase,
     ): EvenUpEntryProviderInstaller = EvenUpEntryProviderInstaller { scope ->
         with(scope) {
             entry<NewExpenseDestination> {
@@ -92,6 +106,11 @@ object ExpenseFlowNavigationModule {
                     prepareAiExpense = prepareAiExpense,
                     speechTranscriber = speechTranscriber,
                     networkStatus = networkStatus,
+                    requireAuthenticatedAccount = requireAuthenticatedAccount,
+                    pendingActions = pendingActions,
+                    resumePendingAction = resumePendingAction,
+                    onAuthenticationRequired = { navigator.navigate(AuthenticationDestination(it)) },
+                    onProfile = { navigator.navigate(ProfileDestination) },
                     onScanReceipt = { navigator.navigate(ReceiptScanDestination) },
                     onEnterManually = { navigator.navigate(ManualEntryDestination) },
                     onReviewExpense = { navigator.navigate(ReviewExpenseDestination) },
@@ -108,6 +127,11 @@ object ExpenseFlowNavigationModule {
                     prepareAiExpense = prepareAiExpense,
                     speechTranscriber = speechTranscriber,
                     networkStatus = networkStatus,
+                    requireAuthenticatedAccount = requireAuthenticatedAccount,
+                    pendingActions = pendingActions,
+                    resumePendingAction = resumePendingAction,
+                    onAuthenticationRequired = { navigator.navigate(AuthenticationDestination(it)) },
+                    onProfile = { navigator.navigate(ProfileDestination) },
                     onScanReceipt = { navigator.navigate(ReceiptScanDestination) },
                     onEnterManually = { navigator.navigate(ManualEntryDestination) },
                     onReviewExpense = { navigator.navigateBack() },
@@ -225,6 +249,29 @@ object ExpenseFlowNavigationModule {
                     validateExpenseBeforeSave = validateExpenseBeforeSave,
                     generateGuestPasscode = generateGuestPasscode,
                     aiSessionRepository = aiExpenseSessionRepository,
+                    authorizeSave = {
+                        val action = PendingAuthAction(
+                            id = UUID.randomUUID().toString(),
+                            type = PendingAuthActionType.ConfirmExpenseSave,
+                            origin = PendingAuthOrigin.ReviewExpense,
+                            reference = null,
+                            createdAtEpochMillis = System.currentTimeMillis(),
+                            state = PendingActionState.Pending,
+                        )
+                        when (requireAuthenticatedAccount.require(action)) {
+                            ProtectedActionDecision.Allowed -> true
+                            is ProtectedActionDecision.AuthenticationRequired,
+                            ProtectedActionDecision.BootstrapRequired,
+                            -> {
+                                navigator.navigate(
+                                    AuthenticationDestination(
+                                        "Sign in to confirm, save, and share this expense.",
+                                    ),
+                                )
+                                false
+                            }
+                        }
+                    },
                     onBack = navigator::navigateBack,
                     onEditDescription = { navigator.navigate(EditAiDescriptionDestination) },
                     onEditDetails = { navigator.navigate(AiExtractedDetailsDestination(fromReview = true)) },

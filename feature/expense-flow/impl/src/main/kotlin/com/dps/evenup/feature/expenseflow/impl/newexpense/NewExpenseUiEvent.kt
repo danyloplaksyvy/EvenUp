@@ -21,4 +21,5 @@ sealed interface NewExpenseUiEvent {
     data object DialogDismissed : NewExpenseUiEvent
     data object ReplaceConfirmed : NewExpenseUiEvent
     data object CloseClick : NewExpenseUiEvent
+    data object ProfileClick : NewExpenseUiEvent
 }

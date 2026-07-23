@@ -2,6 +2,7 @@ package com.dps.evenup.di
 
 import android.content.Context
 import android.content.ContentResolver
+import com.dps.evenup.BuildConfig
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.core.DataStore
@@ -88,7 +89,7 @@ object ReceiptDraftModule {
 
     @Provides
     @Singleton
-    fun provideWorkerApiConfig(): WorkerApiConfig = WorkerApiConfig("https://evenup-worker.danyaplaksyvy.workers.dev")
+    fun provideWorkerApiConfig(): WorkerApiConfig = WorkerApiConfig(BuildConfig.WORKER_BASE_URL)
 
     @Provides
     @Singleton
@@ -123,6 +124,7 @@ object ReceiptDraftModule {
     @Provides
     @Singleton
     fun provideAiExpenseInterpreter(
+        @ProtectedWorkerClient
         workerApiClient: WorkerApiClient,
     ): AiExpenseInterpreter = WorkerAiExpenseInterpreter(workerApiClient)
 
@@ -155,6 +157,7 @@ object ReceiptDraftModule {
     @Provides
     @Singleton
     fun provideReceiptRepository(
+        @ProtectedWorkerClient
         workerApiClient: WorkerApiClient,
     ): ReceiptRepository = WorkerReceiptRepository(workerApiClient)
 
@@ -164,6 +167,7 @@ object ReceiptDraftModule {
     @Provides
     @Singleton
     fun provideExpenseRepository(
+        @ProtectedWorkerClient
         workerApiClient: WorkerApiClient,
         shareLinkResponseMapper: ShareLinkResponseMapper,
         draftRepository: ExpenseDraftRepository,

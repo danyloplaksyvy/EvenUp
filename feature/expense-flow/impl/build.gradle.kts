@@ -25,6 +25,9 @@ dependencies {
     implementation(project(":domain:receipt:api"))
     implementation(project(":domain:sharing:api"))
     implementation(project(":domain:expense-input:api"))
+    implementation(project(":domain:account:api"))
+    implementation(project(":data:account:api"))
+    implementation(project(":feature:account:api"))
     implementation(project(":feature:expense-flow:api"))
 
     implementation(platform(libs.androidx.compose.bom))

@@ -125,6 +125,7 @@ class NewExpenseViewModel(
             }
             NewExpenseUiEvent.DescriptionMicClick,
             NewExpenseUiEvent.AnswerMicClick,
+            NewExpenseUiEvent.ProfileClick,
             NewExpenseUiEvent.CloseClick,
             -> Unit
         }

@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,6 +48,7 @@ import com.dps.evenup.core.designsystem.api.EvenUpComposerField
 import com.dps.evenup.core.designsystem.api.EvenUpSecondaryButton
 import com.dps.evenup.core.designsystem.api.EvenUpTheme
 import com.dps.evenup.core.designsystem.api.EvenUpTopBar
+import com.dps.evenup.core.designsystem.api.EvenUpIconButton
 import com.dps.evenup.core.designsystem.api.EvenUpValidationMessage
 import com.dps.evenup.core.designsystem.api.EvenUpValidationSeverity
 import com.dps.evenup.domain.expenseinput.api.AiExpensePhase
@@ -74,6 +76,14 @@ fun NewExpenseScreen(
                     title = "EvenUp",
                     onNavigationClick = if (closeEnabled) ({ onEvent(NewExpenseUiEvent.CloseClick) }) else null,
                     navigationContentDescription = "Close new expense",
+                    actions = {
+                        EvenUpIconButton(
+                            contentDescription = "Open profile",
+                            onClick = { onEvent(NewExpenseUiEvent.ProfileClick) },
+                        ) {
+                            Icon(Icons.Filled.AccountCircle, contentDescription = null)
+                        }
+                    },
                 )
                 Column(
                     modifier = Modifier
