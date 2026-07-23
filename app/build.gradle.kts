@@ -9,6 +9,21 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val hasGoogleServicesConfig = listOf(
+    "google-services.json",
+    "src/dev/google-services.json",
+    "src/staging/google-services.json",
+    "src/prod/google-services.json",
+).any { file(it).isFile }
+fun hasGoogleServicesConfigFor(flavor: String): Boolean =
+    file("src/$flavor/google-services.json").isFile || file("google-services.json").isFile
+fun environmentValue(name: String, fallback: String = ""): String =
+    providers.gradleProperty(name).orElse(fallback).get()
+
+if (hasGoogleServicesConfig) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 extensions.configure<ApplicationExtension>("android") {
     namespace = "com.dps.evenup"
     compileSdk = 37
@@ -21,6 +36,54 @@ extensions.configure<ApplicationExtension>("android") {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["authHost"] = "evenup-dev.firebaseapp.com"
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            buildConfigField("String", "WORKER_BASE_URL", "\"https://evenup-worker.danyaplaksyvy.workers.dev\"")
+            buildConfigField("String", "AUTH_WEB_CLIENT_ID", "\"${environmentValue("EVENUP_DEV_AUTH_WEB_CLIENT_ID")}\"")
+            buildConfigField("String", "AUTH_LINK_DOMAIN", "\"${environmentValue("EVENUP_DEV_AUTH_LINK_DOMAIN", "evenup-dev.firebaseapp.com")}\"")
+            buildConfigField("String", "TERMS_URL", "\"https://evenup.app/terms\"")
+            buildConfigField("String", "PRIVACY_URL", "\"https://evenup.app/privacy\"")
+            buildConfigField("String", "TERMS_VERSION", "\"2026-07-23\"")
+            buildConfigField("String", "PRIVACY_VERSION", "\"2026-07-23\"")
+            buildConfigField("boolean", "AUTH_CONFIGURED", hasGoogleServicesConfigFor("dev").toString())
+            buildConfigField("boolean", "APP_CHECK_DEBUG", "true")
+            manifestPlaceholders["authHost"] = environmentValue("EVENUP_DEV_AUTH_LINK_DOMAIN", "evenup-dev.firebaseapp.com")
+        }
+        create("staging") {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
+            buildConfigField("String", "WORKER_BASE_URL", "\"https://staging-api.evenup.app\"")
+            buildConfigField("String", "AUTH_WEB_CLIENT_ID", "\"${environmentValue("EVENUP_STAGING_AUTH_WEB_CLIENT_ID")}\"")
+            buildConfigField("String", "AUTH_LINK_DOMAIN", "\"${environmentValue("EVENUP_STAGING_AUTH_LINK_DOMAIN", "evenup-staging.firebaseapp.com")}\"")
+            buildConfigField("String", "TERMS_URL", "\"https://evenup.app/terms\"")
+            buildConfigField("String", "PRIVACY_URL", "\"https://evenup.app/privacy\"")
+            buildConfigField("String", "TERMS_VERSION", "\"2026-07-23\"")
+            buildConfigField("String", "PRIVACY_VERSION", "\"2026-07-23\"")
+            buildConfigField("boolean", "AUTH_CONFIGURED", hasGoogleServicesConfigFor("staging").toString())
+            buildConfigField("boolean", "APP_CHECK_DEBUG", "false")
+            manifestPlaceholders["authHost"] = environmentValue("EVENUP_STAGING_AUTH_LINK_DOMAIN", "evenup-staging.firebaseapp.com")
+        }
+        create("prod") {
+            dimension = "environment"
+            buildConfigField("String", "WORKER_BASE_URL", "\"https://api.evenup.app\"")
+            buildConfigField("String", "AUTH_WEB_CLIENT_ID", "\"${environmentValue("EVENUP_PROD_AUTH_WEB_CLIENT_ID")}\"")
+            buildConfigField("String", "AUTH_LINK_DOMAIN", "\"${environmentValue("EVENUP_PROD_AUTH_LINK_DOMAIN", "auth.evenup.app")}\"")
+            buildConfigField("String", "TERMS_URL", "\"https://evenup.app/terms\"")
+            buildConfigField("String", "PRIVACY_URL", "\"https://evenup.app/privacy\"")
+            buildConfigField("String", "TERMS_VERSION", "\"2026-07-23\"")
+            buildConfigField("String", "PRIVACY_VERSION", "\"2026-07-23\"")
+            buildConfigField("boolean", "AUTH_CONFIGURED", hasGoogleServicesConfigFor("prod").toString())
+            buildConfigField("boolean", "APP_CHECK_DEBUG", "false")
+            manifestPlaceholders["authHost"] = environmentValue("EVENUP_PROD_AUTH_LINK_DOMAIN", "auth.evenup.app")
+        }
     }
 
     buildTypes {
@@ -46,6 +109,7 @@ extensions.configure<ApplicationExtension>("android") {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -68,6 +132,12 @@ dependencies {
     implementation(project(":core:network:impl"))
     implementation(project(":core:speech:api"))
     implementation(project(":core:speech:impl"))
+    implementation(project(":core:auth:api"))
+    implementation(project(":core:auth:impl"))
+    implementation(project(":core:database:api"))
+    implementation(project(":core:database:impl"))
+    implementation(project(":data:account:api"))
+    implementation(project(":data:account:impl"))
     implementation(project(":data:expense:impl"))
     implementation(project(":data:expense:api"))
     implementation(project(":data:participant:api"))
@@ -85,6 +155,10 @@ dependencies {
     implementation(project(":domain:sharing:impl"))
     implementation(project(":domain:expense-input:api"))
     implementation(project(":domain:expense-input:impl"))
+    implementation(project(":domain:account:api"))
+    implementation(project(":domain:account:impl"))
+    implementation(project(":feature:account:api"))
+    implementation(project(":feature:account:impl"))
     implementation(project(":feature:expense-flow:api"))
     implementation(project(":feature:expense-flow:impl"))
 

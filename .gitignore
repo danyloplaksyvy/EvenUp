@@ -11,6 +11,8 @@ captures/
 
 # Local Android configuration
 local.properties
+app/google-services.json
+app/src/*/google-services.json
 *.iml
 
 # Signing and other local secrets

@@ -8,6 +8,44 @@ interface WorkerApiClient {
         body: String,
         headers: Map<String, String> = emptyMap(),
     ): WorkerApiResult
+
+    suspend fun requestJson(
+        method: String,
+        path: String,
+        body: String? = null,
+        headers: Map<String, String> = emptyMap(),
+    ): WorkerApiResult = when (method.uppercase()) {
+        "GET" -> if (headers.isEmpty()) get(path) else WorkerApiResult.Failure(WorkerNetworkError.Unknown)
+        "POST" -> postJson(path, body.orEmpty(), headers)
+        else -> WorkerApiResult.Failure(WorkerNetworkError.Unknown)
+    }
+
+    suspend fun requestBytes(
+        method: String,
+        path: String,
+        body: ByteArray,
+        contentType: String,
+        headers: Map<String, String> = emptyMap(),
+    ): WorkerApiResult = WorkerApiResult.Failure(WorkerNetworkError.Unknown)
+}
+
+interface AuthenticatedWorkerApiClient {
+    suspend fun get(path: String): WorkerApiResult
+
+    suspend fun sendJson(
+        method: String,
+        path: String,
+        body: String? = null,
+        headers: Map<String, String> = emptyMap(),
+    ): WorkerApiResult
+
+    suspend fun sendBytes(
+        method: String,
+        path: String,
+        body: ByteArray,
+        contentType: String,
+        headers: Map<String, String> = emptyMap(),
+    ): WorkerApiResult
 }
 
 sealed interface WorkerApiResult {

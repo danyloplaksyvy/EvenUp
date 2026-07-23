@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -59,6 +60,7 @@ fun EvenUpTopBar(
     onNavigationClick: (() -> Unit)? = null,
     navigationContentDescription: String = "Navigate back",
     navigationIcon: ImageVector = Icons.Filled.Close,
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -93,7 +95,7 @@ fun EvenUpTopBar(
                 textAlign = TextAlign.Center,
             )
             Row(modifier = Modifier.align(Alignment.CenterEnd)) {
-                Box(modifier = Modifier.width(44.dp))
+                actions()
             }
         }
     }

@@ -9,6 +9,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:auth:api"))
     implementation(project(":core:network:api"))
 
     implementation(libs.kotlinx.coroutines.android)

@@ -42,6 +42,47 @@ class DefaultWorkerApiClient(
         headers = headers,
     )
 
+    override suspend fun requestJson(
+        method: String,
+        path: String,
+        body: String?,
+        headers: Map<String, String>,
+    ): WorkerApiResult = request(
+        path = path,
+        method = method.uppercase(),
+        body = body,
+        headers = headers,
+    )
+
+    override suspend fun requestBytes(
+        method: String,
+        path: String,
+        body: ByteArray,
+        contentType: String,
+        headers: Map<String, String>,
+    ): WorkerApiResult {
+        val url = buildUrl(path) ?: return WorkerApiResult.Failure(WorkerNetworkError.InvalidPath)
+        return suspendCancellableCoroutine { continuation ->
+            val activeConnection = AtomicReference<HttpURLConnection?>(null)
+            val requestJob = CoroutineScope(ioDispatcher).launch {
+                ensureActive()
+                val result = executeByteRequest(
+                    url = url,
+                    method = method.uppercase(),
+                    body = body,
+                    contentType = contentType,
+                    headers = headers,
+                    activeConnection = activeConnection,
+                )
+                if (continuation.isActive) continuation.resume(result)
+            }
+            continuation.invokeOnCancellation {
+                activeConnection.get()?.disconnect()
+                requestJob.cancel()
+            }
+        }
+    }
+
     private suspend fun request(
         path: String,
         method: String,
@@ -96,6 +137,51 @@ class DefaultWorkerApiClient(
                 connection.outputStream.use { output -> output.write(bytes) }
             }
 
+            val statusCode = connection.responseCode
+            val responseBody = readResponseBody(connection, statusCode)
+            if (statusCode in 200..299) {
+                WorkerApiResult.Success(WorkerApiResponse(statusCode, responseBody))
+            } else {
+                WorkerApiResult.Failure(WorkerNetworkError.HttpFailure(statusCode, responseBody))
+            }
+        } catch (_: SocketTimeoutException) {
+            WorkerApiResult.Failure(WorkerNetworkError.Timeout)
+        } catch (_: IOException) {
+            WorkerApiResult.Failure(WorkerNetworkError.ConnectionFailed)
+        } catch (_: RuntimeException) {
+            WorkerApiResult.Failure(WorkerNetworkError.Unknown)
+        } finally {
+            connection.disconnect()
+            activeConnection.compareAndSet(connection, null)
+        }
+    }
+
+    private fun executeByteRequest(
+        url: URL,
+        method: String,
+        body: ByteArray,
+        contentType: String,
+        headers: Map<String, String>,
+        activeConnection: AtomicReference<HttpURLConnection?>,
+    ): WorkerApiResult {
+        val connection = try {
+            openConnection(url)
+        } catch (_: IllegalArgumentException) {
+            return WorkerApiResult.Failure(WorkerNetworkError.InvalidBaseUrl)
+        } catch (_: IOException) {
+            return WorkerApiResult.Failure(WorkerNetworkError.ConnectionFailed)
+        }
+        activeConnection.set(connection)
+        return try {
+            connection.requestMethod = method
+            connection.connectTimeout = CONNECT_TIMEOUT_MILLIS
+            connection.readTimeout = READ_TIMEOUT_MILLIS
+            connection.setRequestProperty("Accept", "application/json")
+            headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", contentType)
+            connection.setRequestProperty("Content-Length", body.size.toString())
+            connection.outputStream.use { output -> output.write(body) }
             val statusCode = connection.responseCode
             val responseBody = readResponseBody(connection, statusCode)
             if (statusCode in 200..299) {
