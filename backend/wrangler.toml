@@ -1,6 +1,7 @@
 name = "evenup-worker"
-main = "src/index.js"
+main = "src/worker.ts"
 compatibility_date = "2026-06-15"
+compatibility_flags = ["nodejs_compat"]
 
 [observability]
 enabled = true
@@ -9,6 +10,14 @@ head_sampling_rate = 1
 [vars]
 PUBLIC_BASE_URL = "https://evenup-worker.danyaplaksyvy.workers.dev"
 RECEIPT_PARSE_AUDIT = "false"
+ALLOW_ANONYMOUS_V1_WRITES = "true"
+APP_CHECK_ENFORCED = "false"
+
+[triggers]
+crons = ["17 * * * *"]
+
+# Add environment-specific Hyperdrive/R2 bindings in wrangler environment
+# configuration or CI. Do not commit connection strings or credentials.
 
 [[d1_databases]]
 binding = "EXPENSES_DB"

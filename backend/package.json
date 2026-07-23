@@ -6,10 +6,18 @@
     "db:migrate:local": "wrangler d1 migrations apply evenup-expenses --local",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "test": "node --test",
-    "typecheck": "wrangler deploy --dry-run"
+    "test": "node --test test/*.test.js && tsx --test test-v2/**/*.test.ts",
+    "typecheck": "tsc --noEmit && wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "jose": "^6.1.0",
+    "postgres": "^3.4.7",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
     "wrangler": "^4.93.0"
   }
 }
